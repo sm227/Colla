@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Peer, { MediaConnection } from "peerjs";
 import io, { Socket } from "socket.io-client";
+import { UserIcon } from 'lucide-react'; 
 
 let socket: Socket;
 
@@ -10,6 +11,7 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
+  const [hasCamera, setHasCamera] = useState(true);
   const [screenShare, setScreenShare] = useState<MediaStream | null>(null);
   const userVideo = useRef<HTMLVideoElement>(null);
   const peersRef = useRef<{ [key: string]: MediaConnection }>({});
@@ -23,7 +25,18 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
       .then((stream) => {
         setStream(stream);
         if (userVideo.current) userVideo.current.srcObject = stream;
-
+        setHasCamera(true);
+      })
+      .catch((error) => {
+        console.error("Error accessing media devices:", error);
+        setHasCamera(false);
+        // 오디오만 사용하는 스트림 생성
+        return navigator.mediaDevices.getUserMedia({ audio: true });
+      })
+      .then((audioOnlyStream) => {
+        if (audioOnlyStream) {
+          setStream(audioOnlyStream);
+        }
         const peer = new Peer();
         peerInstance.current = peer;
 
@@ -32,14 +45,14 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
         });
 
         peer.on("call", (call: MediaConnection) => {
-          call.answer(stream);
+          call.answer(audioOnlyStream || new MediaStream());
           call.on("stream", (userVideoStream: MediaStream) => {
             addVideoStream(call.peer, userVideoStream);
           });
         });
 
         socket.on("user-connected", (userId: string) => {
-          connectToNewUser(userId, stream);
+          connectToNewUser(userId, audioOnlyStream || new MediaStream());
         });
       });
 
@@ -86,24 +99,35 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
 
   function addVideoStream(userId: string, stream: MediaStream) {
     const existingVideo = document.getElementById(`video-${userId}`);
-    if (existingVideo) return; // 이미 존재하는 비디오는 추가하지 않음
+    if (existingVideo) return;
 
-    const video = document.createElement("video");
-    video.srcObject = stream;
-    video.id = `video-${userId}`;
-    video.autoplay = true;
-    video.playsInline = true;
-    video.className = "w-full h-full object-cover rounded-lg";
     const videoContainer = document.createElement("div");
-    videoContainer.className = "relative";
-    videoContainer.appendChild(video);
+    videoContainer.className = "relative w-full h-full";
+    videoContainer.id = `video-container-${userId}`;
+
+    if (stream.getVideoTracks().length > 0) {
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.id = `video-${userId}`;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.className = "w-full h-full object-cover rounded-lg";
+      videoContainer.appendChild(video);
+    } else {
+      const iconContainer = document.createElement("div");
+      iconContainer.className = "w-full h-full flex items-center justify-center bg-gray-200 rounded-lg";
+      iconContainer.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
+      videoContainer.appendChild(iconContainer);
+    }
+
     document.getElementById("video-grid")?.appendChild(videoContainer);
   }
 
+
   const handleEndCall = () => {
     cleanup();
-    // 여기에 통화 종료 후 리다이렉트 로직을 추가할 수 있습니다.
-    // 예: router.push('/');
+    // TODO 통화 종료 후 리다이렉트 로직을 추가
+    // 예) router.push('/');
   };
 
   const cleanup = () => {
@@ -167,19 +191,25 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
 
   return (
     <div className="min-h-screen bg-white text-black p-8">
-      <h1 className="text-3xl font-bold mb-4">Meeting Room: {params.id}</h1>
+     <h1 className="text-3xl font-bold mb-4">Meeting Room: {params.id}</h1>
       <div
         id="video-grid"
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
       >
-        <div className="relative">
-          <video
-            ref={userVideo}
-            autoPlay
-            muted
-            playsInline
-            className="w-full h-full object-cover rounded-lg"
-          />
+        <div className="relative w-full h-full">
+          {hasCamera ? (
+            <video
+              ref={userVideo}
+              autoPlay
+              muted
+              playsInline
+              className="w-full h-full object-cover rounded-lg"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gray-200 rounded-lg">
+              <UserIcon size={64} className="text-gray-500" />
+            </div>
+          )}
           <p className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded">
             You
           </p>
