@@ -2,9 +2,10 @@
   "name": "capstone3-2",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
+  "type" : "module",
   "scripts": {
     "dev": "node server.js",
+    "nodemon": "nodemon server.js",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
