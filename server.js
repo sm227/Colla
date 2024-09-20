@@ -9,6 +9,7 @@ const port = 3000;
 const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
 
+console.log("running ..")
 app.prepare().then(() => {
   const httpServer = createServer(handler);
 
