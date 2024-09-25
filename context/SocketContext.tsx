@@ -4,10 +4,13 @@ import { createContext, use, useCallback, useContext, useEffect, useState } from
 
 import { io, Socket } from "socket.io-client";
 import { OngoingCall, Participants, SocketUser } from "../types";
+import { strict } from "assert";
+import { string } from "zod";
 
 interface iSocketContext {
   onlineUsers: SocketUser[] | null;
   ongoingCall: OngoingCall | null;
+  localStream : MediaStream | null
   handleCall : (user: SocketUser) => void 
 }
 
@@ -25,9 +28,49 @@ export const SocketContextProvider = ({
   const [ongoingCall, setOngoingCall] = useState<OngoingCall | null>(null);
 
   const currentSocketUser = onlineUsers?.find(onlineUser => onlineUser.userId === user?.id)
+  const [localStream, setLocalStream] = useState<MediaStream | null> (null)
 
-  const handleCall = useCallback((user:SocketUser) => {
+  const getMediaStream = useCallback(async(faceMode ?: string) => {
+    if(localStream) {
+      return localStream
+    }
+
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const videoDevices = devices.filter(device => device.kind === 'videoinput')
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video : {
+          width: {min: 640, ideal: 1280, max: 1920},
+          height: {min: 340, ideal: 720, max: 1080},
+          frameRate: {min: 16, ideal: 30, max: 30},
+          facingMode: videoDevices.length > 0 ? faceMode : undefined
+
+        }
+      })
+      setLocalStream(stream)
+
+      return stream
+    }
+    catch (error) {
+      console.log("Failed to get the stream", error)
+      setLocalStream(null)
+      return null 
+    }
+  },[localStream])
+
+
+  const handleCall = useCallback(async(user:SocketUser) => {
     if(!currentSocketUser || !socket) return;
+
+    const stream = await getMediaStream()
+
+    if(!stream) {
+      console.log("No Stream in handleCall")
+      return
+    }
+
     const participants = {caller : currentSocketUser, receiver : user}
     setOngoingCall( {
       participants,
@@ -109,6 +152,7 @@ export const SocketContextProvider = ({
       value={{
         onlineUsers,
         ongoingCall,
+        localStream,
         handleCall
       }}
     >
