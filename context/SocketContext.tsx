@@ -1,12 +1,14 @@
 import { useUser } from "@clerk/nextjs";
 import { connect } from "http2";
-import { createContext, use, useContext, useEffect, useState } from "react";
+import { createContext, use, useCallback, useContext, useEffect, useState } from "react";
 
 import { io, Socket } from "socket.io-client";
-import { OngoingCall, SocketUser } from "../types";
+import { OngoingCall, Participants, SocketUser } from "../types";
 
 interface iSocketContext {
   onlineUsers: SocketUser[] | null;
+  ongoingCall: OngoingCall | null;
+  handleCall : (user: SocketUser) => void 
 }
 
 export const SocketContext = createContext<iSocketContext | null>(null);
@@ -22,7 +24,26 @@ export const SocketContextProvider = ({
   const [onlineUsers, setOnlineUsers] = useState<SocketUser[] | null>(null);
   const [ongoingCall, setOngoingCall] = useState<OngoingCall | null>(null);
 
-  console.log("onlineUsers>>", onlineUsers);
+  const currentSocketUser = onlineUsers?.find(onlineUser => onlineUser.userId === user?.id)
+
+  const handleCall = useCallback((user:SocketUser) => {
+    if(!currentSocketUser || !socket) return;
+    const participants = {caller : currentSocketUser, receiver : user}
+    setOngoingCall( {
+      participants,
+      isRinging:false,
+    }
+    )
+    socket?.emit('call',participants)
+  },[socket, currentSocketUser, ongoingCall])
+
+  const onIncomingCall = useCallback((participants : Participants) => {
+
+    setOngoingCall ({
+      participants,
+      isRinging: true
+    })
+  },[socket, user, ongoingCall])
 
   // initializing a socket
   useEffect(() => {
@@ -73,10 +94,22 @@ export const SocketContextProvider = ({
     };
   }, [socket, isSocketConnected, user]);
 
+  // calls
+  useEffect(() => {
+    if(!socket || !isSocketConnected) return
+
+    socket.on('incomingCall', onIncomingCall)
+    return() => {
+      socket.off('incomingCall', onIncomingCall)
+    }
+  },[socket, isSocketConnected, user, onIncomingCall])
+
   return (
     <SocketContext.Provider
       value={{
         onlineUsers,
+        ongoingCall,
+        handleCall
       }}
     >
       {children}

@@ -8,7 +8,7 @@ export type SocketUser = {
 
 export type OngoingCall = {
     participants : Participants,
-    isRinging : boolean,
+    isRinging : boolean;
 
 }
 

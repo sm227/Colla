@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import ListOnlineUsers from "@/components/ListOnlineUsers";
+import CallNotification from "@/components/CallNotification";
 
 export default function Home() {
   const [roomId, setRoomId] = useState("");
@@ -35,6 +36,7 @@ export default function Home() {
           Join Meeting
         </button>
         <ListOnlineUsers/>
+        <CallNotification/>
       </div>
     </main>
   );
