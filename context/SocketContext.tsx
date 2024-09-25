@@ -3,7 +3,7 @@ import { connect } from "http2";
 import { createContext, use, useContext, useEffect, useState } from "react";
 
 import { io, Socket } from "socket.io-client";
-import { SocketUser } from "../types";
+import { OngoingCall, SocketUser } from "../types";
 
 interface iSocketContext {
   onlineUsers: SocketUser[] | null;
@@ -20,6 +20,7 @@ export const SocketContextProvider = ({
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<SocketUser[] | null>(null);
+  const [ongoingCall, setOngoingCall] = useState<OngoingCall | null>(null);
 
   console.log("onlineUsers>>", onlineUsers);
 
