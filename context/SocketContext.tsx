@@ -6,6 +6,8 @@ import { io, Socket } from "socket.io-client";
 import { OngoingCall, Participants, SocketUser } from "../types";
 import { strict } from "assert";
 import { string } from "zod";
+import Peer from "simple-peer";
+
 
 interface iSocketContext {
   onlineUsers: SocketUser[] | null;
@@ -89,9 +91,42 @@ export const SocketContextProvider = ({
     })
   },[socket, user, ongoingCall])
 
-  const handleJoinCall = useCallback((ongoingCall : OngoingCall) => {
+  const createPeer = useCallback((stream : MediaStream, initiator : ) => {
+    const iceServers:RTCIceServer[] = [
+      {
+        urls:[
+          "stun:stun.l.google.com:19302",
+          "stun:stun1.l.google.com:19302",
+          "stun:stun2.l.google.com:19302",
+          "stun:stun3.l.google.com:19302",
+        ]
+      }
+    ]
+
+    const peer = new Peer({
+      stream,
+      initiator,
+      trickle: true,
+      config: {iceServers}
+    })
+
+    peer.on('stream', (stream))
+  },[ongoingCall])
+
+  const handleJoinCall = useCallback(async (ongoingCall : OngoingCall) => {
     // join call
-    console.log(ongoingCall)
+    setOngoingCall( prev => {
+      if(prev) {
+        return {...prev, isRinging: false}
+      }
+      return prev
+    })
+
+    const stream = await getMediaStream()
+    if (!stream) {
+      console.log('Could not get stream in handleJoinCall')
+      return
+    }
 
   },[socket,currentSocketUser])
 
