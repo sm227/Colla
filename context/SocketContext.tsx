@@ -91,7 +91,7 @@ export const SocketContextProvider = ({
     })
   },[socket, user, ongoingCall])
 
-  const createPeer = useCallback((stream : MediaStream, initiator : ) => {
+  const createPeer = useCallback((stream : MediaStream, initiator : boolean) => {
     const iceServers:RTCIceServer[] = [
       {
         urls:[
