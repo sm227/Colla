@@ -12,6 +12,7 @@ interface iSocketContext {
   ongoingCall: OngoingCall | null;
   localStream : MediaStream | null
   handleCall : (user: SocketUser) => void 
+  handleJoinCall : (ongoingCall: OngoingCall) => void
 }
 
 export const SocketContext = createContext<iSocketContext | null>(null);
@@ -88,6 +89,13 @@ export const SocketContextProvider = ({
     })
   },[socket, user, ongoingCall])
 
+  const handleJoinCall = useCallback((ongoingCall : OngoingCall) => {
+    // join call
+    console.log(ongoingCall)
+
+  },[socket,currentSocketUser])
+
+
   // initializing a socket
   useEffect(() => {
     const newSocket = io();
@@ -153,7 +161,8 @@ export const SocketContextProvider = ({
         onlineUsers,
         ongoingCall,
         localStream,
-        handleCall
+        handleCall,
+        handleJoinCall,
       }}
     >
       {children}
