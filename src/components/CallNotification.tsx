@@ -5,7 +5,7 @@ import { useSocket } from "../../context/SocketContext";
 import Avatar from "./Avatar";
 
 const CallNotification = () => {
-  const { ongoingCall } = useSocket();
+  const { ongoingCall, handleJoinCall } = useSocket();
 
   if (!ongoingCall?.isRinging) return;
   return (
@@ -19,7 +19,7 @@ const CallNotification = () => {
         </div>
         <p className="text-sm mb-2 text-black">Incoming Call</p>
         <div className="flex gap-8">
-          <button className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white">
+          <button onClick={() => handleJoinCall(ongoingCall)} className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white">
             <MdCall size={24} />
           </button>
           <button className="w-10 h-10 bg-rose-500 rounded-full flex items-center justify-center text-white">
