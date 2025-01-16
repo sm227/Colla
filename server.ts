@@ -18,8 +18,17 @@ interface UserState {
   lastConnected: number;
 }
 
+interface Message {
+  userId: string;
+  userName: string;
+  content: string;
+  timestamp: number;
+}
+
 // 전역으로 rooms 선언
 const rooms = new Map<string, Map<string, UserState>>();
+// 각 방의 메시지 히스토리를 저장
+const roomMessages = new Map<string, Message[]>();
 
 // 소켓 ID와 사용자 ID의 매핑을 저장
 const socketToUser = new Map<string, { roomId: string; userId: string }>();
@@ -81,6 +90,10 @@ nextApp.prepare().then(() => {
         console.log(`Room ${roomId} participants (${participants.length}):`, participants);
       }
       
+      // 새로 접속한 사용자에게 이전 메시지 히스토리 전송
+      const messages = roomMessages.get(roomId) || [];
+      socket.emit('message-history', messages);
+
       socket.join(roomId);
       socket.to(roomId).emit('user-connected', userId, userState);
 
@@ -108,6 +121,21 @@ nextApp.prepare().then(() => {
           socket.to(roomId).emit('user-disconnected', userId);
         }
       });
+    });
+
+    // 새 메시지 처리
+    socket.on('new-message', ({ roomId, message }: { roomId: string, message: Message }) => {
+      console.log('New message received:', { roomId, message });
+      
+      // 메시지 히스토리에 추가
+      if (!roomMessages.has(roomId)) {
+        roomMessages.set(roomId, []);
+      }
+      const messages = roomMessages.get(roomId)!;
+      messages.push(message);
+      
+      // 방의 다른 참가자들에게 메시지 브로드캐스트
+      socket.to(roomId).emit('receive-message', message);
     });
 
     socket.on('toggle-video', ({ roomId, userId, enabled }) => {

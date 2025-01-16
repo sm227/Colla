@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { io } from "socket.io-client";
 import Peer from "peerjs";
 import { useRouter } from "next/navigation";
@@ -10,8 +10,11 @@ import {
   MicOff as MicrophoneOffIcon, 
   Video as VideoIcon, 
   VideoOff as VideoOffIcon, 
-  PhoneOff as PhoneOffIcon 
+  PhoneOff as PhoneOffIcon,
+  MessageSquare as MessageIcon
 } from 'lucide-react';
+import SpeechToText from './SpeechToText';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 interface PeerStream {
   userId: string;
@@ -24,6 +27,46 @@ interface ToggleEvent {
   roomId: string;
   userId: string;
   enabled: boolean;
+}
+
+interface Message {
+  userId: string;
+  userName: string;
+  content: string;
+  timestamp: number;
+}
+
+interface SummaryModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  summary: string;
+}
+
+function SummaryModal({ isOpen, onClose, summary }: SummaryModalProps) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+        <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">회의 요약</h2>
+        <div className="prose dark:prose-invert max-w-none">
+          {summary.split('\n').map((line, index) => (
+            <p key={index} className="text-gray-700 dark:text-gray-300">
+              {line}
+            </p>
+          ))}
+        </div>
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function Toast({ message, isVisible, onHide }: { message: string; isVisible: boolean; onHide: () => void }) {
@@ -54,12 +97,17 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
   const [peerStreams, setPeerStreams] = useState<PeerStream[]>([]);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [messages, setMessages] = useState<Message[]>([]);
   const socketRef = useRef<any>(null);
   const peerRef = useRef<Peer>();
   const myVideoRef = useRef<HTMLVideoElement>(null);
   const peersRef = useRef<{ [key: string]: any }>({});
   const myPeerIdRef = useRef<string>("");
   const [showToast, setShowToast] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [summary, setSummary] = useState('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     let localStream: MediaStream | null = null;
@@ -82,7 +130,6 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
           myVideoRef.current.srcObject = localStream;
         }
 
-        // Socket.IO 초기화
         socketRef.current = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000', {
           transports: ['websocket'],
           reconnection: true,
@@ -90,7 +137,6 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
           reconnectionDelay: 1000
         });
 
-        // PeerJS 초기화
         const peer = new Peer({
           config: {
             iceServers: [
@@ -157,6 +203,18 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
             peer.userId === userId ? { ...peer, isAudioEnabled: enabled } : peer
           ));
         });
+
+        // 메시지 히스토리 수신
+        socketRef.current.on('message-history', (messages: Message[]) => {
+          console.log('Received message history:', messages);
+          setMessages(messages);
+        });
+
+        // 새 메시지 수신
+        socketRef.current.on('receive-message', (message: Message) => {
+          console.log('Received new message:', message);
+          setMessages(prev => [...prev, message]);
+        });
       } catch (error) {
         console.error('Error initializing peer:', error);
       }
@@ -212,12 +270,9 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
   const addPeerStream = (userId: string, stream: MediaStream, userState?: any) => {
     console.log(`Adding peer stream for user ${userId}`);
     
-    // 중복 스트림 방지를 위한 체크
     setPeerStreams(prev => {
-      // 이미 존재하는 스트림 제거
       const filteredStreams = prev.filter(p => p.userId !== userId);
       
-      // 새 스트림 추가
       return [...filteredStreams, {
         userId,
         stream,
@@ -316,7 +371,50 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     }
   };
 
-  const handleEndCall = () => {
+  const summarizeMessages = async (messages: Message[]) => {
+    try {
+      const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
+      const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+
+      const messageText = messages.map(msg => 
+        `${msg.userId === myPeerIdRef.current ? '나' : '참가자 ' + msg.userId.slice(0, 4)}: ${msg.content}`
+      ).join('\n');
+
+      const prompt = `다음은 온라인 회의의 대화 내용입니다. 이 대화 내용을 다음 형식으로 요약해주세요:
+
+1. 주요 논의 사항
+2. 결정된 사항
+3. 후속 조치 필요 사항
+
+대화 내용:
+${messageText}`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const summary = response.text();
+      
+      return summary;
+    } catch (error) {
+      console.error('Error summarizing messages:', error);
+      throw error;
+    }
+  };
+
+  const handleEndCall = async () => {
+    if (messages.length > 0) {
+      setIsSummarizing(true);
+      try {
+        const summary = await summarizeMessages(messages);
+        setSummary(summary);
+        setShowSummary(true);
+      } catch (error) {
+        console.error('Failed to summarize meeting:', error);
+        alert('회의 요약 중 오류가 발생했습니다.');
+      } finally {
+        setIsSummarizing(false);
+      }
+    }
+
     myStream?.getTracks().forEach(track => track.stop());
     
     Object.values(peersRef.current).forEach((call: any) => {
@@ -334,8 +432,6 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     setMyStream(null);
     setPeerStreams([]);
     peersRef.current = {};
-
-    router.push('/');
   };
 
   const handleCopyInviteLink = async () => {
@@ -347,120 +443,77 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-900">
-      <div className="h-screen flex flex-col">
-        <Toast 
-          message="초대 링크가 복사되었습니다" 
-          isVisible={showToast} 
-          onHide={() => setShowToast(false)} 
-        />
+  const handleNewMessage = useCallback((message: Message) => {
+    setMessages(prev => [...prev, message]);
+    
+    // 소켓을 통해 다른 참가자들에게 메시지 전송
+    socketRef.current?.emit('new-message', {
+      roomId: params.id,
+      message
+    });
+  }, [params.id]);
 
-        <header className="bg-gray-800 px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-white font-medium">
-              Meeting: <span className="text-blue-400">{params.id}</span>
-            </h1>
-            <div className="bg-gray-700 px-3 py-1 rounded-full">
-              <p className="text-sm text-gray-300">
-                {peerStreams.length + 1} 참가자
-              </p>
+  return (
+    <div className="relative min-h-screen bg-gray-900">
+      {/* 메인 비디오 그리드 */}
+      <div className="h-screen p-4 flex flex-col">
+        <div className="flex-grow grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-fr">
+          {/* 내 비디오 */}
+          <div className="relative aspect-video bg-gray-800 rounded-xl overflow-hidden shadow-lg">
+            <video
+              ref={myVideoRef}
+              muted
+              autoPlay
+              playsInline
+              className={`w-full h-full object-cover ${!isVideoEnabled ? 'hidden' : ''}`}
+            />
+            {!isVideoEnabled && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <UsersIcon className="w-20 h-20 text-gray-400" />
+              </div>
+            )}
+            <div className="absolute bottom-4 left-4 text-sm text-white bg-black/50 px-3 py-1.5 rounded-lg">
+              나 {!isAudioEnabled && '(음소거)'}
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={handleCopyInviteLink}
-              className="text-gray-300 hover:text-white px-3 py-1 rounded-md text-sm flex items-center gap-2 transition-colors duration-200"
-            >
-              <Share2Icon className="w-4 h-4" />
-              초대 링크 복사
-            </button>
-          </div>
-        </header>
 
-        <main className="flex-1 p-4 overflow-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-7xl mx-auto">
-            <div className="relative aspect-video bg-gray-800 rounded-lg overflow-hidden shadow-lg">
+          {/* 다른 참가자 비디오 */}
+          {peerStreams.map((peerStream) => (
+            <div key={peerStream.userId} className="relative aspect-video bg-gray-800 rounded-xl overflow-hidden shadow-lg">
               <video
-                ref={myVideoRef}
                 autoPlay
                 playsInline
-                muted
-                className={`w-full h-full object-cover ${!isVideoEnabled ? 'hidden' : ''}`}
+                ref={(element) => {
+                  if (element) element.srcObject = peerStream.stream;
+                }}
+                className={`w-full h-full object-cover ${!peerStream.isVideoEnabled ? 'hidden' : ''}`}
               />
-              {!isVideoEnabled && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-700">
-                  <div className="text-center">
-                    <div className="w-20 h-20 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-2">
-                      <UsersIcon className="w-10 h-10 text-gray-400" />
-                    </div>
-                    <span className="text-gray-400">카메라 꺼짐</span>
-                  </div>
+              {!peerStream.isVideoEnabled && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <UsersIcon className="w-20 h-20 text-gray-400" />
                 </div>
               )}
-              <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/70 to-transparent">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <p className="text-white text-sm">나</p>
-                    {!isAudioEnabled && (
-                      <div className="bg-red-500 rounded-full p-1">
-                        <MicrophoneOffIcon className="w-3 h-3 text-white" />
-                      </div>
-                    )}
-                  </div>
-                </div>
+              <div className="absolute bottom-4 left-4 text-sm text-white bg-black/50 px-3 py-1.5 rounded-lg">
+                참가자 {peerStream.userId.slice(0, 4)} {!peerStream.isAudioEnabled && '(음소거)'}
               </div>
             </div>
+          ))}
+        </div>
 
-            {peerStreams.map(({ userId, stream, isVideoEnabled: peerVideoEnabled, isAudioEnabled: peerAudioEnabled }) => (
-              <div key={userId} className="relative aspect-video bg-gray-800 rounded-lg overflow-hidden shadow-lg">
-                {peerVideoEnabled ? (
-                  <video
-                    autoPlay
-                    playsInline
-                    className="w-full h-full object-cover"
-                    ref={video => {
-                      if (video) {
-                        video.srcObject = stream;
-                        // 오디오 트랙 상태 설정
-                        stream.getAudioTracks().forEach(track => {
-                          track.enabled = peerAudioEnabled;
-                        });
-                      }
-                    }}
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-700">
-                    <div className="text-center">
-                      <div className="w-20 h-20 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-2">
-                        <UsersIcon className="w-10 h-10 text-gray-400" />
-                      </div>
-                      <span className="text-gray-400">카메라 꺼짐</span>
-                    </div>
-                  </div>
-                )}
-                <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/70 to-transparent">
-                  <div className="flex items-center justify-between">
-                    <p className="text-white text-sm flex items-center gap-2">
-                      <span>참가자</span>
-                      {!peerAudioEnabled && (
-                        <MicrophoneOffIcon className="w-4 h-4 text-red-500" />
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
+        {/* 하단 컨트롤 바 */}
+        <div className="flex justify-between items-center py-4 px-6">
+          <div className="text-white text-sm">
+            {new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
           </div>
-        </main>
-
-        <footer className="bg-gray-800 px-4 py-4">
-          <div className="max-w-7xl mx-auto flex items-center justify-center space-x-4">
+          
+          <div className="flex items-center space-x-4">
             <button
               onClick={toggleAudio}
-              className={`${
-                isAudioEnabled ? "bg-gray-700" : "bg-red-500"
-              } hover:opacity-90 text-white p-4 rounded-full transition-colors`}
+              className={`p-4 rounded-full transition-all duration-200 ${
+                isAudioEnabled 
+                  ? 'bg-gray-700 hover:bg-gray-600 text-white' 
+                  : 'bg-red-500 hover:bg-red-600 text-white'
+              }`}
             >
               {isAudioEnabled ? (
                 <MicrophoneIcon className="w-6 h-6" />
@@ -470,9 +523,11 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
             </button>
             <button
               onClick={toggleVideo}
-              className={`${
-                isVideoEnabled ? "bg-gray-700" : "bg-red-500"
-              } hover:opacity-90 text-white p-4 rounded-full transition-colors`}
+              className={`p-4 rounded-full transition-all duration-200 ${
+                isVideoEnabled 
+                  ? 'bg-gray-700 hover:bg-gray-600 text-white' 
+                  : 'bg-red-500 hover:bg-red-600 text-white'
+              }`}
             >
               {isVideoEnabled ? (
                 <VideoIcon className="w-6 h-6" />
@@ -482,13 +537,66 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
             </button>
             <button
               onClick={handleEndCall}
-              className="bg-red-500 hover:opacity-90 text-white p-4 rounded-full transition-colors"
+              className="p-4 rounded-full bg-red-500 hover:bg-red-600 text-white transition-all duration-200"
+              disabled={isSummarizing}
             >
-              <PhoneOffIcon className="w-6 h-6" />
+              {isSummarizing ? (
+                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <PhoneOffIcon className="w-6 h-6" />
+              )}
+            </button>
+            <button
+              onClick={handleCopyInviteLink}
+              className="p-4 rounded-full bg-gray-700 hover:bg-gray-600 text-white transition-all duration-200"
+            >
+              <Share2Icon className="w-6 h-6" />
+            </button>
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className={`p-4 rounded-full transition-all duration-200 ${
+                isSidebarOpen
+                  ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                  : 'bg-gray-700 hover:bg-gray-600 text-white'
+              }`}
+            >
+              <MessageIcon className="w-6 h-6" />
             </button>
           </div>
-        </footer>
+
+          <div className="w-20">
+            {/* 시간 표시 영역과 대칭을 위한 빈 공간 */}
+          </div>
+        </div>
       </div>
+
+      {/* 사이드 패널 - 음성 인식 컴포넌트 */}
+      <div className={`fixed top-0 right-0 h-full w-80 bg-gray-800 shadow-xl transform transition-transform duration-300 ${
+        isSidebarOpen ? 'translate-x-0' : 'translate-x-full'
+      }`}>
+        <SpeechToText 
+          isAudioEnabled={isAudioEnabled}
+          userId={myPeerIdRef.current}
+          userName="나"
+          messages={messages}
+          onNewMessage={handleNewMessage}
+        />
+      </div>
+
+      <Toast
+        message="초대 링크가 복사되었습니다!"
+        isVisible={showToast}
+        onHide={() => setShowToast(false)}
+      />
+
+      <SummaryModal
+        isOpen={showSummary}
+        onClose={() => {
+          setShowSummary(false);
+          router.push('/');
+        }}
+        summary={summary}
+      />
     </div>
   );
 }
