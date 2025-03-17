@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { useTasks } from "@/hooks/useTasks";
 import { Alert } from "@/components/ui/alert";
+import { KanbanTask } from "./KanbanTask";
 
 // 칸반 보드 상태 타입 정의
 export type TaskStatus = "todo" | "in-progress" | "review" | "done";
@@ -29,6 +30,7 @@ interface KanbanBoardProps {
 export function KanbanBoard({ projectId }: KanbanBoardProps) {
   const { tasks, loading, error, addTask, updateTaskStatus } = useTasks(projectId);
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
+  const [tasksState, setTasksState] = useState<Task[]>(tasks);
   
   // 상태별로 태스크 필터링
   const todoTasks = tasks.filter((task) => task.status === "todo");
@@ -47,6 +49,12 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
   // 태스크 상태 변경 함수
   const handleUpdateTaskStatus = async (taskId: string, newStatus: TaskStatus) => {
     await updateTaskStatus(taskId, newStatus);
+  };
+
+  const handleTaskUpdate = (updatedTask: Task) => {
+    setTasksState(tasksState.map(t => 
+      t.id === updatedTask.id ? updatedTask : t
+    ));
   };
 
   return (
@@ -81,25 +89,57 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             tasks={todoTasks} 
             status="todo" 
             updateTaskStatus={handleUpdateTaskStatus} 
-          />
+          >
+            {todoTasks.map((task) => (
+              <KanbanTask 
+                key={task.id}
+                task={task} 
+                onUpdate={handleTaskUpdate}
+              />
+            ))}
+          </KanbanColumn>
           <KanbanColumn 
             title="진행 중" 
             tasks={inProgressTasks} 
             status="in-progress" 
             updateTaskStatus={handleUpdateTaskStatus} 
-          />
+          >
+            {inProgressTasks.map((task) => (
+              <KanbanTask 
+                key={task.id}
+                task={task} 
+                onUpdate={handleTaskUpdate}
+              />
+            ))}
+          </KanbanColumn>
           <KanbanColumn 
             title="검토" 
             tasks={reviewTasks} 
             status="review" 
             updateTaskStatus={handleUpdateTaskStatus} 
-          />
+          >
+            {reviewTasks.map((task) => (
+              <KanbanTask 
+                key={task.id}
+                task={task} 
+                onUpdate={handleTaskUpdate}
+              />
+            ))}
+          </KanbanColumn>
           <KanbanColumn 
             title="완료" 
             tasks={doneTasks} 
             status="done" 
             updateTaskStatus={handleUpdateTaskStatus} 
-          />
+          >
+            {doneTasks.map((task) => (
+              <KanbanTask 
+                key={task.id}
+                task={task} 
+                onUpdate={handleTaskUpdate}
+              />
+            ))}
+          </KanbanColumn>
         </div>
       )}
 
