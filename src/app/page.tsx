@@ -23,7 +23,8 @@ import {
   PlusIcon,
   LogOutIcon,
   MenuIcon,
-  XIcon
+  XIcon,
+  BarChart3Icon
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -104,6 +105,7 @@ export default function Home() {
                 <SidebarLink icon={<FileTextIcon className="w-5 h-5" />} text="문서" href="/documents" />
                 <SidebarLink icon={<CalendarIcon className="w-5 h-5" />} text="일정" href="/calendar" />
                 <SidebarLink icon={<MessageSquareIcon className="w-5 h-5" />} text="메시지" href="/messages" />
+                <SidebarLink icon={<BarChart3Icon className="w-5 h-5" />} text="보고서" href="/reports" />
               </nav>
               
               <div className="mt-8">
