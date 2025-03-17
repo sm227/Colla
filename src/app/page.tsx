@@ -4,7 +4,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
-import { VideoIcon, UsersIcon, Share2Icon } from "lucide-react";
+import { VideoIcon, UsersIcon, Share2Icon, Trello } from "lucide-react";
+import Link from "next/link";
 
 export default function Home() {
   const router = useRouter();
@@ -43,6 +44,14 @@ export default function Home() {
               <VideoIcon className="w-6 h-6" />
               새 회의 시작하기
             </button>
+
+            <Link
+              href="/kanban"
+              className="w-full flex items-center justify-center gap-3 bg-purple-600 hover:bg-purple-700 text-white px-6 py-4 rounded-lg text-lg font-semibold transition-colors"
+            >
+              <Trello className="w-6 h-6" />
+              프로젝트 칸반보드
+            </Link>
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -92,6 +101,11 @@ export default function Home() {
                 icon={<Share2Icon className="w-6 h-6 text-blue-600" />}
                 title="화면 공유"
                 description="문서나 프레젠테이션을 실시간으로 공유"
+              />
+              <Feature
+                icon={<Trello className="w-6 h-6 text-purple-600" />}
+                title="프로젝트 관리"
+                description="칸반보드로 프로젝트 작업을 효율적으로 관리"
               />
             </div>
           </div>
