@@ -1,7 +1,7 @@
 // app/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import { 
@@ -28,11 +28,31 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { useAuth } from "./contexts/AuthContext";
 
 export default function Home() {
   const router = useRouter();
   const [roomId, setRoomId] = useState("");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const { user, loading, logout } = useAuth();
+
+  // 로딩 중이거나 사용자가 없으면 로딩 표시
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 사용자가 없으면 로그인 페이지로 리디렉션 (미들웨어에서 처리되지만 추가 안전장치)
+  if (!user) {
+    router.push('/auth/login');
+    return null;
+  }
 
   const createNewMeeting = () => {
     const newRoomId = uuidv4().substring(0, 8);
@@ -43,6 +63,14 @@ export default function Home() {
     e.preventDefault();
     if (roomId.trim()) {
       router.push(`/meeting/${roomId}`);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error("로그아웃 오류:", error);
     }
   };
 
@@ -131,7 +159,10 @@ export default function Home() {
                   <SettingsIcon className="w-5 h-5 mr-2" />
                   설정
                 </button>
-                <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-100 w-full mt-2">
+                <button 
+                  onClick={handleLogout}
+                  className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-100 w-full mt-2"
+                >
                   <LogOutIcon className="w-5 h-5 mr-2" />
                   로그아웃
                 </button>
@@ -146,7 +177,7 @@ export default function Home() {
           <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">대시보드</h1>
-              <p className="text-sm text-gray-600">오늘의 업무와 프로젝트를 확인하세요</p>
+              <p className="text-sm text-gray-600">안녕하세요, {user.name}님! 오늘의 업무와 프로젝트를 확인하세요</p>
             </div>
             <div className="mt-4 md:mt-0 flex space-x-3">
               <button
