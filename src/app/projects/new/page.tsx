@@ -69,8 +69,8 @@ export default function NewProjectPage() {
         throw new Error(data.error || "프로젝트 생성 중 오류가 발생했습니다.");
       }
       
-      // 프로젝트 생성 성공 후 홈페이지로 리다이렉트
-      router.push("/");
+      // 강제로 홈페이지로 이동 - window.location 사용
+      window.location.href = "/";
     } catch (err: any) {
       setError(err.message);
     } finally {
