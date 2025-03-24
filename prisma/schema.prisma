@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,7 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 사용자 모델 추가
 model User {
   id        String   @id @default(uuid())
   name      String
@@ -18,15 +14,15 @@ model User {
   password  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  projects  Project[]
 }
 
-// 칸반보드 관련 모델
 model Task {
   id          String    @id @default(cuid())
   title       String
   description String?
-  status      String    // "todo", "in-progress", "review", "done"
-  priority    String    // "low", "medium", "high"
+  status      String
+  priority    String
   assignee    String?
   dueDate     DateTime?
   createdAt   DateTime  @default(now())
@@ -42,4 +38,6 @@ model Project {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   tasks       Task[]
-} 
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id])
+}

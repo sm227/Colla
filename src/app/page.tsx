@@ -29,15 +29,38 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "./contexts/AuthContext";
+import { useProject } from "./contexts/ProjectContext";
+import { Task, TaskStatus } from "@/components/kanban/KanbanBoard";
+import { useTasks } from "@/hooks/useTasks";
 
 export default function Home() {
   const router = useRouter();
   const [roomId, setRoomId] = useState("");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const { user, loading, logout } = useAuth();
+  const { user, loading: authLoading, logout } = useAuth();
+  const { projects, hasProjects, loading: projectLoading, currentProject, setCurrentProject } = useProject();
+  const { tasks = [], loading: tasksLoading } = useTasks(currentProject?.id || null);
 
-  // 로딩 중이거나 사용자가 없으면 로딩 표시
-  if (loading) {
+  // Handle redirects with useEffect
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/auth/login');
+    } else if (!authLoading && !projectLoading && user && !hasProjects) {
+      // 프로젝트가 없는 경우에만 프로젝트 생성 페이지로 리디렉션
+      router.push('/projects/new');
+    }
+    // 프로젝트가 있는 경우 현재 대시보드 페이지에 머무름
+  }, [authLoading, projectLoading, user, hasProjects, router]);
+
+  // 현재 프로젝트가 선택되지 않았으면 첫 번째 프로젝트 선택
+  useEffect(() => {
+    if (hasProjects && !currentProject && projects.length > 0) {
+      setCurrentProject(projects[0]);
+    }
+  }, [hasProjects, currentProject, projects, setCurrentProject]);
+
+  // 로딩 중이면 로딩 표시
+  if (authLoading || projectLoading || tasksLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -48,9 +71,8 @@ export default function Home() {
     );
   }
 
-  // 사용자가 없으면 로그인 페이지로 리디렉션 (미들웨어에서 처리되지만 추가 안전장치)
-  if (!user) {
-    router.push('/auth/login');
+  // 사용자가 없거나 프로젝트가 없으면 빈 화면 렌더링 (useEffect에서 리디렉션 처리)
+  if (!user || !hasProjects) {
     return null;
   }
 
@@ -138,17 +160,31 @@ export default function Home() {
               
               <div className="mt-8">
                 <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  최근 프로젝트
+                  프로젝트
                 </h3>
                 <nav className="mt-2 space-y-1">
-                  <SidebarLink icon={<FolderIcon className="w-5 h-5" />} text="마케팅 캠페인" href="/projects/marketing" small />
-                  <SidebarLink icon={<FolderIcon className="w-5 h-5" />} text="제품 개발" href="/projects/product" small />
-                  <SidebarLink icon={<FolderIcon className="w-5 h-5" />} text="디자인 시스템" href="/projects/design" small />
+                  {projects.map(project => (
+                    <SidebarLink 
+                      key={project.id}
+                      icon={<FolderIcon className="w-5 h-5" />} 
+                      text={project.name} 
+                      href="/"
+                      small
+                      active={currentProject?.id === project.id}
+                      onClick={() => {
+                        setCurrentProject(project);
+                        router.push('/');
+                      }}
+                    />
+                  ))}
                 </nav>
               </div>
               
               <div className="mt-8">
-                <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-100 w-full">
+                <button 
+                  onClick={() => router.push('/projects/new')}
+                  className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-100 w-full"
+                >
                   <PlusIcon className="w-5 h-5 mr-2" />
                   새 프로젝트
                 </button>
@@ -177,7 +213,9 @@ export default function Home() {
           <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">대시보드</h1>
-              <p className="text-sm text-gray-600">안녕하세요, {user.name}님! 오늘의 업무와 프로젝트를 확인하세요</p>
+              <p className="text-sm text-gray-600">
+                안녕하세요, {user.name}님! {currentProject?.name || '프로젝트'}의 업무를 확인하세요
+              </p>
             </div>
             <div className="mt-4 md:mt-0 flex space-x-3">
               <button
@@ -226,52 +264,15 @@ export default function Home() {
           
           {/* 대시보드 그리드 */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* 최근 프로젝트 */}
+            {/* 간략한 칸반 보드 */}
             <div className="bg-white rounded-lg shadow-sm p-4 lg:col-span-2">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium text-gray-900">최근 프로젝트</h2>
-                <Link href="/projects" className="text-sm text-blue-600 hover:text-blue-800">
-                  모두 보기
+                <h2 className="text-lg font-medium text-gray-900">칸반 보드</h2>
+                <Link href="/kanban" className="text-sm text-blue-600 hover:text-blue-800">
+                  전체 보기
                 </Link>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <ProjectCard 
-                  title="마케팅 캠페인 기획"
-                  description="2024년 2분기 마케팅 전략 및 실행 계획"
-                  progress={75}
-                  type="칸반보드"
-                  icon={<Trello className="w-5 h-5 text-purple-600" />}
-                  link="/kanban/marketing"
-                />
-                
-                <ProjectCard 
-                  title="제품 개발 로드맵"
-                  description="신규 기능 개발 및 출시 일정 관리"
-                  progress={40}
-                  type="문서"
-                  icon={<FileTextIcon className="w-5 h-5 text-green-600" />}
-                  link="/documents/roadmap"
-                />
-                
-                <ProjectCard 
-                  title="주간 팀 미팅"
-                  description="매주 월요일 10:00 정기 회의"
-                  progress={0}
-                  type="회의"
-                  icon={<VideoIcon className="w-5 h-5 text-blue-600" />}
-                  link="/meeting/weekly"
-                  upcoming={true}
-                />
-                
-                <ProjectCard 
-                  title="사용자 피드백 분석"
-                  description="최근 수집된 사용자 의견 및 개선점"
-                  progress={20}
-                  type="문서"
-                  icon={<FileTextIcon className="w-5 h-5 text-green-600" />}
-                  link="/documents/feedback"
-                />
-              </div>
+              <SimplifiedKanbanBoard />
             </div>
             
             {/* 예정된 일정 */}
@@ -434,26 +435,27 @@ function SidebarLink({
   text, 
   href, 
   active = false,
-  small = false
+  small = false,
+  onClick
 }: { 
   icon: React.ReactNode; 
   text: string; 
   href: string;
   active?: boolean;
   small?: boolean;
+  onClick?: () => void;
 }) {
   return (
-    <Link 
-      href={href} 
+    <Link
+      href={href}
+      onClick={onClick}
       className={`flex items-center px-3 py-2 ${small ? 'text-sm' : 'text-base'} font-medium rounded-md ${
         active 
-          ? 'bg-blue-50 text-blue-700' 
-          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+          ? 'bg-blue-50 text-blue-600'
+          : 'text-gray-600 hover:bg-gray-100'
       }`}
     >
-      <span className={`mr-3 ${small ? 'text-gray-400' : active ? 'text-blue-500' : 'text-gray-500'}`}>
-        {icon}
-      </span>
+      <div className={`${small ? 'mr-2' : 'mr-3'}`}>{icon}</div>
       {text}
     </Link>
   );
@@ -592,5 +594,98 @@ function MeetingItem({
         </div>
       </div>
     </Link>
+  );
+}
+
+function SimplifiedKanbanBoard() {
+  // 현재 선택된 프로젝트의 태스크 가져오기
+  const { currentProject } = useProject();
+  const { tasks = [], loading } = useTasks(currentProject?.id || null);
+
+  // 상태별로 태스크 필터링
+  const todoTasks = tasks.filter((task) => task.status === "todo").slice(0, 2);
+  const inProgressTasks = tasks.filter((task) => task.status === "in-progress").slice(0, 2);
+  const doneTasks = tasks.filter((task) => task.status === "done").slice(0, 2);
+
+  // 로딩 중이면 로딩 표시
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-40">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // 태스크가 없으면 빈 상태 표시
+  if (tasks.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-40 text-gray-500">
+        <p className="text-center mb-4">현재 프로젝트에 작업이 없습니다</p>
+        <Link
+          href="/kanban/new"
+          className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+        >
+          <PlusIcon className="w-4 h-4" />
+          새 작업 추가
+        </Link>
+      </div>
+    );
+  }
+
+  // 간략화된 칸반 컬럼 컴포넌트
+  const SimplifiedColumn = ({ title, status, statusColor, tasks }: { 
+    title: string; 
+    status: string;
+    statusColor: string;
+    tasks: Task[];
+  }) => (
+    <div className="bg-gray-50 rounded-lg p-3">
+      <h3 className="font-medium text-gray-700 mb-2 flex items-center">
+        <span className={`inline-block w-3 h-3 ${statusColor} rounded-full mr-2`}></span>
+        {title}
+      </h3>
+      <div className="space-y-2">
+        {tasks.length > 0 ? (
+          tasks.map(task => (
+            <div key={task.id} className="bg-white p-2 rounded shadow-sm border border-gray-200">
+              <p className="text-sm font-medium">{task.title}</p>
+              <div className="flex justify-between items-center mt-2">
+                <span className="text-xs text-gray-500">
+                  {task.priority === "high" ? "우선순위 높음" : 
+                   task.priority === "medium" ? "중간 우선순위" : "낮은 우선순위"}
+                </span>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="bg-white p-2 rounded shadow-sm border border-gray-200 text-center">
+            <p className="text-xs text-gray-400">작업 없음</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="grid grid-cols-3 gap-4">
+      <SimplifiedColumn 
+        title="할 일" 
+        status="todo" 
+        statusColor="bg-gray-400" 
+        tasks={todoTasks} 
+      />
+      <SimplifiedColumn 
+        title="진행 중" 
+        status="in-progress" 
+        statusColor="bg-blue-400" 
+        tasks={inProgressTasks} 
+      />
+      <SimplifiedColumn 
+        title="완료" 
+        status="done" 
+        statusColor="bg-green-400" 
+        tasks={doneTasks} 
+      />
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   FileTextIcon, 
   FolderIcon, 
@@ -19,13 +19,17 @@ import {
   BookmarkIcon
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function DocumentsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const projectIdParam = searchParams.get('projectId');
+  const editorRef = useRef<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   
   // 샘플 폴더 및 문서 데이터
   const folders = [
@@ -118,6 +122,13 @@ export default function DocumentsPage() {
       emoji: "⚙️"
     }
   ];
+  
+  // URL 쿼리 파라미터로부터 프로젝트 ID를 가져옴
+  useEffect(() => {
+    if (projectIdParam) {
+      setSelectedProjectId(projectIdParam);
+    }
+  }, [projectIdParam]);
   
   // 필터링된 문서 목록
   const filteredDocuments = documents.filter(doc => {
