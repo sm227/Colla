@@ -10,11 +10,16 @@ import {
   CheckCircleIcon,
   ClockIcon,
   AlertTriangleIcon,
-  Trello
+  Trello,
+  FileTextIcon,
+  PlusIcon
 } from "lucide-react";
 import { useProject } from "../contexts/ProjectContext";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const projectIdParam = searchParams.get('projectId');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -49,9 +54,36 @@ export default function DashboardPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-2">
-        {currentProject ? `${currentProject.name} 대시보드` : '프로젝트 대시보드'}
-      </h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">
+          {currentProject ? `${currentProject.name} 대시보드` : '프로젝트 대시보드'}
+        </h1>
+        
+        {/* 새 문서 버튼 추가 */}
+        {currentProject && (
+          <button
+            onClick={() => {
+              console.log("대시보드에서 새 문서 생성 버튼 클릭:", {
+                projectId: currentProject.id,
+                projectName: currentProject.name
+              });
+              
+              // 쿼리 파라미터를 직접 포함하여 명시적으로 전달
+              const url = `/documents/new?projectId=${currentProject.id}`;
+              console.log("이동할 URL:", url);
+              
+              // 라우터를 사용해 강제로 URL 이동
+              router.push(url);
+            }}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            <PlusIcon className="w-4 h-4" />
+            <FileTextIcon className="w-4 h-4" />
+            <span>새 문서 작성</span>
+          </button>
+        )}
+      </div>
+      
       {currentProject?.description && (
         <p className="text-gray-600 mb-8">{currentProject.description}</p>
       )}

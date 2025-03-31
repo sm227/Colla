@@ -151,8 +151,34 @@ export default function Home() {
               <nav className="space-y-1">
                 <SidebarLink icon={<HomeIcon className="w-5 h-5" />} text="홈" href="/" active={true} />
                 <SidebarLink icon={<VideoIcon className="w-5 h-5" />} text="화상 회의" href="/meetings" />
-                <SidebarLink icon={<Trello className="w-5 h-5" />} text="칸반보드" href="/kanban" />
-                <SidebarLink icon={<FileTextIcon className="w-5 h-5" />} text="문서" href="/documents" />
+                <SidebarLink icon={<Trello className="w-5 h-5" />} text="칸반보드" href={currentProject ? `/kanban?projectId=${currentProject.id}` : "/kanban"} />
+                <SidebarLink 
+                  icon={<FileTextIcon className="w-5 h-5" />} 
+                  text="문서" 
+                  href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
+                  onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                    if (currentProject?.id) {
+                      e.preventDefault();
+                      console.log("사이드바에서 문서 클릭, 프로젝트 ID:", currentProject.id);
+                      
+                      // 유효한 프로젝트 ID인지 확인 후 이동
+                      fetch(`/api/projects/${currentProject.id}`)
+                        .then(response => {
+                          if (response.ok) {
+                            router.push(`/documents?projectId=${currentProject.id}`);
+                          } else {
+                            console.error("유효하지 않은 프로젝트 ID:", currentProject.id);
+                            alert("선택된 프로젝트에 접근할 수 없습니다. 일반 문서 목록으로 이동합니다.");
+                            router.push('/documents');
+                          }
+                        })
+                        .catch(error => {
+                          console.error("프로젝트 확인 중 오류:", error);
+                          router.push('/documents');
+                        });
+                    }
+                  }}
+                />
                 <SidebarLink icon={<CalendarIcon className="w-5 h-5" />} text="일정" href="/calendar" />
                 <SidebarLink icon={<MessageSquareIcon className="w-5 h-5" />} text="메시지" href="/messages" />
                 <SidebarLink icon={<BarChart3Icon className="w-5 h-5" />} text="보고서" href="/reports" />
@@ -233,8 +259,32 @@ export default function Home() {
                 새 보드
               </Link>
               <Link
-                href="/documents/new"
+                href={currentProject?.id ? `/documents/new?projectId=${currentProject.id}` : "/documents/new"}
                 className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                  if (currentProject?.id) {
+                    e.preventDefault();
+                    
+                    // 프로젝트 ID가 유효한지 먼저 확인
+                    console.log("대시보드에서 새 문서 버튼 클릭, 프로젝트 ID:", currentProject.id);
+                    
+                    // 유효한 프로젝트 ID인지 확인 후 이동
+                    fetch(`/api/projects/${currentProject.id}`)
+                      .then(response => {
+                        if (response.ok) {
+                          router.push(`/documents/new?projectId=${currentProject.id}`);
+                        } else {
+                          console.error("유효하지 않은 프로젝트 ID:", currentProject.id);
+                          alert("현재 선택된 프로젝트에 접근할 수 없습니다. 다른 프로젝트를 선택하세요.");
+                          router.push('/documents/new');
+                        }
+                      })
+                      .catch(error => {
+                        console.error("프로젝트 확인 중 오류:", error);
+                        router.push('/documents/new');
+                      });
+                  }
+                }}
               >
                 <FileTextIcon className="w-4 h-4" />
                 새 문서
@@ -319,7 +369,17 @@ export default function Home() {
             <div className="bg-white rounded-lg shadow-sm p-4">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-gray-900">최근 문서</h2>
-                <Link href="/documents" className="text-sm text-blue-600 hover:text-blue-800">
+                <Link 
+                  href={currentProject ? `/documents?projectId=${currentProject.id}` : "/documents"}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                  onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                    if (currentProject) {
+                      e.preventDefault();
+                      console.log("최근 문서 모두 보기 클릭, 프로젝트 ID:", currentProject.id);
+                      router.push(`/documents?projectId=${currentProject.id}`);
+                    }
+                  }}
+                >
                   모두 보기
                 </Link>
               </div>
@@ -443,7 +503,7 @@ function SidebarLink({
   href: string;
   active?: boolean;
   small?: boolean;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 }) {
   return (
     <Link
@@ -521,16 +581,25 @@ function ScheduleItem({ title, time, type, icon }: { title: string; time: string
 }
 
 function DocumentItem({ title, updatedAt, icon }: { title: string; updatedAt: string; icon: React.ReactNode }) {
+  // 현재 프로젝트 ID 가져오기
+  const { currentProject } = useProject();
+  const router = useRouter();
+  
   return (
-    <Link href={`/documents/${title.toLowerCase().replace(/\s+/g, '-')}`} className="block">
-      <div className="flex items-center p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
-        <div className="mr-3 p-2 bg-gray-100 rounded-full">{icon}</div>
-        <div>
-          <h4 className="font-medium text-gray-900">{title}</h4>
-          <p className="text-sm text-gray-500">수정됨: {updatedAt}</p>
-        </div>
+    <div 
+      onClick={() => {
+        const url = `/documents/${title.toLowerCase().replace(/\s+/g, '-')}${currentProject ? `?projectId=${currentProject.id}` : ''}`;
+        console.log("문서 아이템 클릭:", { title, url, projectId: currentProject?.id });
+        router.push(url);
+      }}
+      className="flex items-center p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer"
+    >
+      <div className="mr-3 p-2 bg-gray-100 rounded-full">{icon}</div>
+      <div>
+        <h4 className="font-medium text-gray-900">{title}</h4>
+        <p className="text-sm text-gray-500">수정됨: {updatedAt}</p>
       </div>
-    </Link>
+    </div>
   );
 }
 
