@@ -21,6 +21,7 @@ type ProjectContextType = {
   loading: boolean;
   error: string | null;
   fetchProjects: () => Promise<void>;
+  refreshProjects: () => Promise<void>;
   createProject: (name: string, description?: string) => Promise<Project>;
   setCurrentProject: (project: Project | null) => void;
   hasProjects: boolean;
@@ -33,6 +34,7 @@ const ProjectContext = createContext<ProjectContextType>({
   loading: false,
   error: null,
   fetchProjects: async () => {},
+  refreshProjects: async () => {},
   createProject: async () => ({ id: "", name: "", createdAt: "", updatedAt: "", userId: "" }),
   setCurrentProject: () => {},
   hasProjects: false,
@@ -186,6 +188,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         loading,
         error,
         fetchProjects,
+        refreshProjects: fetchProjects,
         createProject,
         setCurrentProject: handleSetCurrentProject,
         hasProjects,

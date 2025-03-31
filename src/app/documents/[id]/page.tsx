@@ -19,7 +19,7 @@ import {
   AlignLeft
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 // Tiptap 관련 임포트
 import { EditorContent, useEditor, Editor, BubbleMenu } from '@tiptap/react';
@@ -45,7 +45,8 @@ interface Document {
   isStarred: boolean;
   folder: string;
   tags: string[];
-  content: string; // JSON 형식의 문서 내용
+  content: string;
+  projectId?: string;
 }
 
 export default function DocumentPage({ params }: { params: { id: string } }) {
@@ -57,6 +58,18 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
   const [tags, setTags] = useState<string[]>(["문서"]);
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  const searchParams = useSearchParams();
+  const projectIdParam = searchParams.get('projectId');
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [projectIdWarning, setProjectIdWarning] = useState(false);
+  const [projectIdFixed, setProjectIdFixed] = useState(false);
+  const [projectIdDebug, setProjectIdDebug] = useState({
+    source: '',
+    value: '',
+    normalized: '' 
+  });
   
   // 슬래시 커맨드 관련 상태
   const [showSlashMenu, setShowSlashMenu] = useState(false);
@@ -64,7 +77,15 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
   
   const menuRef = useRef<HTMLDivElement | null>(null);
   const slashMenuRef = useRef<HTMLDivElement | null>(null);
-  
+
+  // 디버깅용 참조 객체
+  const debugRef = useRef({
+    projectIdParam: null as string | null,
+    selectedProjectId: null as string | null,
+    projectIdFromAPI: null as string | null,
+    projectIdFixed: false
+  });
+
   // 새 문서 작성 페이지인지 확인
   const isNewDocument = params.id === "new";
   
@@ -102,57 +123,87 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
     injectCSS: false,
   });
   
-  // 슬래시 키 입력 감지
-  useEffect(() => {
-    if (!editor) return;
+  // 프로젝트 ID를 확실히 설정하는 함수
+  const forceSetProjectId = (id: string | null) => {
+    // 빈 문자열, 'null' 문자열, undefined는 모두 null로 처리
+    let normalizedId = id;
     
-    // Tiptap 에디터에 키 이벤트 리스너 추가
-    const handleDOMEvents = () => {
-      // 에디터의 DOM 요소 가져오기
-      const editorElement = document.querySelector('.ProseMirror');
-      if (!editorElement) return;
-      
-      // 키 입력 이벤트 핸들러
-      const handleKeyDown = (event: Event) => {
-        const keyEvent = event as KeyboardEvent;
-        if (keyEvent.key === '/' && !showSlashMenu) {
-          // 현재 커서 위치 계산
-          const { view } = editor;
-          const { state } = view;
-          const { selection } = state;
-          const { ranges } = selection;
-          const from = Math.min(...ranges.map(range => range.$from.pos));
+    // 빈 문자열일 경우 URL 파라미터에서 직접 가져와보기
+    if (id === '') {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const projectIdFromUrl = urlParams.get('projectId');
+        
+        // URL에 실제 projectId 값이 있는지 확인
+        if (projectIdFromUrl !== null && projectIdFromUrl !== '') {
+          normalizedId = projectIdFromUrl;
+        } else {
+          if (id === '' || id === 'null' || id === undefined) {
+            normalizedId = null;
+          }
+        }
+      } catch (error) {
+        if (id === '' || id === 'null' || id === undefined) {
+          normalizedId = null;
+        }
+      }
+    } else if (id === 'null' || id === undefined) {
+      normalizedId = null;
+    }
+    
+    setSelectedProjectId(normalizedId);
+    debugRef.current.selectedProjectId = normalizedId;
+    
+    // 디버깅 정보 업데이트
+    setProjectIdDebug({
+      source: '직접설정',
+      value: id === null ? 'null' : String(id || ''),
+      normalized: normalizedId === null ? 'null' : String(normalizedId)
+    });
+    
+    // projectId가 있으면 고정된 것으로 표시
+    if (normalizedId) {
+      setProjectIdFixed(true);
+      debugRef.current.projectIdFixed = true;
+    }
+  };
+  
+  // URL 쿼리 파라미터로부터 프로젝트 ID를 가져옴
+  useEffect(() => {
+    if (projectIdParam) {
+      // 프로젝트 ID 유효성 확인
+      const validateProjectId = async () => {
+        try {
+          // 프로젝트 ID가 유효한지 확인 (API 호출)
+          const response = await fetch(`/api/projects/${projectIdParam}`);
           
-          // 현재 커서 위치의 DOM 좌표 찾기
-          const pos = view.coordsAtPos(from);
-          
-          // 슬래시 메뉴 위치 설정
-          setSlashMenuPosition({
-            x: pos.left,
-            y: pos.bottom
-          });
-          
-          // 메뉴 표시
-          setShowSlashMenu(true);
+          if (response.ok) {
+            // 프로젝트가 존재하고 접근 권한이 있음
+            const project = await response.json();
+            setSelectedProjectId(projectIdParam);
+            debugRef.current.projectIdParam = projectIdParam;
+            debugRef.current.selectedProjectId = projectIdParam;
+            
+            // 경고 표시 관련
+            if (isNewDocument) {
+              setProjectIdWarning(true);
+              setTimeout(() => setProjectIdWarning(false), 5000);
+            }
+          } else {
+            // 프로젝트가 존재하지 않거나 접근 권한이 없음
+            setSelectedProjectId(null);
+            debugRef.current.projectIdParam = null;
+            debugRef.current.selectedProjectId = null;
+            alert("지정된 프로젝트에 대한 접근 권한이 없거나 프로젝트가 존재하지 않습니다.");
+          }
+        } catch (error) {
+          setSelectedProjectId(null);
         }
       };
       
-      // 이벤트 리스너 추가
-      editorElement.addEventListener('keydown', handleKeyDown);
-      
-      // 컴포넌트 언마운트 시 이벤트 리스너 제거
-      return () => {
-        editorElement.removeEventListener('keydown', handleKeyDown);
-      };
-    };
-    
-    // 에디터가 마운트된 후 DOM 이벤트 리스너 설정
-    const setupTimeout = setTimeout(handleDOMEvents, 100);
-    
-    return () => {
-      clearTimeout(setupTimeout);
-    };
-  }, [editor, showSlashMenu]);
+      validateProjectId();
+    }
+  }, [projectIdParam, isNewDocument]);
   
   // 문서 데이터 로드 (실제로는 API 호출)
   useEffect(() => {
@@ -166,52 +217,73 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       if (editor) {
         editor.commands.setContent('');
       }
-    } else if (params.id === "1") {
-      // 샘플 문서 데이터 (실제로는 API에서 가져옴)
-      setTitle("제품 로드맵 2024");
-      setEmoji("🚀");
-      setIsStarred(true);
-      setFolder("프로젝트 문서");
-      setTags(["로드맵", "전략"]);
       
-      // 샘플 문서 내용 설정
-      if (editor) {
-        editor.commands.setContent(`
-          <h1>제품 로드맵 2024</h1>
-          <p>이 문서는 2024년 제품 개발 로드맵을 정리한 문서입니다.</p>
-          <h2>1분기 목표</h2>
-          <ul>
-            <li>사용자 인터페이스 개선</li>
-            <li>성능 최적화</li>
-            <li>모바일 대응성 향상</li>
-          </ul>
-          <h2>2분기 목표</h2>
-          <ul class="task-list">
-            <li data-type="taskItem" data-checked="false"><label><input type="checkbox"><span></span></label><div>새로운 분석 대시보드 개발</div></li>
-            <li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked><span></span></label><div>사용자 피드백 시스템 구축</div></li>
-            <li data-type="taskItem" data-checked="false"><label><input type="checkbox"><span></span></label><div>API 확장 및 문서화</div></li>
-          </ul>
-          <h2>3분기 목표</h2>
-          <p>3분기에는 다음과 같은 기능을 중점적으로 개발할 예정입니다:</p>
-          <ol>
-            <li>AI 기반 추천 시스템</li>
-            <li>고급 데이터 시각화 도구</li>
-            <li>협업 기능 강화</li>
-          </ol>
-          <h2>4분기 목표</h2>
-          <blockquote>사용자 경험을 최우선으로 생각하며 지속적인 개선을 추구합니다.</blockquote>
-          <p>4분기에는 전체 시스템 안정화 및 성능 최적화에 집중할 예정입니다.</p>
-          <pre><code>// 예시 코드
-function optimizePerformance() {
-  // 성능 최적화 로직
-  return improved;
-}</code></pre>
-          <hr>
-          <p>이 로드맵은 상황에 따라 변경될 수 있습니다.</p>
-        `);
+      // 새 문서에서는 URL의 projectId 파라미터를 설정 (칸반보드와 동일한 패턴)
+      if (projectIdParam) {
+        setSelectedProjectId(projectIdParam);
       }
+    } else if (params.id !== "new") {
+      // 실제 API 호출로 문서 데이터 가져오기
+      const fetchDocument = async () => {
+        try {
+          const response = await fetch(`/api/documents/${params.id}`);
+          
+          if (!response.ok) {
+            throw new Error('문서를 불러오는데 실패했습니다.');
+          }
+          
+          const documentData = await response.json();
+          
+          // 받아온 데이터로 상태 업데이트
+          setTitle(documentData.title);
+          setEmoji(documentData.emoji || "📄");
+          setIsStarred(documentData.isStarred || false);
+          setFolder(documentData.folder || "프로젝트 문서");
+          
+          // Tags 처리 - JSON 문자열을 배열로 변환
+          if (documentData.tags) {
+            try {
+              const parsedTags = JSON.parse(documentData.tags);
+              setTags(Array.isArray(parsedTags) ? parsedTags : ["문서"]);
+            } catch {
+              setTags(["문서"]);
+            }
+          } else {
+            setTags(["문서"]);
+          }
+          
+          // 선택된 프로젝트 ID 설정 (우선순위: URL > API)
+          let projectIdToUse = null;
+          
+          if (projectIdParam) {
+            projectIdToUse = projectIdParam;
+          } else if (documentData.projectId) {
+            projectIdToUse = documentData.projectId;
+          }
+          
+          // 디버깅용 참조 업데이트
+          debugRef.current.projectIdFromAPI = documentData.projectId;
+          
+          // 프로젝트 ID 설정
+          forceSetProjectId(projectIdToUse);
+          
+          // 에디터 내용 설정
+          if (editor && documentData.content) {
+            editor.commands.setContent(documentData.content);
+          }
+        } catch (error) {
+          // 에러 발생 시 샘플 데이터 사용
+          setTitle("문서를 불러올 수 없습니다");
+          setEmoji("❌");
+          if (editor) {
+            editor.commands.setContent('<p>문서를 불러오는 중 오류가 발생했습니다.</p>');
+          }
+        }
+      };
+      
+      fetchDocument();
     }
-  }, [params.id, isNewDocument, editor]);
+  }, [params.id, isNewDocument, editor, projectIdParam]);
   
   // 바깥 영역 클릭 감지 이벤트
   useEffect(() => {
@@ -374,40 +446,138 @@ function optimizePerformance() {
     };
   }, [editor]);
   
+  // 슬래시 키 입력 감지
+  useEffect(() => {
+    if (!editor) return;
+    
+    // Tiptap 에디터에 키 이벤트 리스너 추가
+    const handleDOMEvents = () => {
+      // 에디터의 DOM 요소 가져오기
+      const editorElement = document.querySelector('.ProseMirror');
+      if (!editorElement) return;
+      
+      // 키 입력 이벤트 핸들러
+      const handleKeyDown = (event: Event) => {
+        const keyEvent = event as KeyboardEvent;
+        if (keyEvent.key === '/' && !showSlashMenu) {
+          // 현재 커서 위치 계산
+          const { view } = editor;
+          const { state } = view;
+          const { selection } = state;
+          const { ranges } = selection;
+          const from = Math.min(...ranges.map(range => range.$from.pos));
+          
+          // 현재 커서 위치의 DOM 좌표 찾기
+          const pos = view.coordsAtPos(from);
+          
+          // 슬래시 메뉴 위치 설정
+          setSlashMenuPosition({
+            x: pos.left,
+            y: pos.bottom
+          });
+          
+          // 메뉴 표시
+          setShowSlashMenu(true);
+        }
+      };
+      
+      // 이벤트 리스너 추가
+      editorElement.addEventListener('keydown', handleKeyDown);
+      
+      // 컴포넌트 언마운트 시 이벤트 리스너 제거
+      return () => {
+        editorElement.removeEventListener('keydown', handleKeyDown);
+      };
+    };
+    
+    // 에디터가 마운트된 후 DOM 이벤트 리스너 설정
+    const setupTimeout = setTimeout(handleDOMEvents, 100);
+    
+    return () => {
+      clearTimeout(setupTimeout);
+    };
+  }, [editor, showSlashMenu]);
+  
   // 문서 저장
-  const saveDocument = () => {
+  const saveDocument = async () => {
     try {
+      setIsSaving(true);
+      setSaveSuccess(false);
+      
       // 빈 제목은 "제목 없음"으로 설정
       const documentTitle = title.trim() || "제목 없음";
       
       // 에디터 내용 가져오기
       const content = editor ? editor.getHTML() : '';
       
-      // 문서 객체 구성
-      const document: Document = {
-        id: params.id,
-        title: documentTitle, 
-        emoji, 
-        isStarred,
-        folder, 
-        tags,
-        content
-      };
+      // 프로젝트 ID 확인 - 여러 소스에서 확인
+      let finalProjectId = selectedProjectId;
       
-      console.log("문서 저장:", document);
+      // 1. URL에서 직접 확인 (최우선)
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlProjectId = urlParams.get('projectId');
       
-      // 실제로는 API 호출
-      
-      if (isNewDocument) {
-        // 새 문서 저장 후 해당 문서 페이지로 리다이렉트
-        router.push("/documents/1");
+      if (urlProjectId && urlProjectId !== '' && urlProjectId !== 'null') {
+        finalProjectId = urlProjectId;
       }
       
-      // 성공 메시지 표시
-      alert("문서가 성공적으로 저장되었습니다.");
+      // 2. 디버깅 참조 객체에서 확인 (백업)
+      if (!finalProjectId && debugRef.current.projectIdParam) {
+        finalProjectId = debugRef.current.projectIdParam;
+      }
+      
+      // 프로젝트 ID 필수 체크
+      if (!finalProjectId) {
+        alert("프로젝트 ID가 필요합니다. 문서를 저장할 수 없습니다.");
+        setIsSaving(false);
+        return;
+      }
+      
+      // API 요청 데이터 구성
+      const documentData = {
+        title: documentTitle,
+        content,
+        emoji,
+        isStarred,
+        folder,
+        tags,
+        projectId: finalProjectId
+      };
+      
+      let response;
+      if (isNewDocument) {
+        response = await fetch('/api/documents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(documentData)
+        });
+      } else {
+        response = await fetch(`/api/documents/${params.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(documentData)
+        });
+      }
+      
+      // 응답이 OK가 아닌 경우 에러 텍스트 확인
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`서버 응답 오류 (${response.status}): ${errorText}`);
+      }
+      
+      const responseData = await response.json();
+      
+      setSaveSuccess(true);
+      
+      // 새 문서인 경우 저장 후 해당 문서 페이지로 리다이렉트
+      if (isNewDocument) {
+        const redirectUrl = `/documents/${responseData.id}?projectId=${responseData.projectId}`;
+        router.push(redirectUrl);
+      }
     } catch (error) {
-      console.error("문서 저장 중 오류 발생:", error);
-      alert("문서 저장 중 오류가 발생했습니다.");
+      alert(error instanceof Error ? error.message : '문서 저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
     }
   };
   
@@ -525,10 +695,34 @@ function optimizePerformance() {
         }
       `}</style>
       
+      {/* 프로젝트 ID 경고 - 새로 추가 */}
+      {projectIdWarning && (
+        <div className="fixed top-0 left-0 right-0 bg-yellow-100 border-b border-yellow-300 p-2 z-50">
+          <div className="max-w-4xl mx-auto flex items-center justify-between">
+            <div className="flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-700 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <span className="text-yellow-800">
+                <strong>프로젝트 문서 생성 중:</strong> 이 문서는 프로젝트 ID: <span className="font-mono">{selectedProjectId}</span>로 저장됩니다.
+              </span>
+            </div>
+            <button 
+              onClick={() => setProjectIdWarning(false)}
+              className="text-yellow-700 hover:text-yellow-900"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+      
       {/* 상단 툴바 */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
+      <div className={`sticky ${projectIdWarning ? 'top-10' : 'top-0'} z-10 bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between`}>
         <div className="flex items-center">
-          <Link href="/documents" className="p-2 rounded-md hover:bg-gray-100 mr-2">
+          <Link href={`/documents?projectId=${selectedProjectId || ''}`} className="p-2 rounded-md hover:bg-gray-100 mr-2">
             <ArrowLeftIcon className="w-5 h-5 text-gray-600" />
           </Link>
           <div className="flex items-center">
@@ -536,11 +730,43 @@ function optimizePerformance() {
             <div className="text-sm text-gray-500 flex items-center">
               <FolderIcon className="w-4 h-4 mr-1" />
               <span>{folder}</span>
+              {selectedProjectId && (
+                <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full flex items-center">
+                  <span>프로젝트 문서</span>
+                  <span className="font-mono ml-1 bg-blue-200 px-1 rounded">
+                    {selectedProjectId.substring(0, 8)}
+                  </span>
+                </span>
+              )}
             </div>
           </div>
         </div>
         
         <div className="flex items-center gap-2">
+          {/* 프로젝트 선택기 - 새로운 디자인 */}
+          <div className="border border-gray-300 rounded-md overflow-hidden flex items-center">
+            {isNewDocument ? (
+              <select 
+                className="px-2 py-1 text-sm bg-white border-none focus:ring-0"
+                value={selectedProjectId || ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  forceSetProjectId(value === "" ? null : value);
+                }}
+                disabled={projectIdFixed}
+              >
+                <option value="">개인 문서</option>
+                {projectIdParam && (
+                  <option value={projectIdParam}>현재 프로젝트</option>
+                )}
+              </select>
+            ) : (
+              <div className="px-2 py-1 text-sm font-medium">
+                {selectedProjectId ? "프로젝트 문서" : "개인 문서"}
+              </div>
+            )}
+          </div>
+          
           <div className="flex items-center gap-1">
             {tags.map((tag, index) => (
               <span key={index} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
@@ -569,13 +795,46 @@ function optimizePerformance() {
           
           <button 
             onClick={saveDocument}
-            className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-sm transition-colors"
+            className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isSaving}
           >
-            <SaveIcon className="w-4 h-4" />
-            <span>저장</span>
+            {isSaving ? (
+              <>
+                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-1"></div>
+                <span>저장 중...</span>
+              </>
+            ) : (
+              <>
+                <SaveIcon className="w-4 h-4" />
+                <span>저장</span>
+              </>
+            )}
           </button>
         </div>
       </div>
+      
+      {/* 성공 메시지 */}
+      {saveSuccess && (
+        <div className="fixed top-16 right-4 bg-green-50 border-l-4 border-green-500 p-4 rounded shadow-md z-50">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-green-800">
+                문서가 성공적으로 저장되었습니다.
+                {selectedProjectId && (
+                  <span className="block text-xs mt-1 font-mono">
+                    프로젝트 ID: {selectedProjectId}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* 문서 편집 영역 */}
       <div className="max-w-4xl mx-auto px-8">
@@ -588,6 +847,46 @@ function optimizePerformance() {
             className="w-full text-4xl font-bold text-gray-900 border-none outline-none focus:ring-0 p-0"
             placeholder="제목 없음"
           />
+          
+          {/* 프로젝트 ID 디버깅 정보 */}
+          {selectedProjectId && (
+            <div className="mt-2 flex items-center p-2 bg-gray-50 rounded-md border border-dashed border-gray-300">
+              <div className="text-xs text-gray-500 font-mono">
+                <div className="flex flex-col">
+                  <div className="flex items-center space-x-1">
+                    <span className="text-green-600">프로젝트:</span>
+                    <span className="font-bold bg-blue-100 text-blue-800 px-1 rounded">
+                      {selectedProjectId.substring(0, 16)}
+                    </span>
+                    <span className="text-xs text-gray-400">({projectIdDebug.source} 기준)</span>
+                  </div>
+                  
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    <span className="text-xs">
+                      <span className="text-gray-400">상태:</span>
+                      <span className={`ml-1 px-1 rounded ${projectIdFixed ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {projectIdFixed ? '고정됨' : '변경가능'}
+                      </span>
+                    </span>
+                    
+                    <span className="text-xs">
+                      <span className="text-gray-400">타입:</span>
+                      <span className="ml-1 bg-gray-100 px-1 rounded">
+                        {typeof selectedProjectId}
+                      </span>
+                    </span>
+                    
+                    <span className="text-xs">
+                      <span className="text-gray-400">JSON:</span>
+                      <span className="ml-1 bg-gray-100 px-1 rounded">
+                        {JSON.stringify(selectedProjectId)}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         
         {/* 선택 텍스트에 대한 버블 메뉴 */}
