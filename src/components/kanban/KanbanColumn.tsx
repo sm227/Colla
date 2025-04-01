@@ -9,9 +9,16 @@ interface KanbanColumnProps {
   tasks: Task[];
   status: TaskStatus;
   updateTaskStatus: (taskId: string, newStatus: TaskStatus) => void;
+  onTaskClick: (task: Task) => void;
 }
 
-export function KanbanColumn({ title, tasks, status, updateTaskStatus }: KanbanColumnProps) {
+export function KanbanColumn({ 
+  title, 
+  tasks, 
+  status, 
+  updateTaskStatus,
+  onTaskClick
+}: KanbanColumnProps) {
   // 드롭 영역 설정
   const { isOver, setNodeRef } = useDrop({
     onDrop: (taskId: string) => {
@@ -35,7 +42,14 @@ export function KanbanColumn({ title, tasks, status, updateTaskStatus }: KanbanC
       
       <div className="flex flex-col gap-2 flex-grow">
         {tasks.map((task) => (
-          <KanbanTask key={task.id} task={task} />
+          <div key={task.id} onClick={() => onTaskClick(task)}>
+            <KanbanTask 
+              task={task} 
+              onUpdate={(updatedTask) => {
+                // 업데이트 로직
+              }}
+            />
+          </div>
         ))}
         
         {tasks.length === 0 && (
