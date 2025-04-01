@@ -3,15 +3,17 @@
 import { KanbanTask } from "./KanbanTask";
 import { Task, TaskStatus } from "./KanbanBoard";
 import { useDrop } from "./useDragDrop";
+import { ReactNode } from "react";
 
 interface KanbanColumnProps {
   title: string;
   tasks: Task[];
   status: TaskStatus;
   updateTaskStatus: (taskId: string, newStatus: TaskStatus) => void;
+  children?: ReactNode;
 }
 
-export function KanbanColumn({ title, tasks, status, updateTaskStatus }: KanbanColumnProps) {
+export function KanbanColumn({ title, tasks, status, updateTaskStatus, children }: KanbanColumnProps) {
   // 드롭 영역 설정
   const { isOver, setNodeRef } = useDrop({
     onDrop: (taskId: string) => {
@@ -34,9 +36,7 @@ export function KanbanColumn({ title, tasks, status, updateTaskStatus }: KanbanC
       </div>
       
       <div className="flex flex-col gap-2 flex-grow">
-        {tasks.map((task) => (
-          <KanbanTask key={task.id} task={task} />
-        ))}
+        {children}
         
         {tasks.length === 0 && (
           <div className="flex-grow flex items-center justify-center">
