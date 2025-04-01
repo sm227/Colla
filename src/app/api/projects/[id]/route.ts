@@ -21,6 +21,24 @@ export async function GET(
       where: { id },
       include: {
         tasks: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        }
       },
     });
     
@@ -31,9 +49,29 @@ export async function GET(
       );
     }
     
-    // 프로젝트 소유자 확인 (인증된 사용자만)
-    if (currentUser && project.userId !== null && project.userId !== currentUser.id) {
-      // 다른 사용자의 프로젝트에 접근하려는 시도 (경고만 표시)
+    // 프로젝트 접근 권한 확인
+    if (currentUser) {
+      // 1. 프로젝트 소유자인 경우
+      const isOwner = project.userId === currentUser.id;
+      
+      // 2. 프로젝트 멤버인 경우
+      const isMember = project.members.some(
+        member => member.userId === currentUser.id && member.inviteStatus === "accepted"
+      );
+      
+      // 권한이 없는 경우
+      if (!isOwner && !isMember) {
+        return NextResponse.json(
+          { error: '이 프로젝트에 접근할 권한이 없습니다.' },
+          { status: 403 }
+        );
+      }
+    } else {
+      // 인증되지 않은 사용자
+      return NextResponse.json(
+        { error: '인증이 필요합니다.' },
+        { status: 401 }
+      );
     }
     
     return NextResponse.json(project);
@@ -96,7 +134,10 @@ export async function PATCH(
     
     // 프로젝트가 존재하는지 확인
     const existingProject = await prisma.project.findUnique({
-      where: { id: projectId }
+      where: { id: projectId },
+      include: {
+        members: true
+      }
     });
     
     if (!existingProject) {
@@ -106,21 +147,43 @@ export async function PATCH(
       );
     }
     
-    // 프로젝트 소유자 확인 (null이거나 현재 사용자의 프로젝트만 수정 가능)
-    if (existingProject.userId !== null && existingProject.userId !== currentUser.id) {
+    // 프로젝트 권한 확인
+    // 소유자이거나 admin 역할의 멤버만 수정 가능
+    const isOwner = existingProject.userId === currentUser.id;
+    const isAdmin = existingProject.members.some(
+      member => member.userId === currentUser.id && 
+                member.inviteStatus === "accepted" && 
+                member.role === "admin"
+    );
+    
+    if (!isOwner && !isAdmin) {
       return NextResponse.json(
         { error: '이 프로젝트를 수정할 권한이 없습니다.' },
         { status: 403 }
       );
     }
     
-    // 프로젝트 업데이트
+    // 프로젝트 업데이트 (소유자는 변경하지 않음)
     const updatedProject = await prisma.project.update({
       where: { id: projectId },
       data: {
-        ...body,
-        userId: currentUser.id // 프로젝트를 수정하는 사용자로 소유권 업데이트
+        name: body.name,
+        description: body.description,
+        // userId는 업데이트하지 않음 (소유자 변경 방지)
       },
+      include: {
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        }
+      }
     });
     
     return NextResponse.json(updatedProject);

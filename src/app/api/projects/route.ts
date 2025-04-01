@@ -49,16 +49,41 @@ export async function GET() {
     
     console.log('프로젝트 조회 중... 사용자 ID:', currentUser.id);
     
-    // 현재 사용자의 프로젝트와 미할당 프로젝트 가져오기
+    // 현재 사용자의 프로젝트(소유 + 멤버십) 가져오기
     const projects = await prisma.project.findMany({
       where: {
         OR: [
-          { userId: currentUser.id }, // 사용자 ID로 연결된 프로젝트
-          { userId: null }            // userId가 null인 프로젝트
+          { userId: currentUser.id }, // 사용자가 소유한 프로젝트
+          { 
+            members: {
+              some: {
+                userId: currentUser.id,
+                inviteStatus: "accepted" // 초대를 수락한 프로젝트만
+              }
+            }
+          } // 사용자가 멤버로 참여하는 프로젝트
         ]
       },
       include: {
         tasks: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        }
       },
       orderBy: {
         createdAt: 'desc',

@@ -8,13 +8,14 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  projects  Project[]
+  id          String          @id @default(uuid())
+  name        String
+  email       String          @unique
+  password    String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  projects    Project[]
+  memberships ProjectMember[]
 }
 
 model Task {
@@ -32,27 +33,42 @@ model Task {
 }
 
 model Project {
-  id          String   @id @default(cuid())
+  id          String          @id @default(cuid())
   name        String
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
   tasks       Task[]
   userId      String?
-  user        User?     @relation(fields: [userId], references: [id])
+  user        User?           @relation(fields: [userId], references: [id])
   documents   Document[]
+  members     ProjectMember[]
+}
+
+model ProjectMember {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id])
+  role         String   @default("member")
+  inviteStatus String   @default("pending")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, projectId])
 }
 
 model Document {
-  id          String   @id @default(cuid())
-  title       String
-  content     String
-  emoji       String?
-  isStarred   Boolean  @default(false)
-  folder      String?
-  tags        String?  // JSON array stored as string
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  projectId   String?
-  project     Project?  @relation(fields: [projectId], references: [id])
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  emoji     String?
+  isStarred Boolean  @default(false)
+  folder    String?
+  tags      String? // JSON array stored as string
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
 }
