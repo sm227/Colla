@@ -44,6 +44,7 @@ interface Document {
   emoji: string;
   isStarred: boolean;
   folder: string;
+  folderId?: string | null; // DB 컬럼명과 일치
   tags: string[];
   content: string;
   projectId?: string;
@@ -59,7 +60,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const searchParams = useSearchParams();
-  const projectIdParam = searchParams.get('projectId');
+  const projectIdParam = searchParams?.get('projectId') || null;
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -70,6 +71,14 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
     value: '',
     normalized: '' 
   });
+  
+  // 프로젝트 정보 상태 추가
+  const [projectName, setProjectName] = useState<string | null>(null);
+  // 문서 정보 상태 추가
+  const [folderId, setFolderId] = useState<string | null>(null);
+  // 폴더 목록 상태 추가
+  const [availableFolders, setAvailableFolders] = useState<{ id: string; name: string; count: number }[]>([]);
+  const [showFolderDropdown, setShowFolderDropdown] = useState(false);
   
   // 슬래시 커맨드 관련 상태
   const [showSlashMenu, setShowSlashMenu] = useState(false);
@@ -87,7 +96,10 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
   });
 
   // 새 문서 작성 페이지인지 확인
-  const isNewDocument = params.id === "new";
+  const [isNewDocument, setIsNewDocument] = useState(params.id === "new");
+  
+  // 저장된 문서 ID를 추적하기 위한 상태 추가
+  const [savedDocumentId, setSavedDocumentId] = useState<string | null>(params.id !== "new" ? params.id : null);
   
   // Tiptap 에디터 설정
   const editor = useEditor({
@@ -203,7 +215,16 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       
       validateProjectId();
     }
-  }, [projectIdParam, isNewDocument]);
+    
+    // URL 쿼리스트링에서 폴더 정보 가져오기
+    const folderIdParam = searchParams?.get('folderId') || null;
+    const folderNameParam = searchParams?.get('folderName') || null;
+    
+    if (folderIdParam && folderNameParam && isNewDocument) {
+      setFolder(folderNameParam);
+      setFolderId(folderIdParam);
+    }
+  }, [projectIdParam, isNewDocument, searchParams]);
   
   // 문서 데이터 로드 (실제로는 API 호출)
   useEffect(() => {
@@ -212,6 +233,20 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       setTitle("제목 없음");
       setEmoji("📄");
       setIsStarred(false);
+      
+      // URL 쿼리스트링에서 폴더 정보 가져오기
+      const folderIdParam = searchParams?.get('folderId') || null;
+      const folderNameParam = searchParams?.get('folderName') || null;
+      
+      if (folderIdParam && folderNameParam) {
+        // 전달받은 폴더 정보가 있으면 해당 폴더로 설정
+        setFolder(folderNameParam);
+        setFolderId(folderIdParam);
+      } else {
+        // 전달받은 폴더 정보가 없으면 기본 폴더로 설정
+        setFolder("기본 폴더");
+        setFolderId(null);
+      }
       
       // 에디터 내용 초기화
       if (editor) {
@@ -238,7 +273,8 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
           setTitle(documentData.title);
           setEmoji(documentData.emoji || "📄");
           setIsStarred(documentData.isStarred || false);
-          setFolder(documentData.folder || "프로젝트 문서");
+          setFolder(documentData.folder || "기본 폴더");
+          setFolderId(documentData.folderId || null); // DB 컬럼명에 맞게 수정
           
           // Tags 처리 - JSON 문자열을 배열로 변환
           if (documentData.tags) {
@@ -541,23 +577,20 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
         isStarred,
         folder,
         tags,
-        projectId: finalProjectId
+        projectId: finalProjectId,
+        folderId
       };
       
-      let response;
-      if (isNewDocument) {
-        response = await fetch('/api/documents', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(documentData)
-        });
-      } else {
-        response = await fetch(`/api/documents/${params.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(documentData)
-        });
-      }
+      // 저장된 문서가 있으면 업데이트, 없으면 새로 생성
+      const isCreatingNew = !savedDocumentId;
+      const endpoint = isCreatingNew ? '/api/documents' : `/api/documents/${savedDocumentId}`;
+      const method = isCreatingNew ? 'POST' : 'PATCH';
+      
+      const response = await fetch(endpoint, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(documentData)
+      });
       
       // 응답이 OK가 아닌 경우 에러 텍스트 확인
       if (!response.ok) {
@@ -567,13 +600,18 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       
       const responseData = await response.json();
       
+      // 새 문서 생성 후 ID 저장
+      if (isCreatingNew && responseData.id) {
+        setSavedDocumentId(responseData.id);
+        setIsNewDocument(false);
+        
+        // URL 업데이트
+        const newUrl = `/documents/${responseData.id}?projectId=${finalProjectId}`;
+        window.history.replaceState({}, '', newUrl);
+      }
+      
       setSaveSuccess(true);
       
-      // 새 문서인 경우 저장 후 해당 문서 페이지로 리다이렉트
-      if (isNewDocument) {
-        const redirectUrl = `/documents/${responseData.id}?projectId=${responseData.projectId}`;
-        router.push(redirectUrl);
-      }
     } catch (error) {
       alert(error instanceof Error ? error.message : '문서 저장 중 오류가 발생했습니다.');
     } finally {
@@ -581,14 +619,218 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
     }
   };
   
+  // 프로젝트 정보 가져오기 함수
+  const fetchProjectInfo = async (projectId: string) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}`);
+      if (response.ok) {
+        const projectData = await response.json();
+        setProjectName(projectData.name);
+      }
+    } catch (error) {
+      console.error('프로젝트 정보를 가져오는데 실패했습니다:', error);
+    }
+  };
+
+  // 프로젝트 ID가 변경될 때마다 프로젝트 정보 가져오기
+  useEffect(() => {
+    if (selectedProjectId) {
+      fetchProjectInfo(selectedProjectId);
+    }
+  }, [selectedProjectId]);
+  
+  // 폴더 목록 가져오기
+  const fetchFolders = async () => {
+    try {
+      // 프로젝트 ID가 있을 경우 해당 프로젝트의 폴더만 가져옴
+      const url = selectedProjectId 
+        ? `/api/documents/folders?projectId=${selectedProjectId}`
+        : '/api/documents/folders';
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        console.error('폴더 목록을 가져오는데 실패했습니다.');
+        return;
+      }
+      
+      const data = await response.json();
+      setAvailableFolders(data);
+    } catch (error) {
+      console.error('폴더 목록을 가져오는 중 오류:', error);
+    }
+  };
+
+  // 프로젝트 ID가 변경될 때 폴더 목록 가져오기
+  useEffect(() => {
+    if (selectedProjectId) {
+      fetchFolders();
+    }
+  }, [selectedProjectId]);
+
+  // 폴더 변경 함수
+  const handleFolderChange = (newFolderData: { id: string; name: string }) => {
+    setFolder(newFolderData.name);
+    setFolderId(newFolderData.id);
+    setShowFolderDropdown(false);
+  };
+  
+  // 새 폴더 생성 함수
+  const createNewFolder = async (folderName: string) => {
+    if (!folderName || !folderName.trim() || !selectedProjectId) {
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/documents/folders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: folderName.trim(),
+          projectId: selectedProjectId
+        })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || '폴더 생성 실패');
+      }
+      
+      // 새 폴더 생성 성공
+      const newFolder = await response.json();
+      
+      // 폴더 목록 업데이트
+      fetchFolders();
+      
+      // 새 폴더로 설정
+      setFolder(newFolder.name);
+      setFolderId(newFolder.id);
+      setShowFolderDropdown(false);
+    } catch (error) {
+      console.error('새 폴더 생성 중 오류:', error);
+      alert('폴더를 생성하는 중 오류가 발생했습니다.');
+    }
+  };
+  
+  // 자동저장 관련 상태 추가
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  // 자동저장 디바운스 타이머 ref
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 자동저장 함수
+  const autoSave = useCallback(async () => {
+    if (!autoSaveEnabled || !selectedProjectId) return;
+    
+    try {
+      setIsSaving(true);
+      
+      const documentTitle = title.trim() || "제목 없음";
+      const content = editor ? editor.getHTML() : '';
+      
+      const documentData = {
+        title: documentTitle,
+        content,
+        emoji,
+        isStarred,
+        folder,
+        tags,
+        projectId: selectedProjectId,
+        folderId
+      };
+      
+      // 이미 저장된 문서가 있으면 해당 ID로 업데이트, 아니면 새로 생성
+      const isCreatingNew = !savedDocumentId;
+      const endpoint = isCreatingNew ? '/api/documents' : `/api/documents/${savedDocumentId}`;
+      const method = isCreatingNew ? 'POST' : 'PATCH';
+      
+      const response = await fetch(endpoint, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(documentData)
+      });
+      
+      if (!response.ok) {
+        throw new Error('자동 저장 실패');
+      }
+      
+      const responseData = await response.json();
+      
+      // 새 문서 생성 후 ID 저장
+      if (isCreatingNew && responseData.id) {
+        setSavedDocumentId(responseData.id);
+        setIsNewDocument(false);
+        
+        // URL을 업데이트하지만 페이지를 다시 로드하지는 않음
+        const newUrl = `/documents/${responseData.id}?projectId=${selectedProjectId}`;
+        window.history.replaceState({}, '', newUrl);
+      }
+      
+      setLastSaved(new Date());
+      setHasUnsavedChanges(false);
+      
+    } catch (error) {
+      console.error('자동 저장 중 오류:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [title, editor, emoji, isStarred, folder, tags, selectedProjectId, savedDocumentId, folderId]);
+  
+  // 컨텐츠 변경 감지 및 자동저장 트리거
+  useEffect(() => {
+    if (!editor || !autoSaveEnabled) return;
+    
+    const handleUpdate = () => {
+      setHasUnsavedChanges(true);
+      
+      // 이전 타이머 제거 (더 이상 필요없음)
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+      
+      // 바로 저장 실행
+      autoSave();
+    };
+    
+    // editor가 null이 아님이 확인된 상태
+    editor.on('update', handleUpdate);
+    
+    return () => {
+      // editor가 null이 아님이 확인된 상태
+      editor.off('update', handleUpdate);
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [editor, autoSaveEnabled, autoSave]);
+  
+  // 제목 변경시 자동저장 트리거
+  useEffect(() => {
+    if (!autoSaveEnabled || !title) return;
+    
+    // 이전 타이머 취소
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+    
+    setHasUnsavedChanges(true);
+    
+    // 바로 자동저장 실행
+    autoSave();
+  }, [title, autoSaveEnabled, autoSave]);
+  
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white flex flex-col">
       {/* 공통 CSS 스타일 */}
       <style jsx global>{`
         .ProseMirror {
           outline: none;
           min-height: 100px;
-          padding: 1rem 0;
+          padding: 0.5rem 0;
         }
         
         .ProseMirror p {
@@ -606,19 +848,19 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
         .ProseMirror h1 {
           font-size: 1.875rem;
           font-weight: bold;
-          margin: 1em 0 0.5em;
+          margin: 0.5em 0 0.25em;
         }
         
         .ProseMirror h2 {
           font-size: 1.5rem;
           font-weight: bold;
-          margin: 1em 0 0.5em;
+          margin: 0.5em 0 0.25em;
         }
         
         .ProseMirror h3 {
           font-size: 1.25rem;
           font-weight: bold;
-          margin: 1em 0 0.5em;
+          margin: 0.5em 0 0.25em;
         }
         
         .ProseMirror ul, .ProseMirror ol {
@@ -695,30 +937,6 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
         }
       `}</style>
       
-      {/* 프로젝트 ID 경고 - 새로 추가 */}
-      {projectIdWarning && (
-        <div className="fixed top-0 left-0 right-0 bg-yellow-100 border-b border-yellow-300 p-2 z-50">
-          <div className="max-w-4xl mx-auto flex items-center justify-between">
-            <div className="flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-700 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <span className="text-yellow-800">
-                <strong>프로젝트 문서 생성 중:</strong> 이 문서는 프로젝트 ID: <span className="font-mono">{selectedProjectId}</span>로 저장됩니다.
-              </span>
-            </div>
-            <button 
-              onClick={() => setProjectIdWarning(false)}
-              className="text-yellow-700 hover:text-yellow-900"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
-      
       {/* 상단 툴바 */}
       <div className={`sticky ${projectIdWarning ? 'top-10' : 'top-0'} z-10 bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between`}>
         <div className="flex items-center">
@@ -727,14 +945,69 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
           </Link>
           <div className="flex items-center">
             <button className="text-2xl mr-2">{emoji}</button>
-            <div className="text-sm text-gray-500 flex items-center">
+            <div className="text-sm text-gray-500 flex items-center relative">
               <FolderIcon className="w-4 h-4 mr-1" />
-              <span>{folder}</span>
+              <button 
+                onClick={() => setShowFolderDropdown(!showFolderDropdown)}
+                className="hover:bg-gray-100 py-1 px-2 rounded-md flex items-center"
+              >
+                <span>{folder || "기본 폴더"}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              
+              {/* 폴더 드롭다운 */}
+              {showFolderDropdown && (
+                <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-20 w-56">
+                  <div className="py-1 max-h-64 overflow-y-auto">
+                    <button
+                      onClick={() => {
+                        setFolder("기본 폴더");
+                        setFolderId(null);
+                        setShowFolderDropdown(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 text-sm ${folder === "기본 폴더" ? 'bg-gray-100 text-gray-900' : 'hover:bg-gray-50 text-gray-700'}`}
+                    >
+                      기본 폴더
+                    </button>
+                    
+                    {availableFolders.length > 0 && (
+                      <>
+                        <div className="border-t border-gray-200 my-1"></div>
+                        {availableFolders.map((folderItem) => (
+                          <button
+                            key={folderItem.id}
+                            onClick={() => handleFolderChange(folderItem)}
+                            className={`w-full text-left px-4 py-2 text-sm ${folder === folderItem.name ? 'bg-gray-100 text-gray-900' : 'hover:bg-gray-50 text-gray-700'}`}
+                          >
+                            {folderItem.name}
+                          </button>
+                        ))}
+                      </>
+                    )}
+                    
+                    <div className="border-t border-gray-200 my-1"></div>
+                    <button
+                      onClick={() => {
+                        const newFolder = prompt("새 폴더 이름을 입력하세요:");
+                        if (newFolder && newFolder.trim()) {
+                          createNewFolder(newFolder.trim());
+                        }
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 text-gray-700 flex items-center"
+                    >
+                      <PlusIcon className="w-4 h-4 mr-2" />
+                      <span>새 폴더 만들기</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+              
               {selectedProjectId && (
-                <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full flex items-center">
-                  <span>프로젝트 문서</span>
-                  <span className="font-mono ml-1 bg-blue-200 px-1 rounded">
-                    {selectedProjectId.substring(0, 8)}
+                <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full flex items-center">          
+                  <span className="font-mono ml-1 bg-blue-100 px-1">
+                    {projectName || '로딩 중...'}
                   </span>
                 </span>
               )}
@@ -743,30 +1016,6 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
         </div>
         
         <div className="flex items-center gap-2">
-          {/* 프로젝트 선택기 - 새로운 디자인 */}
-          <div className="border border-gray-300 rounded-md overflow-hidden flex items-center">
-            {isNewDocument ? (
-              <select 
-                className="px-2 py-1 text-sm bg-white border-none focus:ring-0"
-                value={selectedProjectId || ""}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  forceSetProjectId(value === "" ? null : value);
-                }}
-                disabled={projectIdFixed}
-              >
-                <option value="">개인 문서</option>
-                {projectIdParam && (
-                  <option value={projectIdParam}>현재 프로젝트</option>
-                )}
-              </select>
-            ) : (
-              <div className="px-2 py-1 text-sm font-medium">
-                {selectedProjectId ? "프로젝트 문서" : "개인 문서"}
-              </div>
-            )}
-          </div>
-          
           <div className="flex items-center gap-1">
             {tags.map((tag, index) => (
               <span key={index} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
@@ -827,7 +1076,6 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
                 문서가 성공적으로 저장되었습니다.
                 {selectedProjectId && (
                   <span className="block text-xs mt-1 font-mono">
-                    프로젝트 ID: {selectedProjectId}
                   </span>
                 )}
               </p>
@@ -837,56 +1085,16 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       )}
       
       {/* 문서 편집 영역 */}
-      <div className="max-w-4xl mx-auto px-8">
+      <div className="max-w-4xl mx-auto px-8 flex-1">
         {/* 문서 제목 */}
-        <div className="mb-8 mt-8">
+        <div className="mt-0 pt-0">
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full text-4xl font-bold text-gray-900 border-none outline-none focus:ring-0 p-0"
+            className="w-full text-4xl font-bold text-gray-900 border-none outline-none focus:ring-0 p-0 pt-2"
             placeholder="제목 없음"
           />
-          
-          {/* 프로젝트 ID 디버깅 정보 */}
-          {selectedProjectId && (
-            <div className="mt-2 flex items-center p-2 bg-gray-50 rounded-md border border-dashed border-gray-300">
-              <div className="text-xs text-gray-500 font-mono">
-                <div className="flex flex-col">
-                  <div className="flex items-center space-x-1">
-                    <span className="text-green-600">프로젝트:</span>
-                    <span className="font-bold bg-blue-100 text-blue-800 px-1 rounded">
-                      {selectedProjectId.substring(0, 16)}
-                    </span>
-                    <span className="text-xs text-gray-400">({projectIdDebug.source} 기준)</span>
-                  </div>
-                  
-                  <div className="mt-1 flex flex-wrap gap-2">
-                    <span className="text-xs">
-                      <span className="text-gray-400">상태:</span>
-                      <span className={`ml-1 px-1 rounded ${projectIdFixed ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                        {projectIdFixed ? '고정됨' : '변경가능'}
-                      </span>
-                    </span>
-                    
-                    <span className="text-xs">
-                      <span className="text-gray-400">타입:</span>
-                      <span className="ml-1 bg-gray-100 px-1 rounded">
-                        {typeof selectedProjectId}
-                      </span>
-                    </span>
-                    
-                    <span className="text-xs">
-                      <span className="text-gray-400">JSON:</span>
-                      <span className="ml-1 bg-gray-100 px-1 rounded">
-                        {JSON.stringify(selectedProjectId)}
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
         
         {/* 선택 텍스트에 대한 버블 메뉴 */}
@@ -1094,7 +1302,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
         )}
         
         {/* Tiptap 에디터 */}
-        <div className="prose max-w-none">
+        <div className="prose max-w-none mt-1">
           <EditorContent editor={editor} className="min-h-[500px]" />
         </div>
       </div>

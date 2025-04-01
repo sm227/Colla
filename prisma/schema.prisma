@@ -46,6 +46,7 @@ model Project {
   user        User?           @relation(fields: [userId], references: [id])
   documents   Document[]
   members     ProjectMember[]
+  folders     Folder[]
 }
 
 model ProjectMember {
@@ -74,4 +75,17 @@ model Document {
   updatedAt DateTime @updatedAt
   projectId String?
   project   Project? @relation(fields: [projectId], references: [id])
+  folderId  String?
+  folderRef Folder?  @relation(fields: [folderId], references: [id])
+}
+
+model Folder {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  projectId   String?
+  project     Project?   @relation(fields: [projectId], references: [id])
+  documents   Document[]
 }

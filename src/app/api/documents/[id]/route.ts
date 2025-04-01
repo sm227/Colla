@@ -90,7 +90,7 @@ export async function PATCH(
     
     const body = await request.json();
     
-    const { title, content, emoji, isStarred, folder, projectId, tags } = body;
+    const { title, content, emoji, isStarred, folder, projectId, tags, folderId } = body;
     
     // 프로젝트 ID 필수 확인
     if (!projectId || projectId === '' || projectId === 'null' || projectId === undefined || projectId === null) {
@@ -109,79 +109,113 @@ export async function PATCH(
       );
     }
     
-    // 트랜잭션 시작
-    const result = await prisma.$transaction(async (tx) => {
-      // 1. 문서 확인
-      const existingDocument = await tx.document.findUnique({
-        where: { id: documentId }
-      });
-      
-      if (!existingDocument) {
-        throw new Error(`문서를 찾을 수 없습니다: ${documentId}`);
-      }
-      
-      // 2. 프로젝트 확인 - 반드시 유효한 프로젝트여야 함
-      const projectToUse = await tx.project.findUnique({
-        where: { id: projectId }
-      });
-      
-      if (!projectToUse) {
-        throw new Error(`지정된 프로젝트(${projectId})를 찾을 수 없습니다.`);
-      }
-      
-      // 권한 확인 - 프로젝트는 반드시 현재 사용자의 것이어야 함
-      if (projectToUse.userId !== currentUser.id) {
-        throw new Error('이 프로젝트에 문서를 연결할 권한이 없습니다.');
-      }
-      
-      // 3. 태그 처리
-      const processedTags = tags ? JSON.stringify(tags) : null;
-      
-      // 4. 문서 업데이트 데이터 구성
-      const updateData: any = {};
-      
-      if (title !== undefined) updateData.title = title;
-      if (content !== undefined) updateData.content = content;
-      if (emoji !== undefined) updateData.emoji = emoji;
-      if (isStarred !== undefined) updateData.isStarred = isStarred;
-      if (folder !== undefined) updateData.folder = folder;
-      if (processedTags !== undefined) updateData.tags = processedTags;
-      
-      // projectId 설정 (필수)
-      updateData.projectId = projectId;
-      
-      // 5. 문서 업데이트
-      const updatedDocument = await tx.document.update({
-        where: { id: documentId },
-        data: updateData
-      });
-      
-      return updatedDocument;
-    });
+    // 문서가 존재하는지 확인
+    const existingDocumentQuery = await prisma.$queryRaw`
+      SELECT d.*, p."userId" 
+      FROM "Document" d
+      LEFT JOIN "Project" p ON d."projectId" = p.id
+      WHERE d.id = ${documentId}
+    `;
     
-    return NextResponse.json(result);
-  } catch (error) {
-    console.error('문서 업데이트 오류:', error);
+    const existingDocument = (existingDocumentQuery as any[])[0];
     
-    // 적절한 상태 코드 결정
-    let statusCode = 500;
-    let errorMessage = '문서를 업데이트하는 중 오류가 발생했습니다.';
+    if (!existingDocument) {
+      return NextResponse.json(
+        { error: "문서를 찾을 수 없습니다." },
+        { status: 404 }
+      );
+    }
     
-    if (error instanceof Error) {
-      if (error.message.includes('찾을 수 없습니다')) {
-        statusCode = 404;
-        errorMessage = error.message;
-      } else if (error.message.includes('권한이 없습니다')) {
-        statusCode = 403;
-        errorMessage = error.message;
-      } else {
-        errorMessage = `문서 업데이트 오류: ${error.message}`;
+    // 문서 소유권 확인
+    if (existingDocument.userId !== currentUser.id) {
+      return NextResponse.json(
+        { error: "이 문서를 수정할 권한이 없습니다." },
+        { status: 403 }
+      );
+    }
+    
+    // 다른 프로젝트로 이동 불가
+    if (existingDocument.projectId !== projectId) {
+      return NextResponse.json(
+        { error: "문서의 프로젝트를 변경할 수 없습니다." },
+        { status: 400 }
+      );
+    }
+    
+    // folderId가 제공된 경우 유효성 확인
+    if (folderId && folderId !== existingDocument.folderId) {
+      try {
+        // SQL로 폴더 확인
+        const folderQuery = await prisma.$queryRaw`
+          SELECT id FROM "Folder" 
+          WHERE id = ${folderId} AND "projectId" = ${projectId}
+        `;
+        
+        if (!(folderQuery as any[]).length) {
+          return NextResponse.json(
+            { error: "지정된 폴더가 존재하지 않거나 해당 프로젝트에 속하지 않습니다." },
+            { status: 404 }
+          );
+        }
+      } catch (error) {
+        console.error("폴더 조회 중 오류:", error);
+        return NextResponse.json(
+          { error: "폴더 정보를 확인할 수 없습니다." },
+          { status: 500 }
+        );
       }
     }
     
+    // 문서 업데이트
+    const updateQuery = `
+      UPDATE "Document"
+      SET 
+        title = $1,
+        content = $2,
+        emoji = $3,
+        "isStarred" = $4,
+        folder = $5,
+        tags = $6,
+        "folderId" = $7,
+        "updatedAt" = $8
+      WHERE id = $9
+      RETURNING *
+    `;
+    
+    // 업데이트할 값 준비
+    const updateTitle = title !== undefined ? title : existingDocument.title;
+    const updateContent = content !== undefined ? content : existingDocument.content;
+    const updateEmoji = emoji !== undefined ? emoji : existingDocument.emoji;
+    const updateIsStarred = isStarred !== undefined ? isStarred : existingDocument.isStarred;
+    const updateFolder = folder !== undefined ? folder : existingDocument.folder;
+    const updateTags = tags !== undefined 
+      ? (Array.isArray(tags) ? JSON.stringify(tags) : tags) 
+      : existingDocument.tags;
+    const updateFolderId = folderId !== undefined ? folderId : existingDocument.folderId;
+    const now = new Date();
+    
+    // 문서 업데이트 직접 쿼리
+    const updatedDocumentResult = await prisma.$queryRaw`
+      UPDATE "Document"
+      SET 
+        title = ${updateTitle},
+        content = ${updateContent},
+        emoji = ${updateEmoji},
+        "isStarred" = ${updateIsStarred},
+        folder = ${updateFolder},
+        tags = ${updateTags},
+        "folderId" = ${updateFolderId},
+        "updatedAt" = ${now}
+      WHERE id = ${documentId}
+      RETURNING *
+    `;
+    
+    return NextResponse.json((updatedDocumentResult as any[])[0]);
+  } catch (error) {
+    console.error('문서 수정 오류:', error);
     return NextResponse.json(
-      { error: errorMessage },
-      { status: statusCode }
+      { error: '문서를 수정하는 중 오류가 발생했습니다.' },
+      { status: 500 }
     );
   }
 }
