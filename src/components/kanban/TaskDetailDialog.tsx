@@ -21,7 +21,6 @@ import TaskItem from '@tiptap/extension-task-item';
 import LinkExtension from '@tiptap/extension-link';
 import ImageExtension from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
-import Underline from '@tiptap/extension-underline';
 
 interface Comment {
   id: string;
@@ -35,35 +34,12 @@ interface TaskDetailDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onUpdate: (task: Task) => void;
-  onDelete: (taskId: string) => void;
 }
 
 const RichTextEditor = ({ content, onChange }: { content: string, onChange: (html: string) => void }) => {
-  // HTML 태그를 안전하게 처리하여 초기 내용 설정
-  const getInitialContent = () => {
-    if (!content) return '';
-    
-    try {
-      // HTML 태그인지 확인 (정규식으로 체크)
-      if (/<\/?[a-z][\s\S]*>/i.test(content)) {
-        return content;
-      }
-    } catch (error) {
-      console.error('HTML 내용 처리 오류:', error);
-    }
-    
-    // 일반 텍스트를 HTML로 변환
-    return `<p>${content.replace(/\n/g, '</p><p>')}</p>`;
-  };
-
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({
-        heading: false,
-        codeBlock: false,
-        blockquote: false,
-        horizontalRule: false,
-      }),
+      StarterKit,
       TextStyle,
       Color,
       ListItem,
@@ -75,79 +51,15 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
       }),
       LinkExtension.configure({
         openOnClick: false,
-        HTMLAttributes: {
-          target: '_blank',
-          rel: 'noopener noreferrer',
-        },
       }),
-      ImageExtension.configure({
-        HTMLAttributes: {
-          class: 'max-w-full h-auto rounded-md',
-        },
-      }),
+      ImageExtension,
       Placeholder.configure({
         placeholder: '설명을 입력하세요...',
-        emptyEditorClass: 'is-editor-empty',
       }),
-      Underline,
     ],
-    content: getInitialContent(),
+    content,
     onUpdate: ({ editor }) => {
-      if (editor) {
-        onChange(editor.getHTML());
-      }
-    },
-    editorProps: {
-      attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none min-h-[150px] p-3',
-      },
-      handlePaste: (view, event) => {
-        const items = event.clipboardData?.items;
-        if (!items) return false;
-
-        // 일반 텍스트가 붙여넣기되는 경우 HTML 태그를 제거
-        const text = event.clipboardData.getData('text/plain');
-        const html = event.clipboardData.getData('text/html');
-        
-        if (html && html.includes('<') && html.includes('>')) {
-          // HTML 내용이 있으면 그대로 처리 (에디터가 알아서 처리)
-          return false;
-        }
-        
-        if (text && (text.includes('<') || text.includes('>'))) {
-          // 텍스트에 HTML 태그처럼 보이는 문자가 있으면 이스케이프 처리
-          event.preventDefault();
-          const escaped = text
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-          
-          if (editor) {
-            editor.commands.insertContent(escaped);
-          }
-          return true;
-        }
-
-        // 이미지 붙여넣기 처리
-        for (let i = 0; i < items.length; i++) {
-          const item = items[i];
-          if (item.type.indexOf('image') === 0) {
-            event.preventDefault();
-            const file = item.getAsFile();
-            if (file && editor) {
-              const reader = new FileReader();
-              reader.onload = (e) => {
-                const imageUrl = e.target?.result as string;
-                if (editor) {
-                  editor.chain().focus().setImage({ src: imageUrl }).run();
-                }
-              };
-              reader.readAsDataURL(file);
-            }
-            return true;
-          }
-        }
-        return false;
-      },
+      onChange(editor.getHTML());
     },
   });
 
@@ -173,14 +85,6 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
           title="기울임"
         >
           <Italic size={16} />
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-          className={`p-1 rounded hover:bg-gray-200 ${editor.isActive('underline') ? 'bg-gray-200' : ''}`}
-          type="button"
-          title="밑줄"
-        >
-          <span className="underline">U</span>
         </button>
         <span className="w-px h-6 bg-gray-300 mx-1"></span>
         <button
@@ -212,11 +116,7 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
           onClick={() => {
             const url = window.prompt('URL 입력:');
             if (url) {
-              if (editor.isActive('link')) {
-                editor.chain().focus().unsetLink().run();
-              } else {
-                editor.chain().focus().setLink({ href: url }).run();
-              }
+              editor.chain().focus().setLink({ href: url }).run();
             }
           }}
           className={`p-1 rounded hover:bg-gray-200 ${editor.isActive('link') ? 'bg-gray-200' : ''}`}
@@ -238,6 +138,14 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
         >
           <Image size={16} />
         </button>
+        <button
+          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+          className={`p-1 rounded hover:bg-gray-200 ${editor.isActive('codeBlock') ? 'bg-gray-200' : ''}`}
+          type="button"
+          title="코드"
+        >
+          <Code size={16} />
+        </button>
         <span className="w-px h-6 bg-gray-300 mx-1"></span>
         <div className="relative inline-block">
           <select
@@ -256,174 +164,57 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
             <option value="#172b4d" style={{ color: '#172b4d' }}>검정</option>
           </select>
         </div>
+        <button
+          onClick={() => {
+            const emoji = window.prompt('이모지 입력:');
+            if (emoji) {
+              editor.chain().focus().insertContent(emoji).run();
+            }
+          }}
+          className="p-1 rounded hover:bg-gray-200"
+          type="button"
+          title="이모지"
+        >
+          <Smile size={16} />
+        </button>
       </div>
-      <EditorContent editor={editor} />
+      <EditorContent editor={editor} className="p-3 min-h-[150px] prose max-w-none" />
     </div>
   );
 };
 
-export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: TaskDetailDialogProps) {
+export function TaskDetailDialog({ task, isOpen, onClose, onUpdate }: TaskDetailDialogProps) {
   const [editedTask, setEditedTask] = useState<Task>({...task});
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
-  const [showTaskEmojiPicker, setShowTaskEmojiPicker] = useState(false);
-  const [showCommentEmojiPicker, setShowCommentEmojiPicker] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
   const [showActivity, setShowActivity] = useState(false);
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
-  const [editingCommentContent, setEditingCommentContent] = useState("");
-  const [editorContent, setEditorContent] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
-
-  // 댓글 목록 가져오기
-  const fetchComments = async () => {
-    try {
-      const response = await fetch(`/api/tasks/${task.id}/comments`);
-      if (!response.ok) throw new Error('댓글을 가져오는데 실패했습니다.');
-      const data = await response.json();
-      setComments(data);
-    } catch (error) {
-      console.error('댓글 조회 오류:', error);
-    }
-  };
-
-  // 다이얼로그가 열릴 때 댓글 목록 가져오기
-  useEffect(() => {
-    if (isOpen) {
-      fetchComments();
-      
-      // 에디터 콘텐츠 초기화 - 이전에 저장된 설명을 사용
-      setEditorContent(task.description || "");
-    }
-  }, [isOpen, task.id]);
 
   // task가 변경될 때마다 editedTask 업데이트
   useEffect(() => {
     setEditedTask({...task});
-    setEditorContent(task.description || "");
   }, [task]);
 
-  // 에디터 내용이 변경될 때 호출
-  const handleEditorChange = (html: string) => {
-    setEditorContent(html);
-  };
-
-  // 변경사항이 있을 때마다 editedTask 업데이트
+  // 변경사항이 있을 때마다 자동 저장
   const handleChange = (updatedTask: Task) => {
     setEditedTask(updatedTask);
+    onUpdate(updatedTask);
   };
 
-  // HTML 태그 제거 함수
-  const stripHtml = (html: string): string => {
-    if (!html) return '';
-    
-    try {
-      // div 요소를 만들어 HTML을 파싱
-      const doc = new DOMParser().parseFromString(html, 'text/html');
-      // 텍스트 내용만 추출
-      return doc.body.textContent || '';
-    } catch (error) {
-      console.error('HTML 제거 오류:', error);
-      // 오류 발생 시 정규식으로 태그 제거 시도
-      return html.replace(/<[^>]*>?/gm, '');
-    }
-  };
-
-  // 다이얼로그 닫기
-  const handleClose = () => {
-    // HTML 태그를 제거하고 텍스트로 저장
-    const cleanDescription = stripHtml(editorContent);
-    
-    const updatedTask = {
-      ...editedTask,
-      description: cleanDescription
-    };
-    
-    onUpdate(updatedTask); // 정제된 내용 저장
-    onClose();
-  };
-
-  // 태스크 삭제 처리
-  const handleDeleteTask = () => {
-    if (window.confirm('정말로 이 태스크를 삭제하시겠습니까?')) {
-      onDelete(task.id);
-      onClose();
-    }
-  };
-
-  // 댓글 추가
-  const handleAddComment = async () => {
+  const handleAddComment = () => {
     if (!newComment.trim()) return;
     
-    try {
-      const response = await fetch(`/api/tasks/${task.id}/comments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content: newComment,
-          author: "현재 사용자", // 실제 구현시 로그인된 사용자 정보 사용
-        }),
-      });
-
-      if (!response.ok) throw new Error('댓글 작성에 실패했습니다.');
-      
-      const comment = await response.json();
-      setComments([comment, ...comments]);
-      setNewComment("");
-    } catch (error) {
-      console.error('댓글 작성 오류:', error);
-    }
-  };
-
-  // 댓글 수정 시작
-  const handleStartEdit = (comment: Comment) => {
-    setEditingCommentId(comment.id);
-    setEditingCommentContent(comment.content);
-  };
-
-  // 댓글 수정 완료
-  const handleFinishEdit = async (commentId: string) => {
-    try {
-      const response = await fetch(`/api/tasks/${task.id}/comments/${commentId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content: editingCommentContent,
-        }),
-      });
-
-      if (!response.ok) throw new Error('댓글 수정에 실패했습니다.');
-      
-      const updatedComment = await response.json();
-      setComments(comments.map(comment => 
-        comment.id === commentId ? updatedComment : comment
-      ));
-      setEditingCommentId(null);
-    } catch (error) {
-      console.error('댓글 수정 오류:', error);
-    }
-  };
-
-  // 댓글 삭제
-  const handleDeleteComment = async (commentId: string) => {
-    if (!window.confirm('정말로 이 댓글을 삭제하시겠습니까?')) return;
-
-    try {
-      const response = await fetch(`/api/tasks/${task.id}/comments/${commentId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) throw new Error('댓글 삭제에 실패했습니다.');
-      
-      setComments(comments.filter(comment => comment.id !== commentId));
-    } catch (error) {
-      console.error('댓글 삭제 오류:', error);
-    }
+    const comment: Comment = {
+      id: Date.now().toString(),
+      content: newComment,
+      author: "현재 사용자", // 실제 구현시 로그인된 사용자 정보 사용
+      createdAt: new Date()
+    };
+    
+    setComments([...comments, comment]);
+    setNewComment("");
   };
 
   const getStatusColor = (status: string) => {
@@ -464,22 +255,10 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
     }
   };
 
-  // 외부 클릭시 다이얼로그 닫기
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    // 오버레이를 클릭했고, 다이얼로그 자체는 클릭하지 않은 경우에만 닫기
-    if (overlayRef.current === e.target) {
-      handleClose();
-    }
-  };
-
   if (!isOpen) return null;
 
   return (
-    <div 
-      ref={overlayRef}
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-      onClick={handleOverlayClick}
-    >
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div 
         ref={dialogRef}
         className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
@@ -502,7 +281,7 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
               <MoreHorizontal size={18} />
             </button>
             <button
-              onClick={handleClose}
+              onClick={onClose}
               className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200"
             >
               <X size={18} />
@@ -525,43 +304,10 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-sm font-medium text-gray-700">설명</span>
                 </div>
-                <div className="relative">
-                  <RichTextEditor 
-                    content={editorContent} 
-                    onChange={handleEditorChange}
-                  />
-                  <div className="absolute top-2 right-2 z-10">
-                    <button
-                      onClick={() => setShowTaskEmojiPicker(!showTaskEmojiPicker)}
-                      className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200"
-                      type="button"
-                    >
-                      <Smile className="h-5 w-5" />
-                    </button>
-                  </div>
-                  {showTaskEmojiPicker && (
-                    <div className="absolute top-12 right-2 z-50">
-                      <EmojiPicker
-                        onEmojiClick={(emojiData) => {
-                          const editor = document.querySelector('.ProseMirror');
-                          if (editor) {
-                            const selection = window.getSelection();
-                            const range = selection?.getRangeAt(0);
-                            if (range) {
-                              const textNode = document.createTextNode(emojiData.emoji);
-                              range.insertNode(textNode);
-                              range.setStartAfter(textNode);
-                              range.setEndAfter(textNode);
-                              selection?.removeAllRanges();
-                              selection?.addRange(range);
-                            }
-                          }
-                          setShowTaskEmojiPicker(false);
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
+                <RichTextEditor 
+                  content={editedTask.description || ""} 
+                  onChange={(html) => handleChange({...editedTask, description: html})}
+                />
               </div>
               
               {/* 활동 섹션 */}
@@ -595,51 +341,13 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
                                   {comment.author.charAt(0)}
                                 </div>
                                 <span className="font-medium">{comment.author}</span>
-                                <span className="text-gray-500 text-xs">{format(new Date(comment.createdAt), 'PPP p', { locale: ko })}</span>
+                                <span className="text-gray-500 text-xs">{format(comment.createdAt, 'PPP p', { locale: ko })}</span>
                               </div>
-                              <div className="flex items-center gap-1">
-                                {editingCommentId === comment.id ? (
-                                  <>
-                                    <button
-                                      onClick={() => handleFinishEdit(comment.id)}
-                                      className="text-blue-600 hover:text-blue-700"
-                                    >
-                                      저장
-                                    </button>
-                                    <button
-                                      onClick={() => setEditingCommentId(null)}
-                                      className="text-gray-600 hover:text-gray-700"
-                                    >
-                                      취소
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <button
-                                      onClick={() => handleStartEdit(comment)}
-                                      className="text-gray-400 hover:text-gray-600"
-                                    >
-                                      수정
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteComment(comment.id)}
-                                      className="text-red-400 hover:text-red-600"
-                                    >
-                                      삭제
-                                    </button>
-                                  </>
-                                )}
-                              </div>
+                              <button className="text-gray-400 hover:text-gray-600">
+                                <MoreHorizontal size={16} />
+                              </button>
                             </div>
-                            {editingCommentId === comment.id ? (
-                              <Textarea
-                                value={editingCommentContent}
-                                onChange={(e) => setEditingCommentContent(e.target.value)}
-                                className="w-full border bg-white focus-visible:ring-1 focus-visible:ring-blue-500 resize-none min-h-[80px] p-3 rounded-md"
-                              />
-                            ) : (
-                              <p className="text-gray-800 ml-10">{comment.content}</p>
-                            )}
+                            <p className="text-gray-800 ml-10">{comment.content}</p>
                           </div>
                         ))
                       ) : (
@@ -662,7 +370,7 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
                           <div className="flex justify-between items-center mt-2">
                             <div className="flex gap-1">
                               <button
-                                onClick={() => setShowCommentEmojiPicker(!showCommentEmojiPicker)}
+                                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                                 className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200"
                                 type="button"
                               >
@@ -687,12 +395,12 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
                             </Button>
                           </div>
                           
-                          {showCommentEmojiPicker && (
-                            <div className="absolute bottom-full mb-2 z-50">
+                          {showEmojiPicker && (
+                            <div className="absolute bottom-full mb-2 z-10">
                               <EmojiPicker
                                 onEmojiClick={(emojiData) => {
                                   setNewComment(prev => prev + emojiData.emoji);
-                                  setShowCommentEmojiPicker(false);
+                                  setShowEmojiPicker(false);
                                 }}
                               />
                             </div>
@@ -793,7 +501,7 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
                   <Input
                     type="date"
                     value={editedTask.dueDate ? new Date(editedTask.dueDate).toISOString().split('T')[0] : ""}
-                    onChange={(e) => handleChange({...editedTask, dueDate: e.target.value ? new Date(e.target.value) : undefined})}
+                    onChange={(e) => handleChange({...editedTask, dueDate: e.target.value})}
                     className="border-0 p-0 h-auto focus-visible:ring-0 text-sm"
                   />
                 </div>
@@ -836,19 +544,18 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
                     variant="outline" 
                     size="sm"
                     className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-                    onClick={handleDeleteTask}
                   >
                     <Trash2 size={14} className="mr-1" />
                     삭제
                   </Button>
-                  {/* <Button 
+                  <Button 
                     variant="outline" 
                     size="sm"
                     className="text-gray-600 border-gray-200 hover:bg-gray-50"
                   >
                     <Copy size={14} className="mr-1" />
                     복제
-                  </Button> */}
+                  </Button>
                 </div>
               </div>
             </div>

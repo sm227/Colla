@@ -28,7 +28,7 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ projectId }: KanbanBoardProps) {
-  const { tasks, loading, error, addTask, updateTaskStatus, updateTask, deleteTask } = useTasks(projectId);
+  const { tasks, loading, error, addTask, updateTaskStatus } = useTasks(projectId);
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
   const [tasksState, setTasksState] = useState<Task[]>(tasks);
   
@@ -51,12 +51,10 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
     await updateTaskStatus(taskId, newStatus);
   };
 
-  const handleTaskUpdate = async (updatedTask: Task) => {
-    await updateTask(updatedTask);
-  };
-
-  const handleDeleteTask = async (taskId: string) => {
-    await deleteTask(taskId);
+  const handleTaskUpdate = (updatedTask: Task) => {
+    setTasksState(tasksState.map(t => 
+      t.id === updatedTask.id ? updatedTask : t
+    ));
   };
 
   return (
@@ -97,7 +95,6 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
                 key={task.id}
                 task={task} 
                 onUpdate={handleTaskUpdate}
-                onDelete={handleDeleteTask}
               />
             ))}
           </KanbanColumn>
@@ -112,7 +109,6 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
                 key={task.id}
                 task={task} 
                 onUpdate={handleTaskUpdate}
-                onDelete={handleDeleteTask}
               />
             ))}
           </KanbanColumn>
@@ -127,7 +123,6 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
                 key={task.id}
                 task={task} 
                 onUpdate={handleTaskUpdate}
-                onDelete={handleDeleteTask}
               />
             ))}
           </KanbanColumn>
@@ -142,7 +137,6 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
                 key={task.id}
                 task={task} 
                 onUpdate={handleTaskUpdate}
-                onDelete={handleDeleteTask}
               />
             ))}
           </KanbanColumn>
