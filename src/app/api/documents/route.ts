@@ -37,59 +37,85 @@ async function getCurrentUser() {
   }
 }
 
-// 모든 문서 가져오기 (프로젝트 ID로 필터링 가능)
+// GET: 모든 문서 가져오기 (+프로젝트 ID 필터링 가능)
 export async function GET(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser();
     
     if (!currentUser) {
       return NextResponse.json(
-        { error: '인증된 사용자를 찾을 수 없습니다.' }, 
+        { error: '인증된 사용자를 찾을 수 없습니다.' },
         { status: 401 }
       );
     }
     
-    // URL에서 projectId 쿼리 파라미터 가져오기
+    // URL 쿼리 파라미터 가져오기
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('projectId');
     
+    // 쿼리 조건 설정
     let whereCondition: any = {};
     
+    // 현재는 직접 SQL 쿼리로 처리
+    let documentsQuery = '';
+    
     if (projectId) {
-      // 특정 프로젝트의 문서만 조회
-      whereCondition = { 
-        projectId: {
-          equals: projectId
-        }
-      };
+      // 특정 프로젝트의 문서만 가져옴
+      documentsQuery = `
+        SELECT 
+          d.id, 
+          d.title, 
+          d.content, 
+          d.emoji, 
+          d."isStarred", 
+          d.folder,
+          d."folderId",
+          d.tags, 
+          d."projectId",
+          d."createdAt", 
+          d."updatedAt"
+        FROM "Document" d
+        WHERE d."projectId" = '${projectId}'
+        ORDER BY d."updatedAt" DESC
+      `;
     } else {
-      // 사용자의 모든 문서 조회 (프로젝트 문서 포함)
-      
-      // 사용자의 프로젝트 목록 가져오기
+      // 사용자의 모든 프로젝트 가져오기
       const userProjects = await prisma.project.findMany({
         where: { userId: currentUser.id },
         select: { id: true }
       });
       
-      const userProjectIds = userProjects.map(p => p.id);
+      const userProjectIds = userProjects.map((p: { id: string }) => p.id);
       
-      // 사용자의 문서 또는 사용자의 프로젝트에 속한 문서
-      whereCondition = {
-        OR: [
-          { projectId: { in: userProjectIds.length > 0 ? userProjectIds : undefined } },
-          { projectId: null }
-        ]
-      };
+      if (userProjectIds.length > 0) {
+        // 사용자의 프로젝트에 속한 모든 문서 가져오기
+        documentsQuery = `
+          SELECT 
+            d.id, 
+            d.title, 
+            d.content, 
+            d.emoji, 
+            d."isStarred", 
+            d.folder,
+            d."folderId",
+            d.tags, 
+            d."projectId",
+            d."createdAt", 
+            d."updatedAt"
+          FROM "Document" d
+          WHERE d."projectId" IN (${userProjectIds.map(id => `'${id}'`).join(',')})
+          ORDER BY d."updatedAt" DESC
+        `;
+      } else {
+        // 사용자 프로젝트가 없는 경우
+        return NextResponse.json([]);
+      }
     }
     
-    // 문서 조회
-    const documents = await prisma.document.findMany({
-      where: whereCondition,
-      orderBy: {
-        updatedAt: 'desc'
-      }
-    });
+    // 쿼리 실행
+    const documents = await prisma.$queryRawUnsafe(documentsQuery);
     
+    // 문서 목록 반환
     return NextResponse.json(documents);
   } catch (error) {
     console.error('문서 조회 오류:', error);
@@ -116,7 +142,7 @@ export async function POST(request: NextRequest) {
     // 요청 본문 파싱
     const body = await request.json();
     
-    const { title, content, emoji, isStarred, folder, tags, projectId } = body;
+    const { title, content, emoji, isStarred, folder, tags, projectId, folderId } = body;
     
     // 프로젝트 ID 검증
     if (!projectId) {
@@ -154,52 +180,69 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // folderId가 제공된 경우 유효성 확인
+    if (folderId) {
+      try {
+        // SQL로 폴더 확인
+        const folderQuery = await prisma.$queryRaw`
+          SELECT id FROM "Folder" 
+          WHERE id = ${folderId} AND "projectId" = ${projectId}
+        `;
+        
+        if (!(folderQuery as any[]).length) {
+          return NextResponse.json(
+            { error: "지정된 폴더가 존재하지 않거나 해당 프로젝트에 속하지 않습니다." },
+            { status: 404 }
+          );
+        }
+      } catch (error) {
+        console.error("폴더 조회 중 오류:", error);
+        return NextResponse.json(
+          { error: "폴더 정보를 확인할 수 없습니다." },
+          { status: 500 }
+        );
+      }
+    }
+    
     // 문서 데이터 구성
     const documentData = {
       title: title || "제목 없음",
       content: content || "",
       emoji: emoji || "📄",
       isStarred: isStarred || false,
-      folder: folder || null,
+      folder: folder || null, // 하위 호환성 유지
       tags: Array.isArray(tags) ? JSON.stringify(tags) : null,
-      projectId: projectId
+      projectId: projectId,
+      folderId: folderId || null
     };
     
-    // 문서 생성
-    try {
-      const document = await prisma.document.create({
-        data: documentData
-      });
-      
-      return NextResponse.json(document, { status: 201 });
-    } catch (error) {
-      console.error("문서 생성 중 오류:", error);
-      
-      if (error instanceof Error) {
-        if (error.message.includes("Foreign key constraint failed")) {
-          return NextResponse.json(
-            { error: "프로젝트 ID가 유효하지 않습니다." },
-            { status: 400 }
-          );
-        }
-        
-        if (error.message.includes("Unique constraint failed")) {
-          return NextResponse.json(
-            { error: "이미 존재하는 문서입니다." },
-            { status: 400 }
-          );
-        }
-      }
-      
-      return NextResponse.json(
-        { error: "문서 생성 중 오류가 발생했습니다." },
-        { status: 500 }
-      );
-    }
+    // 새 문서 생성
+    // Prisma 스키마와 실제 DB 컬럼 간 불일치가 있으므로 SQL 쿼리 직접 실행
+    const insertResult = await prisma.$queryRaw`
+      INSERT INTO "Document" (
+        id, title, content, emoji, "isStarred", folder, tags, "projectId", "folderId", "createdAt", "updatedAt"
+      ) VALUES (
+        ${`doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`}, 
+        ${documentData.title}, 
+        ${documentData.content}, 
+        ${documentData.emoji}, 
+        ${documentData.isStarred}, 
+        ${documentData.folder}, 
+        ${documentData.tags}, 
+        ${documentData.projectId}, 
+        ${documentData.folderId}, 
+        ${new Date()}, 
+        ${new Date()}
+      )
+      RETURNING *
+    `;
+    
+    return NextResponse.json((insertResult as any[])[0]);
+    
   } catch (error) {
-    console.error("요청 처리 중 오류:", error);
+    console.error('문서 생성 오류:', error);
     return NextResponse.json(
-      { error: "요청을 처리할 수 없습니다." },
+      { error: '문서를 생성하는 중 오류가 발생했습니다.' },
       { status: 500 }
     );
   }
