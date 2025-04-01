@@ -14,6 +14,22 @@ export async function GET(
       orderBy: {
         createdAt: 'desc',
       },
+      // 필요한 모든 필드 선택 (startDate, endDate, isAllDay 포함)
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        status: true,
+        priority: true,
+        assignee: true,
+        dueDate: true,
+        startDate: true,
+        endDate: true,
+        isAllDay: true,
+        createdAt: true,
+        updatedAt: true,
+        projectId: true
+      }
     });
     
     return NextResponse.json(tasks);
@@ -35,7 +51,17 @@ export async function POST(
     const projectId = params.id;
     const body = await request.json();
     
-    const { title, description, status, priority, assignee, dueDate } = body;
+    const { 
+      title, 
+      description, 
+      status, 
+      priority, 
+      assignee, 
+      dueDate,
+      startDate,
+      endDate,
+      isAllDay 
+    } = body;
     
     if (!title || !status || !priority) {
       return NextResponse.json(
@@ -64,6 +90,9 @@ export async function POST(
         priority,
         assignee,
         dueDate: dueDate ? new Date(dueDate) : null,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+        isAllDay: isAllDay || false,
         projectId,
       },
     });
