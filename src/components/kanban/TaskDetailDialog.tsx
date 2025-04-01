@@ -34,12 +34,17 @@ interface TaskDetailDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onUpdate: (task: Task) => void;
+  onDelete?: (taskId: string) => void;
 }
 
 const RichTextEditor = ({ content, onChange }: { content: string, onChange: (html: string) => void }) => {
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        bulletList: false,
+        orderedList: false,
+        listItem: false,
+      }),
       TextStyle,
       Color,
       ListItem,
@@ -61,6 +66,7 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
+    immediatelyRender: false,
   });
 
   if (!editor) {
@@ -183,7 +189,7 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
   );
 };
 
-export function TaskDetailDialog({ task, isOpen, onClose, onUpdate }: TaskDetailDialogProps) {
+export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: TaskDetailDialogProps) {
   const [editedTask, setEditedTask] = useState<Task>({...task});
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -255,34 +261,128 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate }: TaskDetail
     }
   };
 
+  // 삭제 버튼 핸들러 수정
+  const handleDelete = () => {
+    // 삭제 전 사용자에게 확인
+    if (window.confirm(`'${task.title}' 작업을 정말 삭제하시겠습니까?`)) {
+      // 콘솔에 삭제 요청 기록
+      console.log('작업 삭제 요청:', task.id);
+      
+      // onDelete 함수가 있으면 실행
+      if (typeof onDelete === 'function') {
+        console.log('onDelete는 함수입니다. 실행합니다.');
+        onDelete(task.id);
+      } else {
+        console.warn('onDelete 함수가 제공되지 않았습니다', onDelete);
+        alert('작업 삭제 기능이 제대로 설정되지 않았습니다.');
+      }
+      
+      // 대화상자 닫기
+      onClose();
+    }
+  };
+
+  // 모달 외부 클릭 처리 함수 수정
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('모달 배경 클릭 - 닫기 실행');
+      onClose();
+    }
+  };
+
+  // 닫기 버튼 클릭 핸들러를 수정합니다
+  const handleXButtonClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('X 버튼 클릭 - 직접 상태 변경');
+    
+    // 직접 모달을 숨기고 상태 초기화
+    if (typeof document !== 'undefined') {
+      const modalEl = document.querySelector('[data-modal-backdrop="true"]');
+      if (modalEl) {
+        modalEl.classList.add('opacity-0');
+        modalEl.classList.add('pointer-events-none');
+        
+        // 완전히 사라진 후에 onClose 호출
+        setTimeout(() => {
+          onClose();
+        }, 10);
+      } else {
+        onClose();
+      }
+    } else {
+      onClose();
+    }
+  };
+
+  // 모달의 JSX 부분에서 반환 직전에 추가합니다
+  useEffect(() => {
+    // ESC 키로 모달 닫기
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    // Clean up event listeners
+    window.addEventListener('keydown', handleEscKey);
+    return () => {
+      window.removeEventListener('keydown', handleEscKey);
+    };
+  }, [onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    // 모달 배경
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      onClick={handleBackdropClick}
+      data-modal-backdrop="true"
+    >
+      {/* 모달 컨테이너 */}
       <div 
         ref={dialogRef}
         className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* 헤더 영역 */}
         <div className="p-4 border-b flex justify-between items-center bg-gray-50">
           <div className="flex items-center gap-2">
             <span className="text-gray-500 text-sm">JEXO-{task.id}</span>
             <div className="flex gap-2">
-              <button className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200">
+              <button 
+                type="button" 
+                className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <Copy size={16} />
               </button>
-              <button className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200">
+              <button 
+                type="button" 
+                className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <Share2 size={16} />
               </button>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200">
+            <button 
+              type="button" 
+              className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200"
+              onClick={(e) => e.stopPropagation()}
+            >
               <MoreHorizontal size={18} />
             </button>
+            {/* 닫기 버튼 */}
             <button
-              onClick={onClose}
+              type="button"
+              onClick={handleXButtonClick}
               className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200"
+              data-close-button="true"
             >
               <X size={18} />
             </button>
@@ -543,18 +643,11 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate }: TaskDetail
                   <Button 
                     variant="outline" 
                     size="sm"
-                    className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                    className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 w-full"
+                    onClick={handleDelete}
                   >
                     <Trash2 size={14} className="mr-1" />
                     삭제
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="text-gray-600 border-gray-200 hover:bg-gray-50"
-                  >
-                    <Copy size={14} className="mr-1" />
-                    복제
                   </Button>
                 </div>
               </div>

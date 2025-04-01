@@ -8,6 +8,7 @@ import { Plus } from "lucide-react";
 import { useTasks } from "@/hooks/useTasks";
 import { Alert } from "@/components/ui/alert";
 import { KanbanTask } from "./KanbanTask";
+import { TaskDetailDialog } from "./TaskDetailDialog";
 
 // 칸반 보드 상태 타입 정의
 export type TaskStatus = "todo" | "in-progress" | "review" | "done";
@@ -28,15 +29,24 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ projectId }: KanbanBoardProps) {
-  const { tasks, loading, error, addTask, updateTaskStatus } = useTasks(projectId);
+  const { tasks, loading, error, addTask, updateTaskStatus, deleteTask } = useTasks(projectId);
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
   const [tasksState, setTasksState] = useState<Task[]>(tasks);
   
-  // 상태별로 태스크 필터링
-  const todoTasks = tasks.filter((task) => task.status === "todo");
-  const inProgressTasks = tasks.filter((task) => task.status === "in-progress");
-  const reviewTasks = tasks.filter((task) => task.status === "review");
-  const doneTasks = tasks.filter((task) => task.status === "done");
+  // 작업 상세 다이얼로그 관련 상태 추가
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  // useEffect로 tasks가 변경될 때 tasksState도 업데이트
+  useEffect(() => {
+    setTasksState(tasks);
+  }, [tasks]);
+
+  // 상태별로 태스크 필터링 - tasksState 사용으로 변경
+  const todoTasks = tasksState.filter((task) => task.status === "todo");
+  const inProgressTasks = tasksState.filter((task) => task.status === "in-progress");
+  const reviewTasks = tasksState.filter((task) => task.status === "review");
+  const doneTasks = tasksState.filter((task) => task.status === "done");
 
   // 새 태스크 추가 함수
   const handleAddTask = async (newTask: Omit<Task, "id">) => {
@@ -51,11 +61,64 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
     await updateTaskStatus(taskId, newStatus);
   };
 
-  const handleTaskUpdate = (updatedTask: Task) => {
-    setTasksState(tasksState.map(t => 
-      t.id === updatedTask.id ? updatedTask : t
-    ));
+  // 작업 상세 다이얼로그 관리 함수 수정
+  const handleOpenDialog = (task: Task) => {
+    setSelectedTask(task);
+    setIsDialogOpen(true);
   };
+
+  const handleCloseDialog = () => {
+    // 즉시 상태 업데이트
+    setIsDialogOpen(false);
+    setSelectedTask(null);
+  };
+
+  // 작업 업데이트 함수
+  const handleUpdateTask = (updatedTask: Task) => {
+    const updatedTasks = tasksState.map(t => 
+      t.id === updatedTask.id ? updatedTask : t
+    );
+    setTasksState(updatedTasks);
+  };
+
+  // 삭제 함수 구현 수정 - useTasks의 deleteTask 함수 사용
+  const handleDeleteTask = async (taskId: string) => {
+    console.log('handleDeleteTask 함수가 호출되었습니다.', taskId);
+    
+    try {
+      // DB에서 작업 삭제
+      await deleteTask(taskId);
+      
+      // 로컬 상태 업데이트 (deleteTask가 상태를 업데이트하지 않는 경우에만)
+      const updatedTasks = tasksState.filter(task => task.id !== taskId);
+      setTasksState(updatedTasks);
+      
+      // 대화상자 닫기
+      handleCloseDialog();
+      
+      console.log('작업이 성공적으로 삭제되었습니다.');
+    } catch (error) {
+      console.error('작업 삭제 중 오류 발생:', error);
+      alert('작업 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
+  // DB에서 작업 삭제 함수 (hooks/useTasks.ts에 있을 수 있음)
+  const deleteTaskFromDatabase = async (taskId: string) => {
+    // API 호출로 DB에서 작업 삭제
+    const response = await fetch(`/api/tasks/${taskId}`, {
+      method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+      throw new Error('작업 삭제 실패');
+    }
+    
+    return await response.json();
+  };
+
+  // 함수 전달 시 검증
+  console.log('handleDeleteTask 함수 정의됨:', typeof handleDeleteTask === 'function');
 
   return (
     <div className="flex flex-col">
@@ -89,57 +152,29 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             tasks={todoTasks} 
             status="todo" 
             updateTaskStatus={handleUpdateTaskStatus} 
-          >
-            {todoTasks.map((task) => (
-              <KanbanTask 
-                key={task.id}
-                task={task} 
-                onUpdate={handleTaskUpdate}
-              />
-            ))}
-          </KanbanColumn>
+            onTaskClick={handleOpenDialog}
+          />
           <KanbanColumn 
             title="진행 중" 
             tasks={inProgressTasks} 
             status="in-progress" 
             updateTaskStatus={handleUpdateTaskStatus} 
-          >
-            {inProgressTasks.map((task) => (
-              <KanbanTask 
-                key={task.id}
-                task={task} 
-                onUpdate={handleTaskUpdate}
-              />
-            ))}
-          </KanbanColumn>
+            onTaskClick={handleOpenDialog}
+          />
           <KanbanColumn 
             title="검토" 
             tasks={reviewTasks} 
             status="review" 
             updateTaskStatus={handleUpdateTaskStatus} 
-          >
-            {reviewTasks.map((task) => (
-              <KanbanTask 
-                key={task.id}
-                task={task} 
-                onUpdate={handleTaskUpdate}
-              />
-            ))}
-          </KanbanColumn>
+            onTaskClick={handleOpenDialog}
+          />
           <KanbanColumn 
             title="완료" 
             tasks={doneTasks} 
             status="done" 
             updateTaskStatus={handleUpdateTaskStatus} 
-          >
-            {doneTasks.map((task) => (
-              <KanbanTask 
-                key={task.id}
-                task={task} 
-                onUpdate={handleTaskUpdate}
-              />
-            ))}
-          </KanbanColumn>
+            onTaskClick={handleOpenDialog}
+          />
         </div>
       )}
 
@@ -148,6 +183,16 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
         onClose={() => setIsAddTaskDialogOpen(false)} 
         onAddTask={handleAddTask} 
       />
+
+      {selectedTask && (
+        <TaskDetailDialog
+          task={selectedTask}
+          isOpen={isDialogOpen}
+          onClose={handleCloseDialog}
+          onUpdate={handleUpdateTask}
+          onDelete={handleDeleteTask}
+        />
+      )}
     </div>
   );
 } 
