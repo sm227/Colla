@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useProjects } from "@/hooks/useProjects";
+import { useProject } from "@/app/contexts/ProjectContext";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+
 
 interface ProjectSelectorProps {
   selectedProjectId: string | null;
@@ -14,7 +15,7 @@ export function ProjectSelector({
   selectedProjectId,
   onSelectProject,
 }: ProjectSelectorProps) {
-  const { projects, loading, error, addProject } = useProjects();
+  const { projects, loading, error, createProject } = useProject();
   const [isAddingProject, setIsAddingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectDescription, setNewProjectDescription] = useState("");
@@ -22,7 +23,7 @@ export function ProjectSelector({
   const handleAddProject = async () => {
     if (!newProjectName.trim()) return;
 
-    await addProject(newProjectName, newProjectDescription);
+    await createProject(newProjectName, newProjectDescription);
     setNewProjectName("");
     setNewProjectDescription("");
     setIsAddingProject(false);
