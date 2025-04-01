@@ -29,7 +29,6 @@ model Task {
   updatedAt   DateTime  @updatedAt
   projectId   String?
   project     Project?  @relation(fields: [projectId], references: [id])
-  comments    Comment[]
 }
 
 model Project {
@@ -39,7 +38,6 @@ model Project {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   tasks       Task[]
-<<<<<<< HEAD
   userId      String?
   user        User?     @relation(fields: [userId], references: [id])
   documents   Document[]
@@ -58,16 +56,3 @@ model Document {
   projectId   String?
   project     Project?  @relation(fields: [projectId], references: [id])
 }
-=======
-}
-
-model Comment {
-  id        String   @id @default(cuid())
-  content   String
-  author    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  taskId    String
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-} 
->>>>>>> 2230305d79ec7c6c99424cceaead713b23ecc628

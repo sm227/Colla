@@ -9,10 +9,9 @@ import { TaskDetailDialog } from "./TaskDetailDialog";
 interface KanbanTaskProps {
   task: Task;
   onUpdate: (task: Task) => void;
-  onDelete: (taskId: string) => void;
 }
 
-export function KanbanTask({ task, onUpdate, onDelete }: KanbanTaskProps) {
+export function KanbanTask({ task, onUpdate }: KanbanTaskProps) {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const { isDragging, setNodeRef } = useDrag({
     id: task.id,
@@ -73,7 +72,6 @@ export function KanbanTask({ task, onUpdate, onDelete }: KanbanTaskProps) {
         isOpen={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
         onUpdate={onUpdate}
-        onDelete={onDelete}
       />
     </>
   );
