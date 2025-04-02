@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay, differenceInDays, getDay, addDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, HomeIcon, CalendarIcon, PlusIcon } from "lucide-react";
 import { useProject } from "@/app/contexts/ProjectContext";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface Task {
   id: string;
@@ -25,11 +27,14 @@ interface CalendarTask extends Task {
 }
 
 export default function CalendarPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const projectId = searchParams?.get('projectId');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [calendarTasks, setCalendarTasks] = useState<CalendarTask[]>([]);
-  const { currentProject } = useProject();
+  const { currentProject, projects } = useProject();
 
   // 태스크 가져오기
   useEffect(() => {
@@ -49,37 +54,40 @@ export default function CalendarPage() {
     fetchTasks();
   }, [currentProject?.id]);
 
-  // 현재 월의 시작일과 마지막일을 구함
-  const monthStart = startOfMonth(currentDate);
-  const firstDayOfMonth = getDay(monthStart); // 0: 일요일, 1: 월요일, ...
-  
-  // 이전 달의 마지막 날짜들을 포함 (달력 첫 줄 채우기 위함)
-  const prevMonthDays = firstDayOfMonth > 0 
-    ? eachDayOfInterval({ 
-        start: addDays(monthStart, -firstDayOfMonth), 
-        end: addDays(monthStart, -1) 
-      }) 
-    : [];
-  
-  const monthEnd = endOfMonth(currentDate);
-  const currentMonthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
-  
-  // 다음 달의 시작 날짜들을 포함 (달력 마지막 줄 채우기 위함)
-  const lastDayOfMonth = getDay(monthEnd); // 0: 일요일, 1: 월요일, ...
-  const nextMonthDays = lastDayOfMonth < 6 
-    ? eachDayOfInterval({ 
-        start: addDays(monthEnd, 1), 
-        end: addDays(monthEnd, 6 - lastDayOfMonth) 
-      }) 
-    : [];
-  
-  // 달력에 표시할 모든 날짜 (이전 달 + 현재 달 + 다음 달)
-  const calendarDays = [...prevMonthDays, ...currentMonthDays, ...nextMonthDays];
-
-  // 캘린더에 표시할 태스크 계산
-  useEffect(() => {
-    if (tasks.length === 0) return;
-
+  // 달력 날짜와 태스크 계산을 메모이제이션
+  const { calendarDays, processedCalendarTasks } = useMemo(() => {
+    // 현재 월의 시작일과 마지막일을 구함
+    const monthStart = startOfMonth(currentDate);
+    const firstDayOfMonth = getDay(monthStart); // 0: 일요일, 1: 월요일, ...
+    
+    // 이전 달의 마지막 날짜들을 포함 (달력 첫 줄 채우기 위함)
+    const prevMonthDays = firstDayOfMonth > 0 
+      ? eachDayOfInterval({ 
+          start: addDays(monthStart, -firstDayOfMonth), 
+          end: addDays(monthStart, -1) 
+        }) 
+      : [];
+    
+    const monthEnd = endOfMonth(currentDate);
+    const currentMonthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
+    
+    // 다음 달의 시작 날짜들을 포함 (달력 마지막 줄 채우기 위함)
+    const lastDayOfMonth = getDay(monthEnd); // 0: 일요일, 1: 월요일, ...
+    const nextMonthDays = lastDayOfMonth < 6 
+      ? eachDayOfInterval({ 
+          start: addDays(monthEnd, 1), 
+          end: addDays(monthEnd, 6 - lastDayOfMonth) 
+        }) 
+      : [];
+    
+    // 달력에 표시할 모든 날짜 (이전 달 + 현재 달 + 다음 달)
+    const allCalendarDays = [...prevMonthDays, ...currentMonthDays, ...nextMonthDays];
+    
+    // 태스크 처리 로직 (tasks가 비어있으면 빈 배열 반환)
+    if (tasks.length === 0) {
+      return { calendarDays: allCalendarDays, processedCalendarTasks: [] };
+    }
+    
     // 태스크를 겹침 없이 행별로 배치하기 위한 함수
     const assignRowsToTasks = (tasks: CalendarTask[]): CalendarTask[] => {
       // 태스크를 시작일 기준으로 정렬
@@ -158,8 +166,13 @@ export default function CalendarPage() {
     
     // 태스크에 행 할당
     const tasksWithRows = assignRowsToTasks(preparedTasks);
-    setCalendarTasks(tasksWithRows);
-  }, [tasks, monthStart, monthEnd, firstDayOfMonth, lastDayOfMonth]);
+    return { calendarDays: allCalendarDays, processedCalendarTasks: tasksWithRows };
+  }, [currentDate, tasks]);
+  
+  // 계산된 태스크를 상태로 업데이트
+  useEffect(() => {
+    setCalendarTasks(processedCalendarTasks);
+  }, [processedCalendarTasks]);
 
   // 이전 달로 이동
   const prevMonth = () => {
@@ -173,31 +186,70 @@ export default function CalendarPage() {
 
   // 요일 헤더
   const weekDays = ['일', '월', '화', '수', '목', '금', '토'];
+  
+  // 현재 프로젝트 이름 가져오기
+  const currentProjectName = projectId 
+    ? projects?.find(p => p.id === projectId)?.name || "프로젝트" 
+    : "모든 프로젝트";
 
   return (
-    <div className="p-4">
-      <div className="mx-auto max-w-6xl">
-        {/* 캘린더 헤더 */}
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-semibold">
-            {format(currentDate, 'yyyy년 MM월', { locale: ko })}
-          </h1>
-          <div className="flex gap-2">
-            <Button variant="outline" size="icon" onClick={prevMonth}>
-              <ChevronLeft className="h-4 w-4" />
+    <div className="bg-white min-h-screen">
+      {/* 상단 네비게이션 바 */}
+      <div className="bg-white border-b border-gray-200 py-4 px-6">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Link href="/" className="text-gray-500 hover:text-blue-600 transition-colors">
+              <HomeIcon className="w-5 h-5" />
+            </Link>
+            <span className="text-gray-500">/</span>
+            <span className="text-gray-900 font-medium">캘린더</span>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(projectId ? `/?projectId=${projectId}` : '/')}
+            >
+              <ChevronLeft className="w-4 h-4 mr-1" />
+              대시보드로 돌아가기
             </Button>
-            <Button variant="outline" size="icon" onClick={nextMonth}>
-              <ChevronRight className="h-4 w-4" />
+            
+            {/* <Button size="sm">
+              <PlusIcon className="w-4 h-4 mr-1" />
+              새 일정
+            </Button> */}
+          </div>
+        </div>
+      </div>
+      
+      <div className="max-w-6xl mx-auto py-8 px-4">
+        {/* 캘린더 헤더 */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <CalendarIcon className="w-6 h-6 text-blue-600 mr-2" />
+            <h1 className="text-2xl font-bold">캘린더</h1>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <Button variant="ghost" size="icon" onClick={prevMonth} className="hover:bg-gray-100">
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <div className="text-xl font-medium">
+              {format(currentDate, 'yyyy년 MM월', { locale: ko })}
+            </div>
+            <Button variant="ghost" size="icon" onClick={nextMonth} className="hover:bg-gray-100">
+              <ChevronRight className="h-5 w-5" />
             </Button>
           </div>
         </div>
-
+        
         {/* 요일 헤더 */}
-        <div className="grid grid-cols-7 border-b border-gray-200">
+        <div className="grid grid-cols-7 border-b border-gray-200 bg-white rounded-t-lg">
           {weekDays.map((day, index) => (
             <div
               key={day}
-              className={`text-center py-2 font-semibold text-sm
+              className={`text-center py-3 text-sm font-medium
                 ${index === 0 ? 'text-red-500' : index === 6 ? 'text-blue-500' : 'text-gray-600'}`}
             >
               {day}
@@ -206,9 +258,9 @@ export default function CalendarPage() {
         </div>
 
         {/* 캘린더 그리드 */}
-        <div className="relative">
+        <div className="relative bg-white rounded-b-lg border border-gray-200 border-t-0 shadow-sm">
           {/* 날짜 그리드 */}
-          <div className="grid grid-cols-7 border-b border-l border-gray-200">
+          <div className="grid grid-cols-7">
             {calendarDays.map((day, index) => {
               const isCurrentMonth = isSameMonth(day, currentDate);
               const isCurrentDay = isToday(day);
@@ -219,18 +271,18 @@ export default function CalendarPage() {
                 <div
                   key={day.toString()}
                   className={`
-                    min-h-[90px] p-2 border-r border-t border-gray-200 relative
+                    min-h-[110px] p-2 border-r border-t border-gray-200 relative
                     ${!isCurrentMonth ? 'bg-gray-50' : ''}
                     ${isSelected ? 'bg-blue-50' : ''}
-                    ${isCurrentDay ? 'ring-2 ring-blue-500 ring-inset' : ''}
+                    hover:bg-gray-50 transition-colors duration-150 cursor-pointer
                   `}
                   onClick={() => setSelectedDate(day)}
                 >
                   <div className={`
-                    text-sm font-medium
+                    h-5 w-5 flex items-center justify-center rounded-full text-xs
+                    ${isCurrentDay ? 'bg-blue-500 text-white' : ''}
                     ${!isCurrentMonth ? 'text-gray-400' : ''}
-                    ${isCurrentDay ? 'text-blue-600' : ''}
-                    ${isWeekend && isCurrentMonth ? (index % 7 === 0 ? 'text-red-500' : 'text-blue-500') : ''}
+                    ${isWeekend && isCurrentMonth && !isCurrentDay ? (index % 7 === 0 ? 'text-red-500' : 'text-blue-500') : ''}
                   `}>
                     {format(day, 'd')}
                   </div>
@@ -244,10 +296,10 @@ export default function CalendarPage() {
             {calendarTasks.map((task) => {
               // 태스크 색상 결정
               const bgColor = task.status === 'todo' 
-                ? 'bg-gray-200' 
+                ? 'bg-gray-100' 
                 : task.status === 'in-progress' 
-                  ? 'bg-blue-200' 
-                  : 'bg-green-200';
+                  ? 'bg-blue-100' 
+                  : 'bg-green-100';
               
               const borderColor = task.status === 'todo' 
                 ? 'border-gray-300' 
@@ -281,20 +333,21 @@ export default function CalendarPage() {
                 const width = daysInCurrentWeek * cellWidth;
                 
                 // 세그먼트의 상단 위치 (행 위치에 따라)
-                const rowHeight = 24; // 각 태스크 행의 높이
-                const top = currentRow * 90 + 30 + task.row * rowHeight;
+                const rowHeight = 22; // 각 태스크 행의 높이
+                const top = currentRow * 110 + 35 + task.row * rowHeight;
                 
                 // 세그먼트 추가
                 taskSegments.push(
                   <div 
                     key={`${task.id}-segment-${taskSegments.length}`}
-                    className={`absolute ${bgColor} ${textColor} rounded-sm border ${borderColor} px-2 py-0.5 
-                      text-xs overflow-hidden shadow-sm pointer-events-auto cursor-pointer`}
+                    className={`absolute ${bgColor} ${textColor} rounded-md border ${borderColor} px-2 py-0.5 
+                      text-xs font-medium overflow-hidden shadow-sm pointer-events-auto cursor-pointer
+                      hover:shadow-md transition-all duration-150`}
                     style={{
                       left: `${left}%`,
                       width: `${width}%`,
                       top: `${top}px`,
-                      height: `${rowHeight - 4}px`,
+                      height: `${rowHeight - 2}px`,
                       zIndex: 10
                     }}
                     title={`${task.title} (${format(new Date(task.createdAt), 'yyyy-MM-dd')} ~ ${task.dueDate ? format(new Date(task.dueDate), 'yyyy-MM-dd') : ''})`}

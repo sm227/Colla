@@ -192,7 +192,7 @@ export async function PATCH(
       ? (Array.isArray(tags) ? JSON.stringify(tags) : tags) 
       : existingDocument.tags;
     const updateFolderId = folderId !== undefined ? folderId : existingDocument.folderId;
-    const now = new Date();
+    const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
     
     // 문서 업데이트 직접 쿼리
     const updatedDocumentResult = await prisma.$queryRaw`

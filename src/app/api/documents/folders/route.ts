@@ -174,7 +174,9 @@ export async function POST(request: NextRequest) {
     const newFolder = await prisma.folder.create({
       data: {
         name: name.trim(),
-        projectId
+        projectId,
+        createdAt: new Date(Date.now() + 9 * 60 * 60 * 1000),
+        updatedAt: new Date(Date.now() + 9 * 60 * 60 * 1000)
       }
     });
     

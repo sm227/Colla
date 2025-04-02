@@ -105,6 +105,39 @@ export default function Home() {
     }
   };
 
+  // 날짜 포맷팅 함수
+  const formatDate = (dateStr: string | Date | null) => {
+    if (!dateStr) return "날짜 없음";
+    
+    // 날짜 객체로 변환
+    const date = new Date(dateStr);
+    const now = new Date();
+    
+    // 시간 차이 계산 (밀리초)
+    const diffMs = now.getTime() - date.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+    const diffMonth = Math.floor(diffDay / 30);
+    const diffYear = Math.floor(diffMonth / 12);
+    
+    // 상대적 시간 문자열 반환
+    if (diffSec < 60) {
+      return "방금 전";
+    } else if (diffMin < 60) {
+      return `${diffMin}분 전`;
+    } else if (diffHour < 24) {
+      return `${diffHour}시간 전`;
+    } else if (diffDay < 30) {
+      return `${diffDay}일 전`;
+    } else if (diffMonth < 12) {
+      return `${diffMonth}개월 전`;
+    } else {
+      return `${diffYear}년 전`;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 상단 네비게이션 바 */}
@@ -566,31 +599,7 @@ export default function Home() {
                   모두 보기
                 </Link>
               </div>
-              <div className="space-y-3">
-                <DocumentItem
-                  title="제품 로드맵 2024"
-                  updatedAt="1시간 전"
-                  icon={<FileTextIcon className="w-4 h-4 text-green-600" />}
-                />
-
-                <DocumentItem
-                  title="마케팅 전략 회의록"
-                  updatedAt="어제"
-                  icon={<FileTextIcon className="w-4 h-4 text-green-600" />}
-                />
-
-                <DocumentItem
-                  title="디자인 가이드라인"
-                  updatedAt="3일 전"
-                  icon={<FileTextIcon className="w-4 h-4 text-green-600" />}
-                />
-
-                <DocumentItem
-                  title="사용자 인터뷰 결과"
-                  updatedAt="1주일 전"
-                  icon={<FileTextIcon className="w-4 h-4 text-green-600" />}
-                />
-              </div>
+              <RecentDocuments projectId={currentProject?.id} />
             </div>
 
             {/* 활성 칸반보드 */}
@@ -998,6 +1007,140 @@ function SimplifiedKanbanBoard() {
         statusColor="bg-green-400"
         tasks={doneTasks}
       />
+    </div>
+  );
+}
+
+// 최근 문서 컴포넌트
+function RecentDocuments({ projectId }: { projectId?: string }) {
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        setLoading(true);
+        // 프로젝트 ID가 있을 때와 없을 때 요청 URL 분기
+        const url = projectId 
+          ? `/api/documents?projectId=${projectId}&limit=4` 
+          : '/api/documents?limit=4';
+        
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error('문서를 불러오는 중 문제가 발생했습니다');
+        }
+        
+        const data = await response.json();
+        setDocuments(data);
+        setError(null);
+      } catch (err) {
+        console.error("최근 문서 로딩 오류:", err);
+        setError('문서를 불러오는 중 오류가 발생했습니다');
+        setDocuments([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDocuments();
+  }, [projectId]);
+
+  const formatDate = (dateStr: string | Date | null) => {
+    if (!dateStr) return "날짜 없음";
+    
+    // 날짜 객체로 변환
+    const date = new Date(dateStr);
+    const now = new Date();
+    
+    // 시간 차이 계산 (밀리초)
+    const diffMs = now.getTime() - date.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+    const diffMonth = Math.floor(diffDay / 30);
+    const diffYear = Math.floor(diffMonth / 12);
+    
+    // 상대적 시간 문자열 반환
+    if (diffSec < 60) {
+      return "방금 전";
+    } else if (diffMin < 60) {
+      return `${diffMin}분 전`;
+    } else if (diffHour < 24) {
+      return `${diffHour}시간 전`;
+    } else if (diffDay < 30) {
+      return `${diffDay}일 전`;
+    } else if (diffMonth < 12) {
+      return `${diffMonth}개월 전`;
+    } else {
+      return `${diffYear}년 전`;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        <p>{error}</p>
+      </div>
+    );
+  }
+
+  if (documents.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        <p className="mb-4">아직 문서가 없습니다</p>
+        <Link
+          href={projectId ? `/documents/new?projectId=${projectId}` : "/documents/new"}
+          className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+        >
+          <PlusIcon className="w-4 h-4 mr-2" />
+          새 문서 만들기
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {documents.map((doc) => (
+        <div
+          key={doc.id}
+          onClick={() => router.push(`/documents/${doc.id}${projectId ? `?projectId=${projectId}` : ''}`)}
+          className="flex items-center p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer"
+        >
+          <div className="mr-3 p-2 bg-gray-100 rounded-full">
+            {doc.emoji ? (
+              <span className="text-xl">{doc.emoji}</span>
+            ) : (
+              <FileTextIcon className="w-4 h-4 text-green-600" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-medium text-gray-900 truncate">{doc.title || "무제 문서"}</h4>
+            <p className="text-sm text-gray-500">
+              수정됨: {formatDate(doc.updatedAt || doc.createdAt)}
+            </p>
+          </div>
+          {doc.isStarred && (
+            <span className="ml-2 text-yellow-500">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z" clipRule="evenodd" />
+              </svg>
+            </span>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

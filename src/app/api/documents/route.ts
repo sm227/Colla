@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
     // URL 쿼리 파라미터 가져오기
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('projectId');
+    const limit = searchParams.get('limit');
     
     // 쿼리 조건 설정
     let whereCondition: any = {};
@@ -72,11 +73,12 @@ export async function GET(request: NextRequest) {
           d."folderId",
           d.tags, 
           d."projectId",
-          d."createdAt", 
-          d."updatedAt"
+          d."createdAt"::timestamp with time zone AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul' as "createdAt", 
+          d."updatedAt"::timestamp with time zone AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul' as "updatedAt"
         FROM "Document" d
         WHERE d."projectId" = '${projectId}'
         ORDER BY d."updatedAt" DESC
+        ${limit ? `LIMIT ${limit}` : ''}
       `;
     } else {
       // 사용자의 모든 프로젝트 가져오기
@@ -100,11 +102,12 @@ export async function GET(request: NextRequest) {
             d."folderId",
             d.tags, 
             d."projectId",
-            d."createdAt", 
-            d."updatedAt"
+            d."createdAt"::timestamp with time zone AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul' as "createdAt", 
+            d."updatedAt"::timestamp with time zone AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul' as "updatedAt"
           FROM "Document" d
           WHERE d."projectId" IN (${userProjectIds.map(id => `'${id}'`).join(',')})
           ORDER BY d."updatedAt" DESC
+          ${limit ? `LIMIT ${limit}` : ''}
         `;
       } else {
         // 사용자 프로젝트가 없는 경우
@@ -231,8 +234,8 @@ export async function POST(request: NextRequest) {
         ${documentData.tags}, 
         ${documentData.projectId}, 
         ${documentData.folderId}, 
-        ${new Date()}, 
-        ${new Date()}
+        ${new Date(Date.now() + 9 * 60 * 60 * 1000)}, 
+        ${new Date(Date.now() + 9 * 60 * 60 * 1000)}
       )
       RETURNING *
     `;
