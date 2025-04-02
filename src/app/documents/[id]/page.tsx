@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { 
-  ArrowLeftIcon, 
+  ArrowLeftIcon as ArrowLeft, 
   StarIcon, 
   UsersIcon, 
   ShareIcon,
@@ -16,10 +16,14 @@ import {
   TagIcon,
   Type as TypeIcon,
   Quote as QuoteIcon,
-  AlignLeft
+  AlignLeft,
+  HomeIcon,
+  ChevronDown,
+  CheckIcon
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
 
 // Tiptap 관련 임포트
 import { EditorContent, useEditor, Editor, BubbleMenu } from '@tiptap/react';
@@ -60,7 +64,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const searchParams = useSearchParams();
-  const projectIdParam = searchParams?.get('projectId') || null;
+  const projectId = searchParams?.get('projectId');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -72,6 +76,10 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
     normalized: '' 
   });
   
+  // 문서 로딩 관련 상태 추가
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
+  
   // 프로젝트 정보 상태 추가
   const [projectName, setProjectName] = useState<string | null>(null);
   // 문서 정보 상태 추가
@@ -79,6 +87,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
   // 폴더 목록 상태 추가
   const [availableFolders, setAvailableFolders] = useState<{ id: string; name: string; count: number }[]>([]);
   const [showFolderDropdown, setShowFolderDropdown] = useState(false);
+  const [newFolderName, setNewFolderName] = useState<string>("");
   
   // 슬래시 커맨드 관련 상태
   const [showSlashMenu, setShowSlashMenu] = useState(false);
@@ -182,19 +191,19 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
   
   // URL 쿼리 파라미터로부터 프로젝트 ID를 가져옴
   useEffect(() => {
-    if (projectIdParam) {
+    if (projectId) {
       // 프로젝트 ID 유효성 확인
       const validateProjectId = async () => {
         try {
           // 프로젝트 ID가 유효한지 확인 (API 호출)
-          const response = await fetch(`/api/projects/${projectIdParam}`);
+          const response = await fetch(`/api/projects/${projectId}`);
           
           if (response.ok) {
             // 프로젝트가 존재하고 접근 권한이 있음
             const project = await response.json();
-            setSelectedProjectId(projectIdParam);
-            debugRef.current.projectIdParam = projectIdParam;
-            debugRef.current.selectedProjectId = projectIdParam;
+            setSelectedProjectId(projectId);
+            debugRef.current.projectIdParam = projectId;
+            debugRef.current.selectedProjectId = projectId;
             
             // 경고 표시 관련
             if (isNewDocument) {
@@ -224,7 +233,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       setFolder(folderNameParam);
       setFolderId(folderIdParam);
     }
-  }, [projectIdParam, isNewDocument, searchParams]);
+  }, [projectId, isNewDocument, searchParams]);
   
   // 문서 데이터 로드 (실제로는 API 호출)
   useEffect(() => {
@@ -254,10 +263,14 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       }
       
       // 새 문서에서는 URL의 projectId 파라미터를 설정 (칸반보드와 동일한 패턴)
-      if (projectIdParam) {
-        setSelectedProjectId(projectIdParam);
+      if (projectId) {
+        setSelectedProjectId(projectId);
       }
     } else if (params.id !== "new") {
+      // 로딩 상태 시작
+      setIsLoading(true);
+      setLoadingError(null);
+      
       // 실제 API 호출로 문서 데이터 가져오기
       const fetchDocument = async () => {
         try {
@@ -291,8 +304,8 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
           // 선택된 프로젝트 ID 설정 (우선순위: URL > API)
           let projectIdToUse = null;
           
-          if (projectIdParam) {
-            projectIdToUse = projectIdParam;
+          if (projectId) {
+            projectIdToUse = projectId;
           } else if (documentData.projectId) {
             projectIdToUse = documentData.projectId;
           }
@@ -306,6 +319,14 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
           // 에디터 내용 설정
           if (editor && documentData.content) {
             editor.commands.setContent(documentData.content);
+            
+            // 컨텐츠 설정 후 약간의 지연시간을 두고 로딩 상태 해제
+            setTimeout(() => {
+              setIsLoading(false);
+            }, 500); // 0.5초 지연
+          } else {
+            // 에디터가 없는 경우 로딩 상태 유지
+            // 에디터가 생성되면 다른 useEffect에서 처리됨
           }
         } catch (error) {
           // 에러 발생 시 샘플 데이터 사용
@@ -314,12 +335,57 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
           if (editor) {
             editor.commands.setContent('<p>문서를 불러오는 중 오류가 발생했습니다.</p>');
           }
+          
+          // 오류 상태 설정
+          setLoadingError(error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다');
+          setIsLoading(false);
         }
       };
       
       fetchDocument();
     }
-  }, [params.id, isNewDocument, editor, projectIdParam]);
+  }, [params.id, isNewDocument, editor, projectId]);
+  
+  // 에디터가 생성된 후 로딩된 문서가 있는 경우 내용을 설정
+  useEffect(() => {
+    // 에디터가 생성되었고, 로딩 중이며, 기존 문서인 경우에만 실행
+    if (editor && isLoading && !isNewDocument && params.id !== "new") {
+      // API에서 문서를 가져오는 함수 재실행
+      const fetchDocumentForEditor = async () => {
+        try {
+          const response = await fetch(`/api/documents/${params.id}`);
+          
+          if (!response.ok) {
+            throw new Error('문서를 불러오는데 실패했습니다.');
+          }
+          
+          const documentData = await response.json();
+          
+          // 에디터 내용 설정
+          if (documentData.content) {
+            editor.commands.setContent(documentData.content);
+            
+            // 컨텐츠 설정 후 약간의 지연시간을 두고 로딩 상태 해제
+            setTimeout(() => {
+              setIsLoading(false);
+            }, 500); // 0.5초 지연
+          } else {
+            setIsLoading(false);
+          }
+        } catch (error) {
+          if (editor) {
+            editor.commands.setContent('<p>문서를 불러오는 중 오류가 발생했습니다.</p>');
+          }
+          setIsLoading(false);
+        }
+      };
+      
+      fetchDocumentForEditor();
+    } else if (editor && isNewDocument) {
+      // 새 문서의 경우 에디터가 생성되었으면 바로 로딩 상태 해제
+      setIsLoading(false);
+    }
+  }, [editor, isLoading, isNewDocument, params.id]);
   
   // 바깥 영역 클릭 감지 이벤트
   useEffect(() => {
@@ -515,14 +581,51 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
           // 메뉴 표시
           setShowSlashMenu(true);
         }
+        
+        // 백스페이스 키를 눌렀을 때 슬래시 메뉴가 열려있으면 닫기
+        if (keyEvent.key === 'Backspace' && showSlashMenu) {
+          // 현재 커서 위치
+          const { state } = editor.view;
+          const { selection } = state;
+          const { from } = selection;
+          
+          // 커서 바로 앞의 문자가 '/'인지 확인 (백스페이스로 삭제될 문자)
+          const textBefore = state.doc.textBetween(Math.max(0, from - 1), from);
+          
+          // '/'를 지우는 경우 메뉴 닫기
+          if (textBefore === '/') {
+            setShowSlashMenu(false);
+          }
+        }
+      };
+      
+      // 입력 이벤트 핸들러 - 다른 방법으로 내용이 삭제된 경우 처리
+      const handleInput = () => {
+        if (showSlashMenu) {
+          // 현재 선택 범위의 텍스트 확인
+          const { state } = editor.view;
+          const { selection } = state;
+          const { from } = selection;
+          
+          // 슬래시 문자가 있는지 확인 (커서 위치 기준으로 최대 5자 앞까지 확인)
+          const checkFrom = Math.max(0, from - 5);
+          const surroundingText = state.doc.textBetween(checkFrom, from);
+          
+          // 선택 범위 주변에 슬래시가 없으면 메뉴 닫기
+          if (!surroundingText.includes('/')) {
+            setShowSlashMenu(false);
+          }
+        }
       };
       
       // 이벤트 리스너 추가
       editorElement.addEventListener('keydown', handleKeyDown);
+      editorElement.addEventListener('input', handleInput);
       
       // 컴포넌트 언마운트 시 이벤트 리스너 제거
       return () => {
         editorElement.removeEventListener('keydown', handleKeyDown);
+        editorElement.removeEventListener('input', handleInput);
       };
     };
     
@@ -824,243 +927,162 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
   }, [title, autoSaveEnabled, autoSave]);
   
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* 공통 CSS 스타일 */}
-      <style jsx global>{`
-        .ProseMirror {
-          outline: none;
-          min-height: 100px;
-          padding: 0.5rem 0;
-        }
-        
-        .ProseMirror p {
-          margin-bottom: 0.75em;
-        }
-        
-        .ProseMirror p.is-editor-empty:first-child::before {
-          content: attr(data-placeholder);
-          float: left;
-          color: #9ca3af;
-          pointer-events: none;
-          height: 0;
-        }
-        
-        .ProseMirror h1 {
-          font-size: 1.875rem;
-          font-weight: bold;
-          margin: 0.5em 0 0.25em;
-        }
-        
-        .ProseMirror h2 {
-          font-size: 1.5rem;
-          font-weight: bold;
-          margin: 0.5em 0 0.25em;
-        }
-        
-        .ProseMirror h3 {
-          font-size: 1.25rem;
-          font-weight: bold;
-          margin: 0.5em 0 0.25em;
-        }
-        
-        .ProseMirror ul, .ProseMirror ol {
-          padding-left: 1.5em;
-          margin-bottom: 0.75em;
-        }
-        
-        .ProseMirror blockquote {
-          border-left: 4px solid #d1d5db;
-          padding-left: 1em;
-          font-style: italic;
-          color: #4b5563;
-          margin: 1em 0;
-        }
-        
-        .ProseMirror pre {
-          background-color: #f3f4f6;
-          padding: 1em;
-          border-radius: 0.25em;
-          overflow-x: auto;
-          margin: 1em 0;
-        }
-        
-        .ProseMirror code {
-          font-family: monospace;
-          font-size: 0.875em;
-        }
-        
-        .ProseMirror hr {
-          border: none;
-          border-top: 2px solid #e5e7eb;
-          margin: 2em 0;
-        }
-        
-        .ProseMirror img {
-          max-width: 100%;
-          height: auto;
-        }
-        
-        .ProseMirror a {
-          color: #2563eb;
-          text-decoration: underline;
-        }
-        
-        /* 할 일 목록 스타일 */
-        .ProseMirror ul[data-type="taskList"] {
-          list-style: none;
-          padding: 0;
-        }
-        
-        .ProseMirror ul[data-type="taskList"] li {
-          display: flex;
-          align-items: flex-start;
-          margin-bottom: 0.5em;
-        }
-        
-        .ProseMirror ul[data-type="taskList"] li > label {
-          margin-right: 0.5em;
-          user-select: none;
-        }
-        
-        .ProseMirror ul[data-type="taskList"] li > div {
-          flex: 1;
-        }
-        
-        .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
-          text-decoration: line-through;
-          color: #9ca3af;
-        }
-        
-        /* 선택된 텍스트 스타일 */
-        .ProseMirror .selection {
-          background-color: rgba(35, 131, 226, 0.14);
-        }
-      `}</style>
-      
-      {/* 상단 툴바 */}
-      <div className={`sticky ${projectIdWarning ? 'top-10' : 'top-0'} z-10 bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between`}>
-        <div className="flex items-center">
-          <Link href={`/documents?projectId=${selectedProjectId || ''}`} className="p-2 rounded-md hover:bg-gray-100 mr-2">
-            <ArrowLeftIcon className="w-5 h-5 text-gray-600" />
-          </Link>
-          <div className="flex items-center">
-            <button className="text-2xl mr-2">{emoji}</button>
-            <div className="text-sm text-gray-500 flex items-center relative">
-              <FolderIcon className="w-4 h-4 mr-1" />
-              <button 
+    <div className="bg-gray-50 min-h-screen">
+      {/* 상단 네비게이션 바 */}
+      <div className="bg-white border-b border-gray-200 py-4 px-6">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Link href="/" className="text-gray-500 hover:text-blue-600 transition-colors">
+              <HomeIcon className="w-5 h-5" />
+            </Link>
+            <span className="text-gray-500">/</span>
+            <Link href={projectId ? `/documents?projectId=${projectId}` : '/documents'} className="text-gray-500 hover:text-blue-600 transition-colors">
+              문서
+            </Link>
+            <span className="text-gray-500">/</span>
+            <span className="text-gray-900 font-medium truncate max-w-xs">
+              {isLoading ? '문서 로딩 중...' : (title || '새 문서')}
+              {isLoading && (
+                <span className="ml-2 inline-block h-4 w-4 rounded-full border-2 border-gray-300 border-t-green-600 animate-spin"></span>
+              )}
+            </span>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(projectId ? `/documents?projectId=${projectId}` : '/documents')}
+            >
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              돌아가기
+            </Button>
+            
+            <div className="relative">
+              <button
                 onClick={() => setShowFolderDropdown(!showFolderDropdown)}
-                className="hover:bg-gray-100 py-1 px-2 rounded-md flex items-center"
+                className="flex items-center bg-gray-50 hover:bg-gray-100 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 text-sm text-gray-700"
+                disabled={isLoading}
               >
-                <span>{folder || "기본 폴더"}</span>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+                <FolderIcon className="w-4 h-4 mr-1 text-gray-500" />
+                <span className="truncate max-w-[150px]">{folder || '기본 폴더'}</span>
+                <span className="ml-1">
+                  <ChevronDown className="w-4 h-4 text-gray-500" />
+                </span>
               </button>
               
-              {/* 폴더 드롭다운 */}
               {showFolderDropdown && (
-                <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-20 w-56">
-                  <div className="py-1 max-h-64 overflow-y-auto">
-                    <button
-                      onClick={() => {
-                        setFolder("기본 폴더");
-                        setFolderId(null);
-                        setShowFolderDropdown(false);
-                      }}
-                      className={`w-full text-left px-4 py-2 text-sm ${folder === "기본 폴더" ? 'bg-gray-100 text-gray-900' : 'hover:bg-gray-50 text-gray-700'}`}
-                    >
-                      기본 폴더
-                    </button>
-                    
-                    {availableFolders.length > 0 && (
-                      <>
-                        <div className="border-t border-gray-200 my-1"></div>
-                        {availableFolders.map((folderItem) => (
-                          <button
-                            key={folderItem.id}
-                            onClick={() => handleFolderChange(folderItem)}
-                            className={`w-full text-left px-4 py-2 text-sm ${folder === folderItem.name ? 'bg-gray-100 text-gray-900' : 'hover:bg-gray-50 text-gray-700'}`}
-                          >
-                            {folderItem.name}
-                          </button>
-                        ))}
-                      </>
+                <div className="absolute left-0 mt-1 w-64 bg-white shadow-lg rounded-md z-10 border border-gray-200">
+                  <div className="py-2 px-3 border-b border-gray-200">
+                    <div className="text-sm font-medium text-gray-700 mb-1">폴더 선택</div>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="새 폴더 이름..."
+                        value={newFolderName}
+                        onChange={(e) => setNewFolderName(e.target.value)}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <button
+                        onClick={() => createNewFolder(newFolderName)}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-blue-600 hover:text-blue-800"
+                      >
+                        <PlusIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="max-h-60 overflow-y-auto py-1">
+                    {availableFolders.length > 0 ? (
+                      availableFolders.map((f) => (
+                        <button
+                          key={f.id}
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center justify-between ${f.id === folderId ? 'bg-gray-50 font-medium text-blue-600' : 'text-gray-700'}`}
+                          onClick={() => handleFolderChange({ id: f.id, name: f.name })}
+                        >
+                          <div className="flex items-center">
+                            <FolderIcon className="w-4 h-4 mr-2 text-gray-500" />
+                            <span className="truncate">{f.name}</span>
+                          </div>
+                          {f.id === folderId && (
+                            <CheckIcon className="w-4 h-4 text-blue-600" />
+                          )}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-sm text-gray-500">폴더가 없습니다</div>
                     )}
-                    
-                    <div className="border-t border-gray-200 my-1"></div>
-                    <button
-                      onClick={() => {
-                        const newFolder = prompt("새 폴더 이름을 입력하세요:");
-                        if (newFolder && newFolder.trim()) {
-                          createNewFolder(newFolder.trim());
-                        }
-                      }}
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 text-gray-700 flex items-center"
-                    >
-                      <PlusIcon className="w-4 h-4 mr-2" />
-                      <span>새 폴더 만들기</span>
-                    </button>
                   </div>
                 </div>
               )}
-              
-              {selectedProjectId && (
-                <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full flex items-center">          
-                  <span className="font-mono ml-1 bg-blue-100 px-1">
-                    {projectName || '로딩 중...'}
-                  </span>
-                </span>
+            </div>
+            
+            <button
+              className={`p-2 rounded-md hover:bg-gray-100 ${isStarred ? 'text-yellow-400' : 'text-gray-400'}`}
+              title={isStarred ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+              onClick={() => setIsStarred(!isStarred)}
+              disabled={isLoading}
+            >
+              <StarIcon className={`w-5 h-5 ${isStarred ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400'}`} />
+            </button>
+            
+            <button className="p-2 rounded-md hover:bg-gray-100" disabled={isLoading}>
+              <ShareIcon className="w-5 h-5 text-gray-600" />
+            </button>
+            
+            <button className="p-2 rounded-md hover:bg-gray-100" disabled={isLoading}>
+              <UsersIcon className="w-5 h-5 text-gray-600" />
+            </button>
+            
+            <Button 
+              onClick={saveDocument}
+              className="flex items-center space-x-1 bg-green-600 hover:bg-green-700 text-white"
+              disabled={isSaving || isLoading}
+            >
+              {isSaving ? (
+                <>
+                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-1"></div>
+                  <span>저장 중...</span>
+                </>
+              ) : (
+                <>
+                  <SaveIcon className="w-4 h-4" />
+                  <span>저장</span>
+                </>
               )}
+            </Button>
+          </div>
+        </div>
+      </div>
+      
+      {/* 로딩 및 오류 상태 표시 */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-white bg-opacity-70 flex items-center justify-center z-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">문서 가져오는 중...</p>
+          </div>
+        </div>
+      )}
+      
+      {loadingError && (
+        <div className="max-w-7xl mx-auto mt-4 px-4">
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700">
+                  {loadingError}
+                </p>
+              </div>
             </div>
           </div>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1">
-            {tags.map((tag, index) => (
-              <span key={index} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                {tag}
-              </span>
-            ))}
-            <button className="p-1 rounded-md hover:bg-gray-100">
-              <TagIcon className="w-4 h-4 text-gray-500" />
-            </button>
-          </div>
-          
-          <button 
-            className="p-2 rounded-md hover:bg-gray-100"
-            onClick={() => setIsStarred(!isStarred)}
-          >
-            <StarIcon className={`w-5 h-5 ${isStarred ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400'}`} />
-          </button>
-          
-          <button className="p-2 rounded-md hover:bg-gray-100">
-            <ShareIcon className="w-5 h-5 text-gray-600" />
-          </button>
-          
-          <button className="p-2 rounded-md hover:bg-gray-100">
-            <UsersIcon className="w-5 h-5 text-gray-600" />
-          </button>
-          
-          <button 
-            onClick={saveDocument}
-            className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isSaving}
-          >
-            {isSaving ? (
-              <>
-                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-1"></div>
-                <span>저장 중...</span>
-              </>
-            ) : (
-              <>
-                <SaveIcon className="w-4 h-4" />
-                <span>저장</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
+      )}
       
       {/* 성공 메시지 */}
       {saveSuccess && (
@@ -1085,225 +1107,401 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       )}
       
       {/* 문서 편집 영역 */}
-      <div className="max-w-4xl mx-auto px-8 flex-1">
-        {/* 문서 제목 */}
-        <div className="mt-0 pt-0">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full text-4xl font-bold text-gray-900 border-none outline-none focus:ring-0 p-0 pt-2"
-            placeholder="제목 없음"
-          />
-        </div>
-        
-        {/* 선택 텍스트에 대한 버블 메뉴 */}
-        {editor && (
-          <BubbleMenu 
-            editor={editor} 
-            shouldShow={({ editor, view, state, oldState, from, to }) => {
-              // 텍스트가 선택되었을 때만 표시
-              return from !== to;
-            }}
-            tippyOptions={{
-              duration: 100,
-              placement: 'top',
-            }}
-          >
-            <div className="flex items-center bg-white rounded-md shadow-lg border border-gray-200 p-1">
-              <button
-                onClick={() => editor.chain().focus().toggleBold().run()}
-                className={`p-1 rounded ${editor.isActive('bold') ? 'bg-gray-200' : 'hover:bg-gray-100'}`}
-                title="굵게"
-              >
-                <span className="font-bold">B</span>
-              </button>
-              <button
-                onClick={() => editor.chain().focus().toggleItalic().run()}
-                className={`p-1 rounded ${editor.isActive('italic') ? 'bg-gray-200' : 'hover:bg-gray-100'}`}
-                title="기울임"
-              >
-                <span className="italic">I</span>
-              </button>
-              <button
-                onClick={() => editor.chain().focus().toggleHighlight().run()}
-                className={`p-1 rounded ${editor.isActive('highlight') ? 'bg-gray-200' : 'hover:bg-gray-100'}`}
-                title="강조"
-              >
-                <span className="bg-yellow-200 px-1">A</span>
-              </button>
-            </div>
-          </BubbleMenu>
-        )}
-        
-        {/* 슬래시 커맨드 메뉴 */}
-        {showSlashMenu && (
-          <div
-            ref={slashMenuRef}
-            className="fixed bg-white shadow-xl rounded-lg border border-gray-200 z-50 w-72"
-            style={{ left: `${slashMenuPosition.x}px`, top: `${slashMenuPosition.y}px` }}
-          >
-            <div className="overflow-hidden max-h-80 overflow-y-auto">
-              <button 
-                className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
-                onClick={() => applyBlockType('paragraph')}
-              >
-                <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
-                  <AlignLeft className="w-4 h-4" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium">텍스트</div>
-                  <div className="text-xs text-gray-500">일반 텍스트를 입력합니다</div>
-                </div>
-                <div className="text-xs text-gray-400 ml-2">Ctrl+0</div>
-              </button>
-              
-              <button 
-                className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
-                onClick={() => applyBlockType('heading1')}
-              >
-                <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
-                  <span className="font-bold">H1</span>
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium">제목 1</div>
-                  <div className="text-xs text-gray-500">큰 제목</div>
-                </div>
-                <div className="text-xs text-gray-400 ml-2">Ctrl+1</div>
-              </button>
-              
-              <button 
-                className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
-                onClick={() => applyBlockType('heading2')}
-              >
-                <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
-                  <span className="font-bold">H2</span>
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium">제목 2</div>
-                  <div className="text-xs text-gray-500">중간 제목</div>
-                </div>
-                <div className="text-xs text-gray-400 ml-2">Ctrl+2</div>
-              </button>
-              
-              <button 
-                className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
-                onClick={() => applyBlockType('heading3')}
-              >
-                <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
-                  <span className="font-bold">H3</span>
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium">제목 3</div>
-                  <div className="text-xs text-gray-500">작은 제목</div>
-                </div>
-                <div className="text-xs text-gray-400 ml-2">Ctrl+3</div>
-              </button>
-              
-              <button 
-                className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
-                onClick={() => applyBlockType('bulletList')}
-              >
-                <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
-                  <ListIcon className="w-4 h-4" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium">글머리 기호</div>
-                  <div className="text-xs text-gray-500">글머리 기호가 있는 목록</div>
-                </div>
-                <div className="text-xs text-gray-400 ml-2">Ctrl+Shift+8</div>
-              </button>
-              
-              <button 
-                className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
-                onClick={() => applyBlockType('orderedList')}
-              >
-                <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
-                  <span className="font-mono">1.</span>
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium">번호 매기기</div>
-                  <div className="text-xs text-gray-500">번호가 매겨진 목록</div>
-                </div>
-                <div className="text-xs text-gray-400 ml-2">Ctrl+Shift+7</div>
-              </button>
-              
-              <button 
-                className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
-                onClick={() => applyBlockType('taskList')}
-              >
-                <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
-                  <CheckSquareIcon className="w-4 h-4" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium">할 일 목록</div>
-                  <div className="text-xs text-gray-500">체크박스가 있는 목록</div>
-                </div>
-                <div className="text-xs text-gray-400 ml-2">Ctrl+Shift+9</div>
-              </button>
-              
-              <button 
-                className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
-                onClick={() => applyBlockType('blockquote')}
-              >
-                <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
-                  <QuoteIcon className="w-4 h-4" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium">인용구</div>
-                  <div className="text-xs text-gray-500">인용문을 추가합니다</div>
-                </div>
-                <div className="text-xs text-gray-400 ml-2">Ctrl+B</div>
-              </button>
-              
-              <button 
-                className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
-                onClick={() => applyBlockType('codeBlock')}
-              >
-                <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
-                  <CodeIcon className="w-4 h-4" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium">코드 블록</div>
-                  <div className="text-xs text-gray-500">코드 블록을 추가합니다</div>
-                </div>
-                <div className="text-xs text-gray-400 ml-2">Ctrl+Alt+C</div>
-              </button>
-              
-              <button 
-                className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
-                onClick={() => applyBlockType('horizontalRule')}
-              >
-                <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
-                  <span>—</span>
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium">구분선</div>
-                  <div className="text-xs text-gray-500">수평선을 추가합니다</div>
-                </div>
-                <div className="text-xs text-gray-400 ml-2">Ctrl+L</div>
-              </button>
-              
-              <button 
-                className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
-                onClick={() => applyBlockType('image')}
-              >
-                <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
-                  <ImageIcon className="w-4 h-4" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium">이미지</div>
-                  <div className="text-xs text-gray-500">이미지를 추가합니다</div>
-                </div>
-                <div className="text-xs text-gray-400 ml-2">Ctrl+Alt+I</div>
-              </button>
-            </div>
+      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          {/* 문서 제목 */}
+          <div className="mb-6">
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full text-3xl font-bold text-gray-900 border-none outline-none focus:ring-0 p-0 placeholder-gray-400"
+              placeholder="제목 없음"
+              disabled={isLoading}
+            />
           </div>
-        )}
-        
-        {/* Tiptap 에디터 */}
-        <div className="prose max-w-none mt-1">
-          <EditorContent editor={editor} className="min-h-[500px]" />
+          
+          {/* 에디터 로딩 표시 */}
+          {isLoading && !editor && (
+            <div className="min-h-[500px] flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+                <p className="mt-4 text-gray-600">에디터 로딩 중...</p>
+              </div>
+            </div>
+          )}
+          
+          {/* 공통 CSS 스타일 */}
+          <style jsx global>{`
+            .ProseMirror {
+              outline: none;
+              min-height: 100px;
+              padding: 0.5rem 0;
+              font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              font-size: 1rem;
+              line-height: 1.6;
+              color: #374151;
+            }
+            
+            .ProseMirror p {
+              margin-bottom: 0.75em;
+            }
+            
+            .ProseMirror p.is-editor-empty:first-child::before {
+              content: attr(data-placeholder);
+              float: left;
+              color: #9ca3af;
+              pointer-events: none;
+              height: 0;
+              font-style: italic;
+            }
+            
+            .ProseMirror h1 {
+              font-size: 1.875rem;
+              font-weight: 700;
+              margin: 1.5em 0 0.5em;
+              padding-bottom: 0.3em;
+              color: #111827;
+            }
+            
+            .ProseMirror h2 {
+              font-size: 1.5rem;
+              font-weight: 600;
+              margin: 1.2em 0 0.5em;
+              padding-bottom: 0.2em;
+              color: #111827;
+            }
+            
+            .ProseMirror h3 {
+              font-size: 1.25rem;
+              font-weight: 600;
+              margin: 1em 0 0.5em;
+              color: #111827;
+            }
+            
+            .ProseMirror ul, .ProseMirror ol {
+              padding-left: 1.5em;
+              margin-bottom: 0.75em;
+            }
+            
+            .ProseMirror li p {
+              margin: 0.3em 0;
+            }
+            
+            .ProseMirror blockquote {
+              border-left: 3px solid #e5e7eb;
+              padding-left: 1em;
+              font-style: italic;
+              color: #4b5563;
+              margin: 1em 0;
+              background-color: #f9fafb;
+              padding: 0.5em 1em;
+              border-radius: 0 0.25em 0.25em 0;
+            }
+            
+            .ProseMirror pre {
+              background-color: #f3f4f6;
+              padding: 1em;
+              border-radius: 0.375em;
+              overflow-x: auto;
+              margin: 1em 0;
+              font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+              font-size: 0.875em;
+            }
+            
+            .ProseMirror code {
+              font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+              font-size: 0.875em;
+              background-color: #f3f4f6;
+              padding: 0.2em 0.4em;
+              border-radius: 0.25em;
+            }
+            
+            .ProseMirror hr {
+              border: none;
+              border-top: 1px solid #e5e7eb;
+              margin: 2em 0;
+            }
+            
+            .ProseMirror img {
+              max-width: 100%;
+              height: auto;
+              border-radius: 0.375em;
+              margin: 1em 0;
+            }
+            
+            .ProseMirror a {
+              color: #2563eb;
+              text-decoration: underline;
+              text-decoration-thickness: 1px;
+              text-underline-offset: 0.2em;
+            }
+            
+            /* 할 일 목록 스타일 */
+            .ProseMirror ul[data-type="taskList"] {
+              list-style: none;
+              padding: 0;
+            }
+            
+            .ProseMirror ul[data-type="taskList"] li {
+              display: flex;
+              align-items: flex-start;
+              margin-bottom: 0.5em;
+            }
+            
+            .ProseMirror ul[data-type="taskList"] li > label {
+              margin-right: 0.5em;
+              user-select: none;
+            }
+            
+            .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+              cursor: pointer;
+              width: 1em;
+              height: 1em;
+              margin-right: 0.5em;
+              border-radius: 0.25em;
+              border: 1px solid #d1d5db;
+            }
+            
+            .ProseMirror ul[data-type="taskList"] li > div {
+              flex: 1;
+            }
+            
+            .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
+              text-decoration: line-through;
+              color: #9ca3af;
+            }
+            
+            /* 선택된 텍스트 스타일 */
+            .ProseMirror .selection {
+              background-color: rgba(35, 131, 226, 0.14);
+            }
+            
+            .ProseMirror:focus {
+              outline: none;
+            }
+            
+            .ProseMirror p {
+              transition: background-color 0.2s;
+            }
+            
+            .ProseMirror p:hover {
+              background-color: rgba(232, 232, 232, 0.1);
+            }
+          `}</style>
+          
+          {/* 선택 텍스트에 대한 버블 메뉴 */}
+          {editor && (
+            <BubbleMenu 
+              editor={editor} 
+              shouldShow={({ editor, view, state, oldState, from, to }) => {
+                // 텍스트가 선택되었을 때만 표시
+                return from !== to;
+              }}
+              tippyOptions={{
+                duration: 100,
+                placement: 'top',
+              }}
+            >
+              <div className="flex items-center bg-white rounded-md shadow-lg border border-gray-200 p-1">
+                <button
+                  onClick={() => editor.chain().focus().toggleBold().run()}
+                  className={`p-1.5 rounded ${editor.isActive('bold') ? 'bg-gray-200' : 'hover:bg-gray-100'}`}
+                  title="굵게"
+                >
+                  <span className="font-bold">B</span>
+                </button>
+                <button
+                  onClick={() => editor.chain().focus().toggleItalic().run()}
+                  className={`p-1.5 rounded ${editor.isActive('italic') ? 'bg-gray-200' : 'hover:bg-gray-100'}`}
+                  title="기울임"
+                >
+                  <span className="italic">I</span>
+                </button>
+                <button
+                  onClick={() => editor.chain().focus().toggleHighlight().run()}
+                  className={`p-1.5 rounded ${editor.isActive('highlight') ? 'bg-gray-200' : 'hover:bg-gray-100'}`}
+                  title="강조"
+                >
+                  <span className="bg-yellow-200 px-1">A</span>
+                </button>
+              </div>
+            </BubbleMenu>
+          )}
+          
+          {/* 슬래시 커맨드 메뉴 */}
+          {showSlashMenu && (
+            <div
+              ref={slashMenuRef}
+              className="fixed bg-white shadow-xl rounded-lg border border-gray-200 z-50 w-72"
+              style={{ left: `${slashMenuPosition.x}px`, top: `${slashMenuPosition.y}px` }}
+            >
+              <div className="overflow-hidden max-h-80 overflow-y-auto">
+                <button 
+                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                  onClick={() => applyBlockType('paragraph')}
+                >
+                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
+                    <AlignLeft className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium">텍스트</div>
+                    <div className="text-xs text-gray-500">일반 텍스트를 입력합니다</div>
+                  </div>
+                  <div className="text-xs text-gray-400 ml-2">Ctrl+0</div>
+                </button>
+                
+                <button 
+                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                  onClick={() => applyBlockType('heading1')}
+                >
+                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
+                    <span className="font-bold">H1</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium">제목 1</div>
+                    <div className="text-xs text-gray-500">큰 제목</div>
+                  </div>
+                  <div className="text-xs text-gray-400 ml-2">Ctrl+1</div>
+                </button>
+                
+                <button 
+                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                  onClick={() => applyBlockType('heading2')}
+                >
+                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
+                    <span className="font-bold">H2</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium">제목 2</div>
+                    <div className="text-xs text-gray-500">중간 제목</div>
+                  </div>
+                  <div className="text-xs text-gray-400 ml-2">Ctrl+2</div>
+                </button>
+                
+                <button 
+                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                  onClick={() => applyBlockType('heading3')}
+                >
+                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
+                    <span className="font-bold">H3</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium">제목 3</div>
+                    <div className="text-xs text-gray-500">작은 제목</div>
+                  </div>
+                  <div className="text-xs text-gray-400 ml-2">Ctrl+3</div>
+                </button>
+                
+                <button 
+                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                  onClick={() => applyBlockType('bulletList')}
+                >
+                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
+                    <ListIcon className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium">글머리 기호</div>
+                    <div className="text-xs text-gray-500">글머리 기호가 있는 목록</div>
+                  </div>
+                  <div className="text-xs text-gray-400 ml-2">Ctrl+Shift+8</div>
+                </button>
+                
+                <button 
+                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                  onClick={() => applyBlockType('orderedList')}
+                >
+                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
+                    <span className="font-mono">1.</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium">번호 매기기</div>
+                    <div className="text-xs text-gray-500">번호가 매겨진 목록</div>
+                  </div>
+                  <div className="text-xs text-gray-400 ml-2">Ctrl+Shift+7</div>
+                </button>
+                
+                <button 
+                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                  onClick={() => applyBlockType('taskList')}
+                >
+                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
+                    <CheckSquareIcon className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium">할 일 목록</div>
+                    <div className="text-xs text-gray-500">체크박스가 있는 목록</div>
+                  </div>
+                  <div className="text-xs text-gray-400 ml-2">Ctrl+Shift+9</div>
+                </button>
+                
+                <button 
+                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                  onClick={() => applyBlockType('blockquote')}
+                >
+                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
+                    <QuoteIcon className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium">인용구</div>
+                    <div className="text-xs text-gray-500">인용문을 추가합니다</div>
+                  </div>
+                  <div className="text-xs text-gray-400 ml-2">Ctrl+B</div>
+                </button>
+                
+                <button 
+                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                  onClick={() => applyBlockType('codeBlock')}
+                >
+                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
+                    <CodeIcon className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium">코드 블록</div>
+                    <div className="text-xs text-gray-500">코드 블록을 추가합니다</div>
+                  </div>
+                  <div className="text-xs text-gray-400 ml-2">Ctrl+Alt+C</div>
+                </button>
+                
+                <button 
+                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                  onClick={() => applyBlockType('horizontalRule')}
+                >
+                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
+                    <span>—</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium">구분선</div>
+                    <div className="text-xs text-gray-500">수평선을 추가합니다</div>
+                  </div>
+                  <div className="text-xs text-gray-400 ml-2">Ctrl+L</div>
+                </button>
+                
+                <button 
+                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                  onClick={() => applyBlockType('image')}
+                >
+                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
+                    <ImageIcon className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium">이미지</div>
+                    <div className="text-xs text-gray-500">이미지를 추가합니다</div>
+                  </div>
+                  <div className="text-xs text-gray-400 ml-2">Ctrl+Alt+I</div>
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {/* Tiptap 에디터 */}
+          <div className="prose max-w-none bg-white rounded-lg">
+            <EditorContent 
+              editor={editor} 
+              className="min-h-[500px] px-2"
+              placeholder="여기에 내용을 입력하세요..."
+            />
+          </div>
         </div>
       </div>
     </div>
