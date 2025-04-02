@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { KanbanColumn } from "./KanbanColumn";
 import { AddTaskDialog } from "./AddTaskDialog";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, ClipboardListIcon } from "lucide-react";
 import { useTasks } from "@/hooks/useTasks";
 import { Alert } from "@/components/ui/alert";
 import { KanbanTask } from "./KanbanTask";
@@ -103,23 +103,6 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
     }
   };
 
-  // DB에서 작업 삭제 함수 (hooks/useTasks.ts에 있을 수 있음)
-  const deleteTaskFromDatabase = async (taskId: string) => {
-    // API 호출로 DB에서 작업 삭제
-    const response = await fetch(`/api/tasks/${taskId}`, {
-      method: 'DELETE',
-    });
-    
-    if (!response.ok) {
-      throw new Error('작업 삭제 실패');
-    }
-    
-    return await response.json();
-  };
-
-  // 함수 전달 시 검증
-  console.log('handleDeleteTask 함수 정의됨:', typeof handleDeleteTask === 'function');
-
   return (
     <div className="flex flex-col">
       {error && (
@@ -129,12 +112,15 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
       )}
 
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">
-          {projectId ? "프로젝트 작업" : "모든 작업"}
-        </h2>
+        <div className="flex items-center">
+          <ClipboardListIcon className="h-5 w-5 text-gray-700 mr-2" />
+          <h2 className="text-xl font-semibold text-gray-900">
+            {projectId ? "프로젝트 작업" : "모든 작업"}
+          </h2>
+        </div>
         <Button 
           onClick={() => setIsAddTaskDialogOpen(true)}
-          className="flex items-center gap-1"
+          className="flex items-center gap-1 bg-purple-600 hover:bg-purple-700"
         >
           <Plus className="h-4 w-4" />
           새 작업
@@ -143,16 +129,32 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
 
       {loading ? (
         <div className="flex justify-center items-center h-64">
-          <p className="text-gray-500">로딩 중...</p>
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+          <p className="ml-3 text-gray-600">작업 로딩 중...</p>
+        </div>
+      ) : tasksState.length === 0 ? (
+        <div className="flex flex-col items-center justify-center bg-gray-50 rounded-lg p-8 border border-gray-200">
+          <ClipboardListIcon className="h-12 w-12 text-gray-400 mb-3" />
+          <h3 className="text-lg font-medium text-gray-900 mb-1">작업이 없습니다</h3>
+          <p className="text-gray-500 mb-4 text-center">이 프로젝트에 아직 작업이 추가되지 않았습니다.</p>
+          <Button 
+            onClick={() => setIsAddTaskDialogOpen(true)}
+            className="flex items-center gap-1 bg-purple-600 hover:bg-purple-700"
+          >
+            <Plus className="h-4 w-4" />
+            첫 작업 추가하기
+          </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <KanbanColumn 
             title="할 일" 
             tasks={todoTasks} 
             status="todo" 
             updateTaskStatus={handleUpdateTaskStatus} 
             onTaskClick={handleOpenDialog}
+            color="gray"
+            onTaskDelete={handleDeleteTask}
           />
           <KanbanColumn 
             title="진행 중" 
@@ -160,6 +162,8 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             status="in-progress" 
             updateTaskStatus={handleUpdateTaskStatus} 
             onTaskClick={handleOpenDialog}
+            color="blue"
+            onTaskDelete={handleDeleteTask}
           />
           <KanbanColumn 
             title="검토" 
@@ -167,6 +171,8 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             status="review" 
             updateTaskStatus={handleUpdateTaskStatus} 
             onTaskClick={handleOpenDialog}
+            color="yellow"
+            onTaskDelete={handleDeleteTask}
           />
           <KanbanColumn 
             title="완료" 
@@ -174,6 +180,8 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             status="done" 
             updateTaskStatus={handleUpdateTaskStatus} 
             onTaskClick={handleOpenDialog}
+            color="green"
+            onTaskDelete={handleDeleteTask}
           />
         </div>
       )}
@@ -181,7 +189,8 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
       <AddTaskDialog 
         isOpen={isAddTaskDialogOpen} 
         onClose={() => setIsAddTaskDialogOpen(false)} 
-        onAddTask={handleAddTask} 
+        onAddTask={handleAddTask}
+        projectId={projectId}
       />
 
       {selectedTask && (

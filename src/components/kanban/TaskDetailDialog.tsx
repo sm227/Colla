@@ -1,7 +1,7 @@
 "use client";
 
 import { Task } from "./KanbanBoard";
-import { X, CalendarIcon, UserIcon, Smile, Bold, Italic, List, ListOrdered, Link2, Image, Code, CheckSquare, Clock, Tag, MoreHorizontal, MessageSquare, ChevronDown, ChevronUp, Copy, Trash2, Share2, AlertCircle } from "lucide-react";
+import { X, CalendarIcon, UserIcon, Smile, Bold, Italic, List, ListOrdered, Link2, Image, Code, CheckSquare, Clock, Tag, MoreHorizontal, MessageSquare, ChevronDown, ChevronUp, Copy, Trash2, Share2, AlertCircle, Users, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -21,6 +21,7 @@ import TaskItem from '@tiptap/extension-task-item';
 import LinkExtension from '@tiptap/extension-link';
 import ImageExtension from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
+import { useProject, ProjectMember } from "@/app/contexts/ProjectContext";
 
 interface Comment {
   id: string;
@@ -196,12 +197,36 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
   const [showActivity, setShowActivity] = useState(false);
+  const [showMembersList, setShowMembersList] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
+  
+  // Get project members from context
+  const { projects, currentProject } = useProject();
+  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
 
   // task가 변경될 때마다 editedTask 업데이트
   useEffect(() => {
     setEditedTask({...task});
   }, [task]);
+  
+  // Find the project and its members
+  useEffect(() => {
+    if (!task.projectId) {
+      setProjectMembers([]);
+      return;
+    }
+    
+    const project = projects.find(p => p.id === task.projectId) || currentProject;
+    if (project) {
+      // Filter for accepted members only
+      const acceptedMembers = project.members.filter(
+        member => member.inviteStatus === "accepted"
+      );
+      setProjectMembers(acceptedMembers);
+    } else {
+      setProjectMembers([]);
+    }
+  }, [task.projectId, projects, currentProject]);
 
   // 변경사항이 있을 때마다 자동 저장
   const handleChange = (updatedTask: Task) => {
@@ -254,32 +279,26 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
 
   const getPriorityIcon = (priority: string) => {
     switch (priority) {
-      case 'high': return <AlertCircle className="h-4 w-4 text-red-600" />;
-      case 'medium': return <AlertCircle className="h-4 w-4 text-yellow-600" />;
-      case 'low': return <AlertCircle className="h-4 w-4 text-green-600" />;
-      default: return null;
+      case 'high': return <AlertCircle className="w-4 h-4 text-red-600 mr-1" />;
+      case 'medium': return <Clock className="w-4 h-4 text-yellow-600 mr-1" />;
+      case 'low': return <Tag className="w-4 h-4 text-green-600 mr-1" />;
+      default: return <Tag className="w-4 h-4 text-gray-600 mr-1" />;
     }
   };
 
-  // 삭제 버튼 핸들러 수정
   const handleDelete = () => {
-    // 삭제 전 사용자에게 확인
-    if (window.confirm(`'${task.title}' 작업을 정말 삭제하시겠습니까?`)) {
-      // 콘솔에 삭제 요청 기록
-      console.log('작업 삭제 요청:', task.id);
-      
-      // onDelete 함수가 있으면 실행
-      if (typeof onDelete === 'function') {
-        console.log('onDelete는 함수입니다. 실행합니다.');
+    if (window.confirm('정말로 이 작업을 삭제하시겠습니까?')) {
+      if (onDelete) {
         onDelete(task.id);
-      } else {
-        console.warn('onDelete 함수가 제공되지 않았습니다', onDelete);
-        alert('작업 삭제 기능이 제대로 설정되지 않았습니다.');
       }
-      
-      // 대화상자 닫기
-      onClose();
     }
+  };
+  
+  // Get assignee name from member ID
+  const getAssigneeName = () => {
+    if (!editedTask.assignee) return "";
+    const member = projectMembers.find(m => m.userId === editedTask.assignee);
+    return member ? member.user.name : editedTask.assignee;
   };
 
   // 모달 외부 클릭 처리 함수 수정
@@ -315,6 +334,12 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
     } else {
       onClose();
     }
+  };
+
+  // Handle date change with proper type conversion
+  const handleDateChange = (dateStr: string) => {
+    const newDate = dateStr ? new Date(dateStr) : undefined;
+    handleChange({...editedTask, dueDate: newDate});
   };
 
   // 모달의 JSX 부분에서 반환 직전에 추가합니다
@@ -558,14 +583,71 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
                 <div className="flex justify-between items-center mb-2">
                   <h3 className="text-sm font-medium text-gray-500">담당자</h3>
                 </div>
-                <div className="flex items-center gap-2 border rounded-md p-2 bg-white">
-                  <UserIcon className="h-4 w-4 text-gray-400" />
-                  <Input
-                    value={editedTask.assignee || ""}
-                    onChange={(e) => handleChange({...editedTask, assignee: e.target.value})}
-                    placeholder="담당자 지정"
-                    className="border-0 p-0 h-auto focus-visible:ring-0 text-sm"
-                  />
+                <div className="relative">
+                  <div 
+                    className="w-full px-3 py-2 border rounded-md bg-white flex justify-between items-center cursor-pointer"
+                    onClick={() => setShowMembersList(!showMembersList)}
+                  >
+                    <div className="flex items-center">
+                      {editedTask.assignee ? (
+                        <>
+                          <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs mr-2">
+                            {getAssigneeName().charAt(0)}
+                          </div>
+                          <span className="text-sm">{getAssigneeName()}</span>
+                        </>
+                      ) : (
+                        <>
+                          <UserCheck className="h-4 w-4 text-gray-400 mr-2" />
+                          <span className="text-gray-500 text-sm">담당자 선택</span>
+                        </>
+                      )}
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                  </div>
+                  
+                  {/* 멤버 선택 드롭다운 */}
+                  {showMembersList && (
+                    <div className="absolute top-full left-0 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 max-h-48 overflow-y-auto">
+                      {/* Unassigned option */}
+                      <div 
+                        className={`px-3 py-2 hover:bg-gray-100 cursor-pointer flex items-center ${!editedTask.assignee ? 'bg-blue-50' : ''}`}
+                        onClick={() => {
+                          handleChange({...editedTask, assignee: undefined});
+                          setShowMembersList(false);
+                        }}
+                      >
+                        <UserIcon className="h-4 w-4 text-gray-400 mr-2" />
+                        <span className="text-sm">담당자 없음</span>
+                      </div>
+                      
+                      {projectMembers.length > 0 ? (
+                        projectMembers.map((member) => (
+                          <div 
+                            key={member.userId}
+                            className={`px-3 py-2 hover:bg-gray-100 cursor-pointer flex items-center ${editedTask.assignee === member.userId ? 'bg-blue-50' : ''}`}
+                            onClick={() => {
+                              handleChange({...editedTask, assignee: member.userId});
+                              setShowMembersList(false);
+                            }}
+                          >
+                            <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs mr-2">
+                              {member.user.name.charAt(0)}
+                            </div>
+                            <span className="text-sm">{member.user.name}</span>
+                            {member.role === "owner" && (
+                              <span className="ml-2 px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">소유자</span>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-3 py-2 text-sm text-gray-500 flex items-center">
+                          <Users className="h-4 w-4 mr-2 text-gray-400" />
+                          {task.projectId ? "초대된 멤버가 없습니다" : "프로젝트 작업이 아닙니다"}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -598,11 +680,11 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
                 </div>
                 <div className="flex items-center gap-2 border rounded-md p-2 bg-white">
                   <CalendarIcon className="h-4 w-4 text-gray-400" />
-                  <Input
+                  <input
                     type="date"
                     value={editedTask.dueDate ? new Date(editedTask.dueDate).toISOString().split('T')[0] : ""}
-                    onChange={(e) => handleChange({...editedTask, dueDate: e.target.value})}
-                    className="border-0 p-0 h-auto focus-visible:ring-0 text-sm"
+                    onChange={(e) => handleDateChange(e.target.value)}
+                    className="border-0 p-0 h-auto focus-visible:ring-0 text-sm w-full"
                   />
                 </div>
               </div>

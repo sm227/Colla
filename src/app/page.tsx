@@ -141,11 +141,12 @@ export default function Home() {
           <div className="flex items-center space-x-4">
             <Link
               href="/projects/invitations"
-              className="p-2 rounded-full hover:bg-gray-100 relative"
+              className="relative p-2 rounded-full hover:bg-gray-100 transition-colors duration-200"
             >
               <BellIcon className="w-5 h-5 text-gray-600" />
-              <span className="absolute top-0 right-0 inline-flex items-center justify-center w-4 h-4 text-xs font-bold text-white bg-red-500 rounded-full">
-                🔔
+              {/* 알림 배지 개선 */}
+              <span className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full shadow-sm animate-pulse">
+                3
               </span>
             </Link>
             <div className="relative">

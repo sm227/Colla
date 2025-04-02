@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useProject } from "@/app/contexts/ProjectContext";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
-
+import { Plus, FolderIcon, CheckIcon } from "lucide-react";
 
 interface ProjectSelectorProps {
   selectedProjectId: string | null;
@@ -30,29 +29,30 @@ export function ProjectSelector({
   };
 
   if (loading) {
-    return <div className="text-gray-500">프로젝트 로딩 중...</div>;
+    return <div className="flex justify-center"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div></div>;
   }
 
   if (error) {
-    return <div className="text-red-500">{error}</div>;
+    return <div className="p-3 bg-red-50 text-red-600 rounded-md">{error}</div>;
   }
 
   return (
-    <div className="mb-6">
+    <div>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-medium">프로젝트</h3>
+        <h3 className="text-lg font-medium text-gray-900">프로젝트 선택</h3>
         <Button
           variant="outline"
           size="sm"
           onClick={() => setIsAddingProject(!isAddingProject)}
+          className="flex items-center gap-1 text-sm"
         >
-          <Plus className="h-4 w-4 mr-1" />
+          <Plus className="h-4 w-4" />
           새 프로젝트
         </Button>
       </div>
 
       {isAddingProject && (
-        <div className="bg-gray-50 p-4 rounded-md mb-4">
+        <div className="bg-gray-50 p-4 rounded-md mb-4 border border-gray-200">
           <div className="mb-3">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               프로젝트 이름
@@ -61,7 +61,7 @@ export function ProjectSelector({
               type="text"
               value={newProjectName}
               onChange={(e) => setNewProjectName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               placeholder="프로젝트 이름 입력"
             />
           </div>
@@ -72,7 +72,7 @@ export function ProjectSelector({
             <textarea
               value={newProjectDescription}
               onChange={(e) => setNewProjectDescription(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               rows={2}
               placeholder="프로젝트 설명 입력"
             />
@@ -92,24 +92,50 @@ export function ProjectSelector({
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant={selectedProjectId === null ? "default" : "outline"}
-          size="sm"
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div 
+          className={`border rounded-md p-3 cursor-pointer transition-colors ${
+            selectedProjectId === null 
+              ? 'bg-blue-50 border-blue-300 text-blue-700' 
+              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+          }`}
           onClick={() => onSelectProject(null)}
         >
-          모든 작업
-        </Button>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="p-2 rounded-full bg-gray-100 mr-3">
+                <FolderIcon className="h-5 w-5 text-gray-600" />
+              </div>
+              <span className="font-medium">모든 작업</span>
+            </div>
+            {selectedProjectId === null && (
+              <CheckIcon className="h-5 w-5 text-blue-600" />
+            )}
+          </div>
+        </div>
         
         {projects.map((project) => (
-          <Button
+          <div
             key={project.id}
-            variant={selectedProjectId === project.id ? "default" : "outline"}
-            size="sm"
+            className={`border rounded-md p-3 cursor-pointer transition-colors ${
+              selectedProjectId === project.id 
+                ? 'bg-blue-50 border-blue-300 text-blue-700' 
+                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+            }`}
             onClick={() => onSelectProject(project.id)}
           >
-            {project.name}
-          </Button>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="p-2 rounded-full bg-gray-100 mr-3">
+                  <FolderIcon className="h-5 w-5 text-gray-600" />
+                </div>
+                <span className="font-medium truncate">{project.name}</span>
+              </div>
+              {selectedProjectId === project.id && (
+                <CheckIcon className="h-5 w-5 text-blue-600" />
+              )}
+            </div>
+          </div>
         ))}
       </div>
     </div>
