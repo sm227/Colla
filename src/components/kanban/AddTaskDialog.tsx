@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProject, ProjectMember } from "@/app/contexts/ProjectContext";
+import { useUsers } from "@/app/contexts/UserContext";
 
 interface AddTaskDialogProps {
   isOpen: boolean;
@@ -37,6 +38,9 @@ export function AddTaskDialog({ isOpen, onClose, onAddTask, projectId }: AddTask
   // Get projects and members from context
   const { projects, currentProject } = useProject();
   const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
+  
+  // Get users from context
+  const { users } = useUsers();
   
   // Find the current project and its members
   useEffect(() => {
@@ -142,8 +146,21 @@ export function AddTaskDialog({ isOpen, onClose, onAddTask, projectId }: AddTask
   // Get assignee name from members
   const getAssigneeName = () => {
     if (!assignee) return "";
+    
+    // 먼저 프로젝트 멤버에서 찾기 (즉시 표시)
     const member = projectMembers.find(m => m.userId === assignee);
-    return member ? member.user.name : "";
+    if (member && member.user) {
+      return member.user.name;
+    }
+    
+    // 컨텍스트의 users에서 찾기
+    const assigneeUser = users[assignee];
+    if (assigneeUser) {
+      return assigneeUser.name;
+    }
+    
+    // 위 두 방법으로 찾지 못했을 경우 빈 문자열 반환
+    return "";
   };
 
   if (!isOpen) return null;
@@ -266,7 +283,7 @@ export function AddTaskDialog({ isOpen, onClose, onAddTask, projectId }: AddTask
                       {assignee ? (
                         <>
                           <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs mr-2">
-                            {getAssigneeName().charAt(0)}
+                            {getAssigneeName() ? getAssigneeName().charAt(0) : ""}
                           </div>
                           <span>{getAssigneeName()}</span>
                         </>

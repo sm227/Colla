@@ -3,8 +3,9 @@
 import { Task } from "./KanbanBoard";
 import { useDrag } from "./useDragDrop";
 import { CalendarIcon, UserIcon, Clock, CheckCircle2, AlertCircle } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TaskDetailDialog } from "./TaskDetailDialog";
+import { useUsers } from "@/app/contexts/UserContext";
 
 interface KanbanTaskProps {
   task: Task;
@@ -17,6 +18,19 @@ export function KanbanTask({ task, onUpdate, onDelete }: KanbanTaskProps) {
   const { isDragging, setNodeRef } = useDrag({
     id: task.id,
   });
+  const { getUserName } = useUsers();
+  const [assigneeName, setAssigneeName] = useState<string>("");
+
+  // 담당자 이름 가져오기
+  useEffect(() => {
+    if (task.assignee) {
+      const fetchName = async () => {
+        const name = await getUserName(task.assignee as string);
+        setAssigneeName(name);
+      };
+      fetchName();
+    }
+  }, [task.assignee, getUserName]);
 
   // 우선순위에 따른 색상 및 아이콘 설정
   const priorityConfig = {
@@ -94,9 +108,9 @@ export function KanbanTask({ task, onUpdate, onDelete }: KanbanTaskProps) {
         {task.assignee && (
           <div className="mt-2 pt-2 border-t border-gray-100 flex items-center gap-1 text-xs text-gray-500">
             <div className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-[10px]">
-              {task.assignee.charAt(0).toUpperCase()}
+              {assigneeName ? assigneeName.charAt(0).toUpperCase() : "?"}
             </div>
-            <span>{task.assignee}</span>
+            <span>{assigneeName || task.assignee}</span>
           </div>
         )}
       </div>
