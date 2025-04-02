@@ -22,6 +22,7 @@ import LinkExtension from '@tiptap/extension-link';
 import ImageExtension from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import { useProject, ProjectMember } from "@/app/contexts/ProjectContext";
+import { useUsers } from "@/app/contexts/UserContext";
 
 interface Comment {
   id: string;
@@ -204,6 +205,9 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
   const { projects, currentProject } = useProject();
   const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
 
+  // Get users from context
+  const { users } = useUsers();
+
   // task가 변경될 때마다 editedTask 업데이트
   useEffect(() => {
     setEditedTask({...task});
@@ -297,8 +301,21 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
   // Get assignee name from member ID
   const getAssigneeName = () => {
     if (!editedTask.assignee) return "";
+    
+    // 먼저 프로젝트 멤버에서 찾기 (즉시 표시)
     const member = projectMembers.find(m => m.userId === editedTask.assignee);
-    return member ? member.user.name : editedTask.assignee;
+    if (member && member.user) {
+      return member.user.name;
+    }
+    
+    // 컨텍스트의 users에서 찾기
+    const assigneeUser = users[editedTask.assignee as string];
+    if (assigneeUser) {
+      return assigneeUser.name;
+    }
+    
+    // 위 두 방법으로 찾지 못했을 경우 ID 반환
+    return editedTask.assignee;
   };
 
   // 모달 외부 클릭 처리 함수 수정
