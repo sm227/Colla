@@ -18,21 +18,37 @@ export default function KanbanPage() {
 
   // URL 쿼리 파라미터로부터 프로젝트 ID를 가져옴
   useEffect(() => {
+    console.log("URL 쿼리 파라미터 projectIdParam:", projectIdParam);
+    
     if (projectIdParam) {
+      console.log("프로젝트 ID 파라미터 발견, 특정 프로젝트 선택:", projectIdParam);
       setSelectedProjectId(projectIdParam);
-    } else if (currentProject) {
-      // 파라미터가 없는 경우 현재 컨텍스트의 프로젝트 사용
-      setSelectedProjectId(currentProject.id);
+      // 현재 URL의 프로젝트 ID를 로컬 스토리지에 저장
+      localStorage.setItem('lastSelectedKanbanProjectId', projectIdParam);
+    } else {
+      // 프로젝트 ID 파라미터가 없는 경우 모든 작업 표시
+      console.log("프로젝트 ID 파라미터 없음: 모든 작업 표시 모드로 설정");
+      setSelectedProjectId(null);
+      localStorage.removeItem('lastSelectedKanbanProjectId');
     }
-  }, [projectIdParam, currentProject]);
+  }, [projectIdParam]);
 
   const handleSelectProject = (projectId: string | null) => {
+    console.log("프로젝트 선택 변경:", projectId);
+    
+    // 프로젝트 ID 변경 시 상태를 즉시 업데이트
     setSelectedProjectId(projectId);
-    // 프로젝트 변경 시 URL 업데이트
+    
+    // 선택한 프로젝트 ID를 로컬 스토리지에 저장
     if (projectId) {
-      router.push(`/kanban?projectId=${projectId}`);
+      console.log("특정 프로젝트 선택:", projectId);
+      localStorage.setItem('lastSelectedKanbanProjectId', projectId);
+      router.replace(`/kanban?projectId=${projectId}`);
     } else {
-      router.push('/kanban');
+      // 모든 작업을 선택한 경우 로컬 스토리지에서 삭제하고 쿼리 파라미터 없이 이동
+      console.log("모든 작업 선택");
+      localStorage.removeItem('lastSelectedKanbanProjectId');
+      router.replace('/kanban');
     }
   };
 

@@ -29,13 +29,26 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ projectId }: KanbanBoardProps) {
-  const { tasks, loading, error, addTask, updateTaskStatus, deleteTask } = useTasks(projectId);
+  console.log("KanbanBoard 렌더링 - projectId:", projectId);
+  
+  const { tasks, loading, error, addTask, updateTaskStatus, deleteTask, fetchTasks } = useTasks(projectId);
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
   const [tasksState, setTasksState] = useState<Task[]>(tasks);
   
   // 작업 상세 다이얼로그 관련 상태 추가
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  // projectId가 변경될 때마다 태스크를 다시 불러옵니다.
+  useEffect(() => {
+    console.log("KanbanBoard - 프로젝트 ID 변경됨:", projectId);
+    if (projectId === null) {
+      console.log("KanbanBoard - 모든 프로젝트 작업 표시");
+    } else {
+      console.log("KanbanBoard - 특정 프로젝트 작업 표시:", projectId);
+    }
+    fetchTasks();
+  }, [projectId, fetchTasks]);
   
   // useEffect로 tasks가 변경될 때 tasksState도 업데이트
   useEffect(() => {

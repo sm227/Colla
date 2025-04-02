@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useProject } from "@/app/contexts/ProjectContext";
 import { Button } from "@/components/ui/button";
 import { Plus, FolderIcon, CheckIcon } from "lucide-react";
@@ -14,6 +15,7 @@ export function ProjectSelector({
   selectedProjectId,
   onSelectProject,
 }: ProjectSelectorProps) {
+  const router = useRouter();
   const { projects, loading, error, createProject } = useProject();
   const [isAddingProject, setIsAddingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
@@ -26,6 +28,16 @@ export function ProjectSelector({
     setNewProjectName("");
     setNewProjectDescription("");
     setIsAddingProject(false);
+  };
+
+  const handleSelectProject = (projectId: string | null) => {
+    if (projectId === null) {
+      console.log("모든 작업 선택 - ProjectSelector");
+      window.location.href = '/kanban';
+    } else {
+      console.log("특정 프로젝트 선택:", projectId);
+      onSelectProject(projectId);
+    }
   };
 
   if (loading) {
@@ -99,7 +111,7 @@ export function ProjectSelector({
               ? 'bg-blue-50 border-blue-300 text-blue-700' 
               : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
           }`}
-          onClick={() => onSelectProject(null)}
+          onClick={() => handleSelectProject(null)}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center">
@@ -122,7 +134,7 @@ export function ProjectSelector({
                 ? 'bg-blue-50 border-blue-300 text-blue-700' 
                 : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
             }`}
-            onClick={() => onSelectProject(project.id)}
+            onClick={() => handleSelectProject(project.id)}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center">

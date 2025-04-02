@@ -4,12 +4,24 @@ import { prisma } from '@/lib/prisma';
 // 모든 태스크 가져오기
 export async function GET() {
   try {
+    console.log('모든 태스크 API 호출됨');
+    
+    // 모든 태스크 가져오기 (프로젝트 정보 포함)
     const tasks = await prisma.task.findMany({
       orderBy: {
-        createdAt: 'desc',
+        updatedAt: 'desc',
+      },
+      include: {
+        project: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
     
+    console.log(`모든 태스크 ${tasks.length}개 조회 완료`);
     return NextResponse.json(tasks);
   } catch (error) {
     console.error('태스크 조회 오류:', error);
