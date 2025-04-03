@@ -1,14 +1,25 @@
-import { NextRequest } from 'next/server';
 import { Server } from '@hocuspocus/server';
+import { Logger } from '@hocuspocus/extension-logger';
 import { Database } from '@hocuspocus/extension-database';
 import { PrismaClient } from '@prisma/client';
 
 // Prisma 클라이언트 인스턴스
 const prisma = new PrismaClient();
 
+export type YDocData = {
+  documentId: string;
+  data: Uint8Array;
+};
+
 // Hocuspocus 서버 인스턴스 생성
-const server = Server.configure({
+export const server = Server.configure({
+  port: 1234, // WebSocket 서버 포트
   extensions: [
+    new Logger({
+      onConnect: true, // 연결 이벤트 로깅 활성화
+      onChange: true,  // 변경 이벤트 로깅 활성화
+      onDisconnect: true // 연결 종료 이벤트 로깅 활성화
+    }),
     new Database({
       // 문서 로드 함수 - Y.js 바이너리 데이터 로드
       async fetch(data: any) {
@@ -55,34 +66,27 @@ const server = Server.configure({
   ],
 });
 
-// 데이터베이스에 ycontent 컬럼이 없는 경우 추가
-try {
-  prisma.$executeRaw`
-    ALTER TABLE "Document" ADD COLUMN IF NOT EXISTS "ycontent" BYTEA;
-  `.then(() => console.log('ycontent 컬럼이 추가되었거나 이미 존재합니다.'));
-} catch (error) {
-  console.error('ycontent 컬럼 추가 중 오류:', error);
-}
-
-export async function GET(request: NextRequest) {
+// 서버 시작 함수
+export async function startHocuspocusServer() {
   try {
-    // Next.js의 요청을 WebSocket 연결로 업그레이드
-    const upgrade = request.headers.get('upgrade');
-    if (upgrade?.toLowerCase() !== 'websocket') {
-      return new Response('WebSocket 연결이 필요합니다', { status: 426 });
+    // 데이터베이스에 ycontent 컬럼이 없는 경우 추가 (첫 실행 시)
+    try {
+      await prisma.$executeRaw`
+        ALTER TABLE "Document" ADD COLUMN IF NOT EXISTS "ycontent" BYTEA;
+      `;
+      console.log('ycontent 컬럼이 추가되었거나 이미 존재합니다.');
+    } catch (error) {
+      console.error('ycontent 컬럼 추가 중 오류:', error);
     }
-
-    const { socket, response } = (Reflect.get(request, 'socket') as any)();
     
-    // 헤더 정보 로깅 및 처리
-    console.log('[WebSocket] 연결 시도:', request.url);
-
-    // Hocuspocus 서버에서 웹소켓 요청 처리
-    server.handleConnection(socket, request, response);
-
-    return response;
+    await server.listen();
+    console.log(`Hocuspocus 서버가 포트 ${server.configuration.port}에서 실행 중입니다.`);
   } catch (error) {
-    console.error('[WebSocket] 오류:', error);
-    return new Response('서버 오류', { status: 500 });
+    console.error('Hocuspocus 서버 시작 중 오류가 발생했습니다:', error);
   }
 }
+
+// 프로덕션 환경에서 분리된 프로세스로 실행할 수 있도록 직접 실행 코드 추가
+if (require.main === module) {
+  startHocuspocusServer();
+} 

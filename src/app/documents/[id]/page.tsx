@@ -24,6 +24,7 @@ import {
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/app/contexts/AuthContext";
 
 // Tiptap 관련 임포트
 import { EditorContent, useEditor, Editor, BubbleMenu } from '@tiptap/react';
@@ -40,6 +41,11 @@ import Blockquote from '@tiptap/extension-blockquote';
 import CodeBlock from '@tiptap/extension-code-block';
 import Highlight from '@tiptap/extension-highlight';
 import Typography from '@tiptap/extension-typography';
+// 협업 관련 임포트 추가
+import Collaboration from '@tiptap/extension-collaboration';
+import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
+import * as Y from 'yjs';
+import { HocuspocusProvider } from '@hocuspocus/provider';
 
 // 문서 인터페이스 정의
 interface Document {
@@ -56,6 +62,7 @@ interface Document {
 
 export default function DocumentPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const { user } = useAuth(); // AuthContext에서 사용자 정보 가져오기
   const [title, setTitle] = useState("제목 없음");
   const [emoji, setEmoji] = useState("📄");
   const [isStarred, setIsStarred] = useState(false);
@@ -110,11 +117,33 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
   // 저장된 문서 ID를 추적하기 위한 상태 추가
   const [savedDocumentId, setSavedDocumentId] = useState<string | null>(params.id !== "new" ? params.id : null);
   
-  // Tiptap 에디터 설정
+  // Y.js 문서 및 Hocuspocus 프로바이더 생성
+  const [ydoc] = useState(() => new Y.Doc());
+  const [provider, setProvider] = useState<HocuspocusProvider | null>(null);
+  // Y.js에서 가져온 컨텐츠인지 여부를 추적하는 플래그
+  const [contentLoadedFromYjs, setContentLoadedFromYjs] = useState(false);
+
+  // 현재 사용자 정보
+  const [currentUser, setCurrentUser] = useState({
+    name: "익명 사용자", 
+    color: `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`
+  });
+
+  // 문서 접속 사용자 목록
+  const [connectedUsers, setConnectedUsers] = useState<any[]>([]);
+  
+  // Tiptap 에디터 설정 - provider가 설정된 후에만 초기화
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: false, // 사용자 정의 Heading 확장을 사용하기 위해 비활성화
+        heading: false,
+        history: false,
+        // StarterKit에서 중복된 확장 비활성화
+        bulletList: false,
+        orderedList: false, 
+        listItem: false,
+        blockquote: false,
+        codeBlock: false
       }),
       Heading.configure({
         levels: [1, 2, 3],
@@ -137,12 +166,38 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       CodeBlock,
       Highlight,
       Typography,
+      // 협업 확장 기능 추가 - provider가 있을 때만 CollaborationCursor 활성화
+      Collaboration.configure({
+        document: ydoc,
+      }),
+      ...(provider ? [
+        CollaborationCursor.configure({
+          provider: provider,
+          user: currentUser,
+          render: user => {
+            const cursor = document.createElement('span')
+            cursor.classList.add('collaboration-cursor')
+            cursor.setAttribute('style', `border-color: ${user.color}`)
+            
+            const label = document.createElement('div')
+            label.classList.add('collaboration-cursor-label')
+            label.setAttribute('style', `background-color: ${user.color}`)
+            label.textContent = user.name
+            
+            cursor.appendChild(label)
+            
+            return cursor
+          },
+        })
+      ] : []),
     ],
     content: '',
     autofocus: true,
     editable: true,
     injectCSS: false,
-  });
+    // SSR 경고 해결
+    immediatelyRender: false
+  }, [provider, currentUser]); // provider와 currentUser가 변경될 때 에디터 다시 초기화
   
   // 프로젝트 ID를 확실히 설정하는 함수
   const forceSetProjectId = (id: string | null) => {
@@ -191,19 +246,42 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
   
   // URL 쿼리 파라미터로부터 프로젝트 ID를 가져옴
   useEffect(() => {
-    if (projectId) {
+    const getProjectIdFromUrl = () => {
+      if (typeof window !== 'undefined') {
+        try {
+          const urlParams = new URLSearchParams(window.location.search);
+          const urlProjectId = urlParams.get('projectId');
+          if (urlProjectId && urlProjectId !== '' && urlProjectId !== 'null') {
+            return urlProjectId;
+          }
+        } catch (e) {
+          console.error("URL에서 projectId 파싱 오류:", e);
+        }
+      }
+      return null;
+    };
+
+    // 값의 우선순위: searchParams > URL > 현재 상태
+    const projectIdToUse = projectId || getProjectIdFromUrl() || selectedProjectId;
+
+    if (projectIdToUse && projectIdToUse !== selectedProjectId) {
+      console.log("프로젝트 ID 설정:", projectIdToUse);
+      
       // 프로젝트 ID 유효성 확인
       const validateProjectId = async () => {
         try {
           // 프로젝트 ID가 유효한지 확인 (API 호출)
-          const response = await fetch(`/api/projects/${projectId}`);
+          const response = await fetch(`/api/projects/${projectIdToUse}`);
           
           if (response.ok) {
             // 프로젝트가 존재하고 접근 권한이 있음
             const project = await response.json();
-            setSelectedProjectId(projectId);
-            debugRef.current.projectIdParam = projectId;
-            debugRef.current.selectedProjectId = projectId;
+            setSelectedProjectId(projectIdToUse);
+            debugRef.current.projectIdParam = projectIdToUse;
+            debugRef.current.selectedProjectId = projectIdToUse;
+            
+            // 프로젝트 이름 설정
+            setProjectName(project.name);
             
             // 경고 표시 관련
             if (isNewDocument) {
@@ -211,14 +289,80 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               setTimeout(() => setProjectIdWarning(false), 5000);
             }
           } else {
+            // 이미 유효하지 않은 projectId가 URL에 있는 경우, URL에서 제거
+            if (typeof window !== 'undefined') {
+              const currentUrl = new URL(window.location.href);
+              currentUrl.searchParams.delete('projectId');
+              window.history.replaceState({}, '', currentUrl.toString());
+            }
+            
             // 프로젝트가 존재하지 않거나 접근 권한이 없음
-            setSelectedProjectId(null);
-            debugRef.current.projectIdParam = null;
-            debugRef.current.selectedProjectId = null;
-            alert("지정된 프로젝트에 대한 접근 권한이 없거나 프로젝트가 존재하지 않습니다.");
+            console.error("지정된 프로젝트에 접근할 수 없습니다. 기본 프로젝트를 사용합니다.");
+            
+            // 첫 번째 프로젝트 가져오기 시도
+            getDefaultProject();
           }
         } catch (error) {
-          setSelectedProjectId(null);
+          console.error("프로젝트 ID 검증 중 오류:", error);
+          getDefaultProject();
+        }
+      };
+      
+      // 기본 프로젝트 가져오기 함수
+      const getDefaultProject = async () => {
+        try {
+          const response = await fetch('/api/projects');
+          if (response.ok) {
+            const projects = await response.json();
+            if (projects.length > 0) {
+              const defaultProjectId = projects[0].id;
+              setSelectedProjectId(defaultProjectId);
+              // URL 업데이트
+              if (typeof window !== 'undefined') {
+                const currentUrl = new URL(window.location.href);
+                currentUrl.searchParams.set('projectId', defaultProjectId);
+                window.history.replaceState({}, '', currentUrl.toString());
+              }
+            } else {
+              createDefaultProject();
+            }
+          } else {
+            createDefaultProject();
+          }
+        } catch (error) {
+          console.error("기본 프로젝트 가져오기 실패:", error);
+          createDefaultProject();
+        }
+      };
+      
+      // 기본 프로젝트 생성 함수
+      const createDefaultProject = async () => {
+        try {
+          const response = await fetch('/api/projects', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              name: "내 프로젝트",
+              description: "자동으로 생성된 프로젝트입니다."
+            })
+          });
+          
+          if (response.ok) {
+            const newProject = await response.json();
+            setSelectedProjectId(newProject.id);
+            // URL 업데이트
+            if (typeof window !== 'undefined') {
+              const currentUrl = new URL(window.location.href);
+              currentUrl.searchParams.set('projectId', newProject.id);
+              window.history.replaceState({}, '', currentUrl.toString());
+            }
+          } else {
+            console.error("기본 프로젝트 생성 실패");
+          }
+        } catch (error) {
+          console.error("기본 프로젝트 생성 중 오류:", error);
         }
       };
       
@@ -233,7 +377,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       setFolder(folderNameParam);
       setFolderId(folderIdParam);
     }
-  }, [projectId, isNewDocument, searchParams]);
+  }, [projectId, isNewDocument, searchParams, selectedProjectId]);
   
   // 문서 데이터 로드 (실제로는 API 호출)
   useEffect(() => {
@@ -259,7 +403,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       
       // 에디터 내용 초기화
       if (editor) {
-        editor.commands.setContent('');
+        editor.commands.setContent('<p></p>');
       }
       
       // 새 문서에서는 URL의 projectId 파라미터를 설정 (칸반보드와 동일한 패턴)
@@ -316,18 +460,21 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
           // 프로젝트 ID 설정
           forceSetProjectId(projectIdToUse);
           
-          // 에디터 내용 설정
-          if (editor && documentData.content) {
-            editor.commands.setContent(documentData.content);
-            
-            // 컨텐츠 설정 후 약간의 지연시간을 두고 로딩 상태 해제
-            setTimeout(() => {
-              setIsLoading(false);
-            }, 500); // 0.5초 지연
-          } else {
-            // 에디터가 없는 경우 로딩 상태 유지
-            // 에디터가 생성되면 다른 useEffect에서 처리됨
-          }
+          // 일정 시간 후에도 Y.js에서 컨텐츠가 로드되지 않았다면
+          // DB에서 가져온 HTML 내용을 사용 (fallback)
+          const timeoutId = setTimeout(() => {
+            if (!contentLoadedFromYjs && editor && documentData.content) {
+              console.log('Y.js 데이터가 없어 DB 내용을 로드합니다.');
+              
+              // 기존 내용이 비어있는지 확인
+              if (editor.isEmpty) {
+                editor.commands.setContent(documentData.content || '<p></p>');
+              }
+            }
+            setIsLoading(false);
+          }, 2000); // 2초 기다림 (더 긴 시간으로 조정)
+          
+          return () => clearTimeout(timeoutId);
         } catch (error) {
           // 에러 발생 시 샘플 데이터 사용
           setTitle("문서를 불러올 수 없습니다");
@@ -344,48 +491,17 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       
       fetchDocument();
     }
-  }, [params.id, isNewDocument, editor, projectId]);
+  }, [params.id, isNewDocument, editor, projectId, contentLoadedFromYjs, searchParams]);
   
-  // 에디터가 생성된 후 로딩된 문서가 있는 경우 내용을 설정
+  // Y.js 컨텐츠가 로드되면 로딩 상태 해제
   useEffect(() => {
-    // 에디터가 생성되었고, 로딩 중이며, 기존 문서인 경우에만 실행
-    if (editor && isLoading && !isNewDocument && params.id !== "new") {
-      // API에서 문서를 가져오는 함수 재실행
-      const fetchDocumentForEditor = async () => {
-        try {
-          const response = await fetch(`/api/documents/${params.id}`);
-          
-          if (!response.ok) {
-            throw new Error('문서를 불러오는데 실패했습니다.');
-          }
-          
-          const documentData = await response.json();
-          
-          // 에디터 내용 설정
-          if (documentData.content) {
-            editor.commands.setContent(documentData.content);
-            
-            // 컨텐츠 설정 후 약간의 지연시간을 두고 로딩 상태 해제
-            setTimeout(() => {
-              setIsLoading(false);
-            }, 500); // 0.5초 지연
-          } else {
-            setIsLoading(false);
-          }
-        } catch (error) {
-          if (editor) {
-            editor.commands.setContent('<p>문서를 불러오는 중 오류가 발생했습니다.</p>');
-          }
-          setIsLoading(false);
-        }
-      };
-      
-      fetchDocumentForEditor();
-    } else if (editor && isNewDocument) {
-      // 새 문서의 경우 에디터가 생성되었으면 바로 로딩 상태 해제
-      setIsLoading(false);
+    if (contentLoadedFromYjs && isLoading) {
+      console.log('Y.js에서 컨텐츠를 불러왔습니다.');
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 300);
     }
-  }, [editor, isLoading, isNewDocument, params.id]);
+  }, [contentLoadedFromYjs, isLoading]);
   
   // 바깥 영역 클릭 감지 이벤트
   useEffect(() => {
@@ -637,6 +753,435 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
     };
   }, [editor, showSlashMenu]);
   
+  // 자동저장 관련 상태 추가
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  // 자동저장 디바운스 타이머 ref
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 자동저장 함수
+  const autoSave = useCallback(async () => {
+    if (!editor || !autoSaveEnabled) return;
+    
+    try {
+      setIsSaving(true);
+      setHasUnsavedChanges(false);
+      
+      // 빈 제목은 "제목 없음"으로 설정
+      const documentTitle = title.trim() || "제목 없음";
+      
+      // 에디터 내용 가져오기 (저장 시에는 HTML 형식으로)
+      const content = editor.getHTML();
+      
+      // 프로젝트 ID 확인 또는 기본 프로젝트 획득
+      let finalProjectId = selectedProjectId;
+      
+      if (!finalProjectId) {
+        console.log("프로젝트 ID 검색 중...");
+        
+        // 1. URL에서 직접 확인 (최우선)
+        const urlProjectId = getProjectIdFromUrl();
+        
+        if (urlProjectId) {
+          finalProjectId = urlProjectId;
+          setSelectedProjectId(urlProjectId);
+          console.log("URL에서 프로젝트 ID 가져옴:", finalProjectId);
+        } else {
+          // 2. 기본 프로젝트를 가져오거나 생성
+          try {
+            // 사용자의 프로젝트 목록 가져오기 시도
+            const projectsResponse = await fetch('/api/projects');
+            
+            if (projectsResponse.ok) {
+              const projects = await projectsResponse.json();
+              
+              // 프로젝트가 있으면 첫 번째 프로젝트 ID 사용
+              if (projects && projects.length > 0) {
+                finalProjectId = projects[0].id;
+                setSelectedProjectId(finalProjectId);
+                console.log("기존 프로젝트 ID 사용:", finalProjectId);
+              } else {
+                // 프로젝트가 없으면 새 프로젝트 생성
+                const createResponse = await fetch('/api/projects', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    name: "내 프로젝트",
+                    description: "자동으로 생성된 프로젝트입니다."
+                  })
+                });
+                
+                if (createResponse.ok) {
+                  const newProject = await createResponse.json();
+                  finalProjectId = newProject.id;
+                  setSelectedProjectId(finalProjectId);
+                  console.log("새 프로젝트 생성:", finalProjectId);
+                } else {
+                  throw new Error('프로젝트를 생성할 수 없습니다');
+                }
+              }
+              
+              // URL 업데이트 (페이지 새로고침 없이)
+              if (finalProjectId) {
+                updateUrlWithProjectId(finalProjectId);
+              }
+            } else {
+              throw new Error('프로젝트 목록을 가져올 수 없습니다');
+            }
+          } catch (error) {
+            console.error("프로젝트 ID 획득 실패:", error);
+            setProjectIdWarning(true);
+            throw new Error('프로젝트 ID를 가져올 수 없습니다');
+          }
+        }
+      }
+      
+      // 필수 값 검증
+      if (!finalProjectId) {
+        console.error("프로젝트 ID가 설정되지 않았습니다");
+        setProjectIdWarning(true);
+        throw new Error('프로젝트 ID가 필요합니다');
+      }
+      
+      const isCreatingNew = !savedDocumentId || savedDocumentId === 'new';
+      
+      // Y.js 데이터 추출 및 인코딩
+      let yjsData = null;
+      if (provider) {
+        try {
+          // @ts-ignore - provider.document 타입 문제 무시
+          const yDocState = Y.encodeStateAsUpdate(ydoc);
+          yjsData = Buffer.from(yDocState).toString('base64');
+          console.log("Y.js 데이터 추출 완료:", yjsData.length, "바이트");
+        } catch (error) {
+          console.error("Y.js 데이터 추출 중 오류:", error);
+        }
+      }
+      
+      // 문서 데이터 구성
+      const documentData = {
+        title: documentTitle,
+        content: content,
+        emoji,
+        isStarred,
+        folder,
+        projectId: finalProjectId,
+        tags,
+        folderId,
+        // Y.js 데이터 포함
+        ycontent: yjsData,
+        // 추가 필드: 이 문서가 Y.js를 사용하는지 여부를 표시
+        isCollaborative: true
+      };
+      
+      // API 엔드포인트 설정 (새 문서/기존 문서)
+      const endpoint = isCreatingNew 
+        ? `/api/documents` 
+        : `/api/documents/${savedDocumentId}`;
+      
+      // HTTP 메서드 설정 (새 문서/기존 문서)
+      const method = isCreatingNew ? 'POST' : 'PATCH';
+      
+      // API 호출
+      const response = await fetch(endpoint, {
+        method,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(documentData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: '알 수 없는 오류' }));
+        throw new Error(`자동 저장 실패: ${errorData.message || response.statusText}`);
+      }
+      
+      const responseData = await response.json();
+      
+      // 새 문서 생성 후 ID 저장 및 URL 업데이트
+      if (isCreatingNew && responseData.id) {
+        setSavedDocumentId(responseData.id);
+        setIsNewDocument(false);
+        
+        // URL 업데이트
+        const newUrl = `/documents/${responseData.id}?projectId=${finalProjectId}${
+          folderId ? `&folderId=${folderId}&folderName=${encodeURIComponent(folder)}` : ''
+        }`;
+        window.history.replaceState({}, '', newUrl);
+        
+        // 새 문서가 생성되면 해당 ID로 Y.js 프로바이더 생성
+        initializeProvider(responseData.id);
+      }
+      
+      setLastSaved(new Date());
+      setSaveSuccess(true);
+      
+      // 3초 후 성공 메시지 숨김
+      setTimeout(() => {
+        setSaveSuccess(false);
+      }, 3000);
+      
+    } catch (error) {
+      console.error('자동 저장 중 오류:', error);
+      setSaveSuccess(false);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [title, editor, emoji, isStarred, folder, tags, selectedProjectId, savedDocumentId, folderId, autoSaveEnabled, provider]);
+  
+  // URL에서 프로젝트 ID 가져오기 함수
+  const getProjectIdFromUrl = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlProjectId = urlParams.get('projectId');
+        if (urlProjectId && urlProjectId !== '' && urlProjectId !== 'null') {
+          return urlProjectId;
+        }
+      } catch (e) {
+        console.error("URL에서 projectId 파싱 오류:", e);
+      }
+    }
+    return null;
+  };
+  
+  // URL에 프로젝트 ID 업데이트하는 함수
+  const updateUrlWithProjectId = (projectId: string) => {
+    if (typeof window !== 'undefined') {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('projectId', projectId);
+      window.history.replaceState({}, '', currentUrl.toString());
+    }
+  };
+  
+  // Y.js 프로바이더 초기화 함수
+  const initializeProvider = (documentId: string) => {
+    // 기존 프로바이더 정리
+    if (provider) {
+      provider.destroy();
+    }
+    
+    // 새 프로바이더 생성
+    const hocuspocusProvider = new HocuspocusProvider({
+      url: process.env.NEXT_PUBLIC_SOCKET_URL || 'ws://localhost:1234',
+      name: documentId,
+      document: ydoc,
+      onConnect: () => {
+        console.log('협업 서버에 연결되었습니다.');
+        // 즉시 사용자 정보 설정
+        hocuspocusProvider.setAwarenessField('user', currentUser);
+        console.log('초기 사용자 정보 설정:', currentUser.name);
+        
+        setTimeout(() => {
+          setContentLoadedFromYjs(true);
+        }, 100);
+      },
+      onDisconnect: () => {
+        console.log('협업 서버와의 연결이 끊어졌습니다.');
+      },
+      onAwarenessUpdate: ({ states }) => {
+        // 접속 중인 사용자 목록 업데이트
+        const users = Array.from(states.entries())
+          .filter(([_, state]) => state.user)
+          .map(([_, state]) => state.user);
+        
+        setConnectedUsers(users);
+        console.log('접속 중인 사용자 목록 업데이트:', users.map(u => u.name).join(', '));
+      },
+      // Y.js 문서 동기화 이벤트
+      onSynced: () => {
+        console.log('Y.js 문서가 서버와 동기화되었습니다.');
+        // 약간의 지연 후 플래그 설정 (에디터 포커스 문제 방지)
+        setTimeout(() => {
+          setContentLoadedFromYjs(true);
+        }, 100);
+      }
+    });
+    
+    // 초기 사용자 정보 설정
+    hocuspocusProvider.setAwarenessField('user', currentUser);
+    
+    setProvider(hocuspocusProvider);
+  };
+  
+  // 현재 사용자 정보 가져오기 - AuthContext 사용
+  useEffect(() => {
+    if (user) {
+      console.log('AuthContext에서 사용자 정보 가져옴:', user);
+      
+      // 사용자 랜덤 색상 생성
+      let idValue = 0;
+      try {
+        // id가 uuid일 경우 간단한 해시값으로 변환
+        idValue = user.id ? 
+          user.id.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0) : 
+          Date.now();
+      } catch (e) {
+        idValue = Date.now();
+      }
+      
+      const userColor = `#${(idValue % 0xffffff).toString(16).padStart(6, '0')}`;
+      
+      setCurrentUser({
+        name: user.name || user.email || '익명 사용자',
+        color: userColor,
+      });
+      
+      console.log('사용자 정보 설정 완료:', user.name || user.email);
+    } else {
+      console.log('로그인된 사용자 정보가 없습니다.');
+      
+      // 사용자 정보가 없을 경우 직접 API 호출 시도
+      const fetchUserDirectly = async () => {
+        try {
+          console.log('API를 통해 사용자 정보 직접 요청...');
+          const response = await fetch('/api/auth/me', {
+            credentials: 'include'
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('API 응답:', data);
+            
+            if (data.authenticated && data.user) {
+              const userColor = `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`;
+              
+              setCurrentUser({
+                name: data.user.name || data.user.email || '익명 사용자',
+                color: userColor,
+              });
+            }
+          } else {
+            console.warn('사용자 정보 요청 실패:', response.status);
+          }
+        } catch (error) {
+          console.error('사용자 정보 직접 요청 실패:', error);
+        }
+      };
+      
+      fetchUserDirectly();
+    }
+  }, [user]);
+
+  // 문서 ID가 있을 때 협업 프로바이더 설정
+  useEffect(() => {
+    if (!savedDocumentId || savedDocumentId === 'new') return;
+    
+    // 기존 프로바이더 정리
+    if (provider) {
+      provider.destroy();
+    }
+    
+    // 새 프로바이더 생성
+    const hocuspocusProvider = new HocuspocusProvider({
+      url: process.env.NEXT_PUBLIC_SOCKET_URL || 'ws://localhost:1234',
+      name: savedDocumentId,
+      document: ydoc,
+      onConnect: () => {
+        console.log('협업 서버에 연결되었습니다.');
+        // 즉시 사용자 정보 설정
+        hocuspocusProvider.setAwarenessField('user', currentUser);
+        console.log('문서 ID 변경 시 사용자 정보 설정:', currentUser.name);
+        
+        // Y.js에서 데이터가 로드되면 플래그 설정
+        setTimeout(() => {
+          setContentLoadedFromYjs(true);
+        }, 100);
+      },
+      onDisconnect: () => {
+        console.log('협업 서버와의 연결이 끊어졌습니다.');
+      },
+      onAwarenessUpdate: ({ states }) => {
+        // 접속 중인 사용자 목록 업데이트
+        const users = Array.from(states.entries())
+          .filter(([_, state]) => state.user)
+          .map(([_, state]) => state.user);
+        
+        setConnectedUsers(users);
+        console.log('접속 중인 사용자 목록 업데이트:', users.map(u => u.name || '익명').join(', '));
+      },
+      // Y.js 문서 동기화 이벤트
+      onSynced: () => {
+        console.log('Y.js 문서가 서버와 동기화되었습니다.');
+        // 약간의 지연 후 플래그 설정 (에디터 포커스 문제 방지)
+        setTimeout(() => {
+          setContentLoadedFromYjs(true);
+        }, 100);
+      }
+    });
+    
+    // 초기 사용자 정보 설정
+    hocuspocusProvider.setAwarenessField('user', currentUser);
+    
+    setProvider(hocuspocusProvider);
+    
+    return () => {
+      hocuspocusProvider.destroy();
+    };
+  }, [savedDocumentId, ydoc, currentUser]);
+  
+  // 프로바이더 변경 시 에디터 업데이트
+  useEffect(() => {
+    if (!editor || !provider) return;
+      
+    // 협업 커서 업데이트 전에 먼저 기본 콘텐츠가 있는지 확인
+    if (editor.isEmpty) {
+      // 기본 빈 단락을 추가하여 TextSelection 오류 방지
+      editor.commands.insertContent('<p></p>');
+    }
+    
+    // 명시적으로 사용자 정보 설정
+    provider.setAwarenessField('user', currentUser);
+    console.log('협업 프로바이더에 사용자 정보 설정:', currentUser.name);
+    
+    // 이미 확장이 있는지 확인
+    const collaborationCursor = editor.extensionManager.extensions.find(
+      extension => extension.name === 'collaborationCursor'
+    );
+    
+    if (collaborationCursor) {
+      try {
+        // 이미 확장이 있으면 옵션 업데이트
+        collaborationCursor.options.provider = provider;
+        collaborationCursor.options.user = currentUser;
+        console.log('협업 커서 옵션 업데이트 완료:', currentUser.name);
+      } catch (err) {
+        console.error('협업 커서 옵션 업데이트 실패:', err);
+      }
+    } else {
+      try {
+        // 확장이 없으면 에디터에 추가
+        editor.extensionManager.extensions.push(
+          CollaborationCursor.configure({
+            provider: provider,
+            user: currentUser,
+            render: user => {
+              const cursor = document.createElement('span')
+              cursor.classList.add('collaboration-cursor')
+              cursor.setAttribute('style', `border-color: ${user.color}`)
+              
+              const label = document.createElement('div')
+              label.classList.add('collaboration-cursor-label')
+              label.setAttribute('style', `background-color: ${user.color}`)
+              label.textContent = user.name
+              
+              cursor.appendChild(label)
+              
+              return cursor
+            },
+          })
+        );
+        console.log('새 협업 커서 추가 완료:', currentUser.name);
+      } catch (err) {
+        console.error('협업 커서 추가 실패:', err);
+      }
+    }
+  }, [editor, provider, currentUser]);
+  
   // 문서 저장
   const saveDocument = async () => {
     try {
@@ -816,73 +1361,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       alert('폴더를 생성하는 중 오류가 발생했습니다.');
     }
   };
-  
-  // 자동저장 관련 상태 추가
-  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  
-  // 자동저장 디바운스 타이머 ref
-  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // 자동저장 함수
-  const autoSave = useCallback(async () => {
-    if (!autoSaveEnabled || !selectedProjectId) return;
-    
-    try {
-      setIsSaving(true);
-      
-      const documentTitle = title.trim() || "제목 없음";
-      const content = editor ? editor.getHTML() : '';
-      
-      const documentData = {
-        title: documentTitle,
-        content,
-        emoji,
-        isStarred,
-        folder,
-        tags,
-        projectId: selectedProjectId,
-        folderId
-      };
-      
-      // 이미 저장된 문서가 있으면 해당 ID로 업데이트, 아니면 새로 생성
-      const isCreatingNew = !savedDocumentId;
-      const endpoint = isCreatingNew ? '/api/documents' : `/api/documents/${savedDocumentId}`;
-      const method = isCreatingNew ? 'POST' : 'PATCH';
-      
-      const response = await fetch(endpoint, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(documentData)
-      });
-      
-      if (!response.ok) {
-        throw new Error('자동 저장 실패');
-      }
-      
-      const responseData = await response.json();
-      
-      // 새 문서 생성 후 ID 저장
-      if (isCreatingNew && responseData.id) {
-        setSavedDocumentId(responseData.id);
-        setIsNewDocument(false);
-        
-        // URL을 업데이트하지만 페이지를 다시 로드하지는 않음
-        const newUrl = `/documents/${responseData.id}?projectId=${selectedProjectId}`;
-        window.history.replaceState({}, '', newUrl);
-      }
-      
-      setLastSaved(new Date());
-      setHasUnsavedChanges(false);
-      
-    } catch (error) {
-      console.error('자동 저장 중 오류:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [title, editor, emoji, isStarred, folder, tags, selectedProjectId, savedDocumentId, folderId]);
-  
+
   // 컨텐츠 변경 감지 및 자동저장 트리거
   useEffect(() => {
     if (!editor || !autoSaveEnabled) return;
@@ -895,8 +1374,10 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
         clearTimeout(autoSaveTimerRef.current);
       }
       
-      // 바로 저장 실행
-      autoSave();
+      // Y.js 데이터가 변경되면 바로 저장하지 않고 잠시 지연
+      autoSaveTimerRef.current = setTimeout(() => {
+        autoSave();
+      }, 1000); // 1초 지연
     };
     
     // editor가 null이 아님이 확인된 상태
@@ -922,10 +1403,27 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
     
     setHasUnsavedChanges(true);
     
-    // 바로 자동저장 실행
-    autoSave();
+    // 일정 시간 후 자동저장 실행
+    autoSaveTimerRef.current = setTimeout(() => {
+      autoSave();
+    }, 1000); // 1초 지연
   }, [title, autoSaveEnabled, autoSave]);
-  
+
+  // 현재 사용자 정보가 변경될 때 provider에 적용
+  useEffect(() => {
+    if (!provider || !currentUser.name) return;
+
+    console.log('사용자 정보를 협업 프로바이더에 적용:', currentUser.name);
+    
+    // provider의 awareness 데이터 업데이트
+    try {
+      provider.setAwarenessField('user', currentUser);
+      console.log('프로바이더 사용자 정보 설정 완료');
+    } catch (error) {
+      console.error('프로바이더 사용자 정보 설정 실패:', error);
+    }
+  }, [provider, currentUser]);
+
   return (
     <div className="bg-gray-50 min-h-screen">
       {/* 상단 네비게이션 바 */}
@@ -957,6 +1455,31 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               <ArrowLeft className="w-4 h-4 mr-1" />
               돌아가기
             </Button>
+            
+            {/* 접속 중인 사용자 표시 추가 */}
+            {connectedUsers.length > 0 && (
+              <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded-md">
+                <UsersIcon className="w-4 h-4 text-gray-500" />
+                <span className="text-xs text-gray-600">{connectedUsers.length}명 접속 중</span>
+                <div className="flex -space-x-2">
+                  {connectedUsers.slice(0, 3).map((user, index) => (
+                    <div 
+                      key={index}
+                      className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-xs text-white"
+                      style={{ backgroundColor: user.color || '#888' }}
+                      title={user.name}
+                    >
+                      {user.name.charAt(0)}
+                    </div>
+                  ))}
+                  {connectedUsers.length > 3 && (
+                    <div className="w-6 h-6 rounded-full bg-gray-400 border-2 border-white flex items-center justify-center text-xs text-white">
+                      +{connectedUsers.length - 3}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             
             <div className="relative">
               <button
@@ -1036,7 +1559,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
             
             <Button 
               onClick={saveDocument}
-              className="flex items-center space-x-1 bg-green-600 hover:bg-green-700 text-white"
+              className="flex items-center bg-green-600 hover:bg-green-700 text-white w-[100px] h-[36px] justify-center"
               disabled={isSaving || isLoading}
             >
               {isSaving ? (
@@ -1046,7 +1569,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
                 </>
               ) : (
                 <>
-                  <SaveIcon className="w-4 h-4" />
+                  <SaveIcon className="w-4 h-4 mr-1" />
                   <span>저장</span>
                 </>
               )}
@@ -1143,8 +1666,44 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               color: #374151;
             }
             
+            /* 협업 커서 스타일 */
+            .collaboration-cursor {
+              position: relative;
+              border-left: 2px solid;
+              margin-left: -1px;
+              margin-right: -1px;
+              pointer-events: none;
+              word-break: normal;
+              display: inline-block;
+              height: 1.5em;
+              width: 0;
+              line-height: normal;
+              vertical-align: text-top;
+            }
+            
+            .collaboration-cursor-label {
+              position: absolute;
+              top: -1.4em;
+              left: -2px;
+              font-size: 0.7rem;
+              font-weight: 500;
+              line-height: normal;
+              padding: 0.1rem 0.3rem;
+              white-space: nowrap;
+              color: white;
+              border-radius: 3px;
+              user-select: none;
+              pointer-events: none;
+              box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+              z-index: 10;
+            }
+            
             .ProseMirror p {
-              margin-bottom: 0.75em;
+              margin-bottom: 0.5em;
+              margin-top: 0;
+              padding-top: 0;
+              padding-bottom: 0;
+              min-height: 1.5em;
             }
             
             .ProseMirror p.is-editor-empty:first-child::before {
@@ -1154,6 +1713,27 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               pointer-events: none;
               height: 0;
               font-style: italic;
+            }
+            
+            /* 빈 줄과 협업 커서 사이의 간격 조정 */
+            .ProseMirror p:empty {
+              margin-top: 0;
+              margin-bottom: 0;
+              padding: 0;
+              min-height: 0;
+              height: 1.5em;
+              line-height: 1.5em;
+            }
+            
+            /* 협업 커서가 포함된 요소의 공백 처리 */
+            .ProseMirror p:has(.collaboration-cursor) {
+              margin-bottom: 0.5em;
+              margin-top: 0;
+            }
+            
+            /* 문단 간격 일관성 유지 */
+            .ProseMirror * + p {
+              margin-top: 0;
             }
             
             .ProseMirror h1 {
@@ -1279,14 +1859,6 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
             
             .ProseMirror:focus {
               outline: none;
-            }
-            
-            .ProseMirror p {
-              transition: background-color 0.2s;
-            }
-            
-            .ProseMirror p:hover {
-              background-color: rgba(232, 232, 232, 0.1);
             }
           `}</style>
           

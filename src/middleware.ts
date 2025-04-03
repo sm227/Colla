@@ -13,6 +13,7 @@ const publicPaths = [
   '/api/auth/me',
   '/_next',
   '/favicon.ico',
+  '/api/socket', // WebSocket 연결은 인증 없이 허용
 ];
 
 // 환경 변수 확인 로그
@@ -23,6 +24,17 @@ export async function middleware(request: NextRequest) {
   
   // 디버깅을 위한 로그 (실제 배포 시 제거)
   console.log('미들웨어 실행:', pathname);
+  
+  // WebSocket 경로 특별 처리
+  if (pathname.startsWith('/api/socket')) {
+    const upgrade = request.headers.get('upgrade');
+    if (upgrade?.toLowerCase() === 'websocket') {
+      // WebSocket 연결을 환경 변수에 설정된 실제 Hocuspocus 서버로 리다이렉트
+      const hocuspocusUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'ws://localhost:1234';
+      console.log(`WebSocket 연결을 ${hocuspocusUrl}로 리다이렉트합니다.`);
+      return NextResponse.rewrite(new URL(hocuspocusUrl));
+    }
+  }
   
   // 공개 경로는 인증 검사 없이 통과
   if (publicPaths.some(path => pathname.startsWith(path))) {

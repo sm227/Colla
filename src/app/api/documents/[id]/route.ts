@@ -50,14 +50,38 @@ export async function GET(
       );
     }
     
-    const document = await prisma.document.findUnique({
-      where: { id: params.id }
-    });
+    // 문서 정보 및 프로젝트 소유자 정보 가져오기
+    const documentQuery = await prisma.$queryRaw`
+      SELECT d.*, p."userId" as "projectOwnerId", p.id as "projectId"
+      FROM "Document" d
+      LEFT JOIN "Project" p ON d."projectId" = p.id
+      WHERE d.id = ${params.id}
+    `;
+    
+    const document = (documentQuery as any[])[0];
     
     if (!document) {
       return NextResponse.json(
         { error: '문서를 찾을 수 없습니다.' },
         { status: 404 }
+      );
+    }
+    
+    // 프로젝트 멤버십 확인
+    const projectMembershipQuery = await prisma.$queryRaw`
+      SELECT * FROM "ProjectMember"
+      WHERE "userId" = ${currentUser.id}
+      AND "projectId" = ${document.projectId}
+    `;
+    
+    const isProjectMember = (projectMembershipQuery as any[]).length > 0;
+    const isProjectOwner = document.projectOwnerId === currentUser.id;
+    
+    // 사용자가 프로젝트 소유자이거나 멤버인 경우에만 문서 접근 허용
+    if (!isProjectOwner && !isProjectMember) {
+      return NextResponse.json(
+        { error: "이 문서에 접근할 권한이 없습니다. 프로젝트 멤버만 문서를 볼 수 있습니다." },
+        { status: 403 }
       );
     }
     
@@ -126,10 +150,20 @@ export async function PATCH(
       );
     }
     
-    // 문서 소유권 확인
-    if (existingDocument.userId !== currentUser.id) {
+    // 프로젝트 멤버십 확인
+    const projectMembershipQuery = await prisma.$queryRaw`
+      SELECT * FROM "ProjectMember"
+      WHERE "userId" = ${currentUser.id}
+      AND "projectId" = ${existingDocument.projectId}
+    `;
+    
+    const isProjectMember = (projectMembershipQuery as any[]).length > 0;
+    const isProjectOwner = existingDocument.userId === currentUser.id;
+    
+    // 사용자가 프로젝트 소유자이거나 멤버인 경우에만 문서 수정 허용
+    if (!isProjectOwner && !isProjectMember) {
       return NextResponse.json(
-        { error: "이 문서를 수정할 권한이 없습니다." },
+        { error: "이 문서를 수정할 권한이 없습니다. 프로젝트 멤버만 문서를 수정할 수 있습니다." },
         { status: 403 }
       );
     }
@@ -248,43 +282,43 @@ export async function DELETE(
     
     if (!currentUser) {
       return NextResponse.json(
-        { error: '인증된 사용자를 찾을 수 없습니다.' }, 
+        { error: '인증된 사용자를 찾을 수 없습니다.' },
         { status: 401 }
       );
     }
     
-    const documentId = params.id;
+    // 문서 정보 및 소유권 확인
+    const documentQuery = await prisma.$queryRaw`
+      SELECT d.*, d."userId" as "documentCreatorId", 
+             p."userId" as "projectOwnerId", p.id as "projectId"
+      FROM "Document" d
+      LEFT JOIN "Project" p ON d."projectId" = p.id
+      WHERE d.id = ${params.id}
+    `;
     
-    // 문서가 존재하는지 확인
-    const existingDocument = await prisma.document.findUnique({
-      where: { id: documentId },
-      include: { project: true }
-    });
+    const document = (documentQuery as any[])[0];
     
-    if (!existingDocument) {
+    if (!document) {
       return NextResponse.json(
         { error: '문서를 찾을 수 없습니다.' },
         { status: 404 }
       );
     }
     
-    // 문서에 연결된 프로젝트가 있으면 접근 권한 확인
-    if (existingDocument.projectId) {
-      const project = await prisma.project.findUnique({
-        where: { id: existingDocument.projectId }
-      });
-      
-      if (project && project.userId !== currentUser.id) {
-        return NextResponse.json(
-          { error: '이 문서를 삭제할 권한이 없습니다.' },
-          { status: 403 }
-        );
-      }
+    // 프로젝트 소유자 또는 문서 생성자만 삭제 가능
+    const isProjectOwner = document.projectOwnerId === currentUser.id;
+    const isDocumentCreator = document.documentCreatorId === currentUser.id;
+    
+    if (!isProjectOwner && !isDocumentCreator) {
+      return NextResponse.json(
+        { error: '이 문서를 삭제할 권한이 없습니다. 프로젝트 소유자나 문서 생성자만 삭제할 수 있습니다.' },
+        { status: 403 }
+      );
     }
     
     // 문서 삭제
     await prisma.document.delete({
-      where: { id: documentId }
+      where: { id: params.id }
     });
     
     return NextResponse.json({ success: true });

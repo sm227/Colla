@@ -26,12 +26,12 @@ model Task {
   priority    String
   assignee    String?
   dueDate     DateTime?
-  startDate   DateTime?
-  endDate     DateTime?
-  isAllDay    Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   projectId   String?
+  endDate     DateTime?
+  isAllDay    Boolean   @default(false)
+  startDate   DateTime?
   project     Project?  @relation(fields: [projectId], references: [id])
 }
 
@@ -41,24 +41,24 @@ model Project {
   description String?
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
-  tasks       Task[]
   userId      String?
-  user        User?           @relation(fields: [userId], references: [id])
   documents   Document[]
-  members     ProjectMember[]
   folders     Folder[]
+  user        User?           @relation(fields: [userId], references: [id])
+  members     ProjectMember[]
+  tasks       Task[]
 }
 
 model ProjectMember {
   id           String   @id @default(cuid())
   userId       String
-  user         User     @relation(fields: [userId], references: [id])
   projectId    String
-  project      Project  @relation(fields: [projectId], references: [id])
   role         String   @default("member")
   inviteStatus String   @default("pending")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  project      Project  @relation(fields: [projectId], references: [id])
+  user         User     @relation(fields: [userId], references: [id])
 
   @@unique([userId, projectId])
 }
@@ -68,15 +68,16 @@ model Document {
   title     String
   content   String
   emoji     String?
-  isStarred Boolean  @default(false)
-  folder    String?
-  tags      String? // JSON array stored as string
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   projectId String?
-  project   Project? @relation(fields: [projectId], references: [id])
+  folder    String?
+  isStarred Boolean  @default(false)
+  tags      String?
   folderId  String?
   folderRef Folder?  @relation(fields: [folderId], references: [id])
+  project   Project? @relation(fields: [projectId], references: [id])
+  ycontent  Bytes?   // Y.js 문서 바이너리 데이터
 }
 
 model Folder {
@@ -86,6 +87,6 @@ model Folder {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   projectId   String?
-  project     Project?   @relation(fields: [projectId], references: [id])
   documents   Document[]
+  project     Project?   @relation(fields: [projectId], references: [id])
 }
