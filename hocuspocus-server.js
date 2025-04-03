@@ -1,34 +1,37 @@
-import { NextRequest } from 'next/server';
-import { Server } from '@hocuspocus/server';
-import { Database } from '@hocuspocus/extension-database';
-import { PrismaClient } from '@prisma/client';
+const { Server } = require('@hocuspocus/server');
+const { Logger } = require('@hocuspocus/extension-logger');
+const { Database } = require('@hocuspocus/extension-database');
+const { PrismaClient } = require('@prisma/client');
 
 // Prisma 클라이언트 인스턴스
 const prisma = new PrismaClient();
 
 // Hocuspocus 서버 인스턴스 생성
 const server = Server.configure({
+  port: 1234, // WebSocket 서버 포트
   extensions: [
+    new Logger({
+      onConnect: true, // 연결 이벤트 로깅 활성화
+      onChange: true,  // 변경 이벤트 로깅 활성화
+      onDisconnect: true // 연결 종료 이벤트 로깅 활성화
+    }),
     new Database({
       // 문서 로드 함수 - Y.js 바이너리 데이터 로드
-      async fetch(data: any) {
+      async fetch(data) {
         const { documentName } = data;
         try {
           // Y.js 콘텐츠 존재 여부 확인
           const document = await prisma.$queryRaw`
             SELECT "id", "ycontent" FROM "Document" WHERE "id" = ${documentName};
           `;
-
-          // 타입스크립트를 위한 구조
-          const doc = document as any;
           
-          if (!doc || !doc[0] || !doc[0].ycontent) {
+          if (!document || !document[0] || !document[0].ycontent) {
             console.log(`[불러오기] 문서를 찾을 수 없거나 Y.js 내용이 없습니다: ${documentName}`);
             return null;
           }
 
           console.log(`[불러오기] 문서를 성공적으로 불러왔습니다: ${documentName}`);
-          return doc[0].ycontent;
+          return document[0].ycontent;
         } catch (error) {
           console.error(`[에러] 문서 불러오기 실패: ${documentName}`, error);
           return null;
@@ -36,7 +39,7 @@ const server = Server.configure({
       },
 
       // 문서 저장 함수 - Y.js 바이너리 데이터 저장
-      async store(data: any) {
+      async store(data) {
         const { documentName, state } = data;
         try {
           // 직접 SQL 쿼리로 업데이트
@@ -55,34 +58,25 @@ const server = Server.configure({
   ],
 });
 
-// 데이터베이스에 ycontent 컬럼이 없는 경우 추가
-try {
-  prisma.$executeRaw`
-    ALTER TABLE "Document" ADD COLUMN IF NOT EXISTS "ycontent" BYTEA;
-  `.then(() => console.log('ycontent 컬럼이 추가되었거나 이미 존재합니다.'));
-} catch (error) {
-  console.error('ycontent 컬럼 추가 중 오류:', error);
-}
-
-export async function GET(request: NextRequest) {
+// 서버 시작 함수
+async function startHocuspocusServer() {
   try {
-    // Next.js의 요청을 WebSocket 연결로 업그레이드
-    const upgrade = request.headers.get('upgrade');
-    if (upgrade?.toLowerCase() !== 'websocket') {
-      return new Response('WebSocket 연결이 필요합니다', { status: 426 });
+    // 데이터베이스에 ycontent 컬럼이 없는 경우 추가 (첫 실행 시)
+    try {
+      await prisma.$executeRaw`
+        ALTER TABLE "Document" ADD COLUMN IF NOT EXISTS "ycontent" BYTEA;
+      `;
+      console.log('ycontent 컬럼이 추가되었거나 이미 존재합니다.');
+    } catch (error) {
+      console.error('ycontent 컬럼 추가 중 오류:', error);
     }
-
-    const { socket, response } = (Reflect.get(request, 'socket') as any)();
     
-    // 헤더 정보 로깅 및 처리
-    console.log('[WebSocket] 연결 시도:', request.url);
-
-    // Hocuspocus 서버에서 웹소켓 요청 처리
-    server.handleConnection(socket, request, response);
-
-    return response;
+    await server.listen();
+    console.log(`Hocuspocus 서버가 포트 ${server.configuration.port}에서 실행 중입니다.`);
   } catch (error) {
-    console.error('[WebSocket] 오류:', error);
-    return new Response('서버 오류', { status: 500 });
+    console.error('Hocuspocus 서버 시작 중 오류가 발생했습니다:', error);
   }
 }
+
+// 서버 시작
+startHocuspocusServer(); 

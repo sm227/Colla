@@ -56,3 +56,16 @@ app.prepare().then(() => {
       console.log(`> Ready on http://${hostname}:${port}`);
     });
 });
+
+// Hocuspocus 서버 실행 스크립트
+const { startHocuspocusServer } = require('./dist/lib/hocuspocus-server');
+
+// Hocuspocus 서버 시작
+startHocuspocusServer()
+  .then(() => {
+    console.log('Hocuspocus 서버가 시작되었습니다.');
+  })
+  .catch((error) => {
+    console.error('Hocuspocus 서버 시작 중 오류가 발생했습니다:', error);
+    process.exit(1);
+  });
