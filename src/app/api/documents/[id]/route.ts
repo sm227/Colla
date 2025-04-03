@@ -289,8 +289,7 @@ export async function DELETE(
     
     // 문서 정보 및 소유권 확인
     const documentQuery = await prisma.$queryRaw`
-      SELECT d.*, d."userId" as "documentCreatorId", 
-             p."userId" as "projectOwnerId", p.id as "projectId"
+      SELECT d.*, p."userId" as "projectOwnerId", p.id as "projectId"
       FROM "Document" d
       LEFT JOIN "Project" p ON d."projectId" = p.id
       WHERE d.id = ${params.id}
@@ -305,13 +304,12 @@ export async function DELETE(
       );
     }
     
-    // 프로젝트 소유자 또는 문서 생성자만 삭제 가능
+    // 프로젝트 소유자만 삭제 가능하도록 변경
     const isProjectOwner = document.projectOwnerId === currentUser.id;
-    const isDocumentCreator = document.documentCreatorId === currentUser.id;
     
-    if (!isProjectOwner && !isDocumentCreator) {
+    if (!isProjectOwner) {
       return NextResponse.json(
-        { error: '이 문서를 삭제할 권한이 없습니다. 프로젝트 소유자나 문서 생성자만 삭제할 수 있습니다.' },
+        { error: '이 문서를 삭제할 권한이 없습니다. 프로젝트 소유자만 삭제할 수 있습니다.' },
         { status: 403 }
       );
     }

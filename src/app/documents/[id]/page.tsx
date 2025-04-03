@@ -60,6 +60,58 @@ interface Document {
   projectId?: string;
 }
 
+// 커스텀 협업 커서 확장 생성
+const CustomCollaborationCursor = CollaborationCursor.extend({
+  addNodeView() {
+    return (node: any, view: any, getPos: any) => {
+      // 커서 요소 생성
+      const cursor = document.createElement('div');
+      cursor.className = 'collaboration-cursor';
+      cursor.contentEditable = 'false';
+      cursor.style.position = 'absolute';
+      cursor.style.zIndex = '20';
+      cursor.style.pointerEvents = 'none';
+
+      // 동적으로 위치 설정
+      const update = (view: any, lastState: any) => {
+        const { user } = node.attrs;
+        
+        if (user && getPos) {
+          const pos = getPos();
+          const coords = view.coordsAtPos(pos);
+          
+          if (coords) {
+            cursor.style.display = 'block';
+            cursor.style.left = `${coords.left}px`;
+            cursor.style.top = `${coords.top}px`;
+          } else {
+            cursor.style.display = 'none';
+          }
+        }
+        
+        return true;
+      };
+      
+      // 사용자 정보 표시 (간단한 커서만 표시)
+      if (node.attrs.user) {
+        const { user } = node.attrs;
+        
+        // 커서 스타일 설정 - 단순한 세로선만 표시
+        cursor.style.borderLeft = `2px solid ${user.color || '#1e88e5'}`;
+        cursor.style.height = '1.5em';
+      }
+
+      return {
+        dom: cursor,
+        update,
+        destroy: () => {
+          cursor.remove();
+        }
+      };
+    };
+  }
+});
+
 export default function DocumentPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { user } = useAuth(); // AuthContext에서 사용자 정보 가져오기
@@ -171,22 +223,21 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
         document: ydoc,
       }),
       ...(provider ? [
-        CollaborationCursor.configure({
+        CustomCollaborationCursor.configure({
           provider: provider,
           user: currentUser,
           render: user => {
-            const cursor = document.createElement('span')
-            cursor.classList.add('collaboration-cursor')
-            cursor.setAttribute('style', `border-color: ${user.color}`)
+            const cursor = document.createElement('span');
+            cursor.classList.add('collaboration-cursor');
             
-            const label = document.createElement('div')
-            label.classList.add('collaboration-cursor-label')
-            label.setAttribute('style', `background-color: ${user.color}`)
-            label.textContent = user.name
+            // 커서 스타일 설정 - 간단한 세로선만 표시
+            cursor.style.position = 'absolute';
+            cursor.style.pointerEvents = 'none';
+            cursor.style.zIndex = '10';
+            cursor.style.borderLeft = `2px solid ${user.color}`;
+            cursor.style.height = '1.5em';
             
-            cursor.appendChild(label)
-            
-            return cursor
+            return cursor;
           },
         })
       ] : []),
@@ -1156,22 +1207,37 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       try {
         // 확장이 없으면 에디터에 추가
         editor.extensionManager.extensions.push(
-          CollaborationCursor.configure({
+          CustomCollaborationCursor.configure({
             provider: provider,
             user: currentUser,
             render: user => {
-              const cursor = document.createElement('span')
-              cursor.classList.add('collaboration-cursor')
-              cursor.setAttribute('style', `border-color: ${user.color}`)
+              const cursor = document.createElement('span');
+              cursor.classList.add('collaboration-cursor');
               
-              const label = document.createElement('div')
-              label.classList.add('collaboration-cursor-label')
-              label.setAttribute('style', `background-color: ${user.color}`)
-              label.textContent = user.name
+              // 절대 위치 스타일을 직접 설정 (transform 속성 제거)
+              cursor.style.position = 'absolute';
+              cursor.style.pointerEvents = 'none';
+              cursor.style.zIndex = '10';
+              cursor.style.borderLeft = `2px solid ${user.color}`;
+              cursor.style.height = '1.5em';
+              cursor.style.width = '0'; // 0 너비 설정
               
-              cursor.appendChild(label)
+              const label = document.createElement('div');
+              label.classList.add('collaboration-cursor-label');
+              label.style.position = 'absolute';
+              label.style.top = '-1.4em';
+              label.style.left = '-3px'; // 위치 조정
+              label.style.backgroundColor = user.color;
+              label.style.color = 'white';
+              label.style.padding = '0.1rem 0.3rem';
+              label.style.borderRadius = '3px';
+              label.style.fontSize = '0.7rem';
+              label.style.whiteSpace = 'nowrap';
+              label.style.pointerEvents = 'none';
+              label.textContent = user.name;
               
-              return cursor
+              cursor.appendChild(label);
+              return cursor;
             },
           })
         );
@@ -1377,7 +1443,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       // Y.js 데이터가 변경되면 바로 저장하지 않고 잠시 지연
       autoSaveTimerRef.current = setTimeout(() => {
         autoSave();
-      }, 1000); // 1초 지연
+      }, 300000); // 5분 지연 (300,000 밀리초)
     };
     
     // editor가 null이 아님이 확인된 상태
@@ -1406,7 +1472,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
     // 일정 시간 후 자동저장 실행
     autoSaveTimerRef.current = setTimeout(() => {
       autoSave();
-    }, 1000); // 1초 지연
+    }, 300000); // 5분 지연 (300,000 밀리초)
   }, [title, autoSaveEnabled, autoSave]);
 
   // 현재 사용자 정보가 변경될 때 provider에 적용
@@ -1423,6 +1489,33 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       console.error('프로바이더 사용자 정보 설정 실패:', error);
     }
   }, [provider, currentUser]);
+
+  // 에디터 컨테이너에 별도 레이어 추가
+  useEffect(() => {
+    if (!editor) return;
+    
+    const container = document.querySelector('.editor-container');
+    if (!container) return;
+    
+    const cursorLayer = document.createElement('div');
+    cursorLayer.className = 'cursor-layer';
+    cursorLayer.style.position = 'absolute';
+    cursorLayer.style.top = '0';
+    cursorLayer.style.left = '0';
+    cursorLayer.style.right = '0';
+    cursorLayer.style.bottom = '0';
+    cursorLayer.style.pointerEvents = 'none';
+    cursorLayer.style.zIndex = '10';
+    
+    container.appendChild(cursorLayer);
+    
+    // 커서 레이어에 커서 렌더링 로직 구현
+    // ...
+    
+    return () => {
+      cursorLayer.remove();
+    };
+  }, [editor]);
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -1657,6 +1750,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
           {/* 공통 CSS 스타일 */}
           <style jsx global>{`
             .ProseMirror {
+              position: relative; /* 필수: 모든 absolute 포지션의 기준점 */
               outline: none;
               min-height: 100px;
               padding: 0.5rem 0;
@@ -1666,44 +1760,32 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               color: #374151;
             }
             
-            /* 협업 커서 스타일 */
+            /* 협업 커서 스타일 수정 */
             .collaboration-cursor {
-              position: relative;
+              position: absolute !important;
               border-left: 2px solid;
-              margin-left: -1px;
-              margin-right: -1px;
               pointer-events: none;
-              word-break: normal;
-              display: inline-block;
               height: 1.5em;
-              width: 0;
-              line-height: normal;
-              vertical-align: text-top;
+              width: 0 !important;
+              z-index: 10 !important;
             }
             
+            /* 커서 레이블 스타일 수정 */
             .collaboration-cursor-label {
-              position: absolute;
+              position: absolute !important;
               top: -1.4em;
-              left: -2px;
-              font-size: 0.7rem;
-              font-weight: 500;
-              line-height: normal;
-              padding: 0.1rem 0.3rem;
+              left: -3px;
+              z-index: 11 !important;
               white-space: nowrap;
-              color: white;
-              border-radius: 3px;
-              user-select: none;
               pointer-events: none;
-              box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-              z-index: 10;
             }
             
+            /* 텍스트 줄 높이 일관성 유지 */
             .ProseMirror p {
-              margin-bottom: 0.5em;
-              margin-top: 0;
-              padding-top: 0;
-              padding-bottom: 0;
               min-height: 1.5em;
+              line-height: 1.5;
+              position: relative;
+              margin: 0.5em 0;
             }
             
             .ProseMirror p.is-editor-empty:first-child::before {
@@ -1859,6 +1941,50 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
             
             .ProseMirror:focus {
               outline: none;
+            }
+            
+            /* ProseMirror 관련 문제 해결 */
+            .ProseMirror-separator {
+              display: none !important;
+              visibility: hidden !important;
+              height: 0 !important;
+              width: 0 !important;
+              padding: 0 !important;
+              margin: 0 !important;
+            }
+            
+            .ProseMirror-trailingBreak {
+              display: none !important;
+              visibility: hidden !important;
+              height: 0 !important;
+              width: 0 !important;
+              padding: 0 !important;
+              margin: 0 !important;
+            }
+            
+            /* 협업 커서 관련 스타일 추가 수정 */
+            .collaboration-cursor {
+              position: absolute !important;
+              pointer-events: none !important;
+              z-index: 1000 !important;
+              height: 1.2em !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              border-left: 2px solid;
+              width: 0 !important;
+              contain: layout style paint !important;
+            }
+            
+            .collaboration-cursor-label {
+              position: absolute !important;
+              top: -1.4em !important;
+              left: -3px !important;
+              border-radius: 3px !important;
+              padding: 0 0.2em !important;
+              pointer-events: none !important;
+              white-space: nowrap !important;
+              font-size: 10px !important;
+              z-index: 1001 !important;
             }
           `}</style>
           
