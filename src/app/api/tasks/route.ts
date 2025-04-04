@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { stripHtmlTags } from '@/lib/utils';
 
 // 모든 태스크 가져오기
 export async function GET() {
@@ -46,10 +47,13 @@ export async function POST(request: Request) {
       );
     }
     
+    // HTML 태그 제거
+    const cleanDescription = description ? stripHtmlTags(description) : '';
+    
     const task = await prisma.task.create({
       data: {
         title,
-        description,
+        description: cleanDescription, // HTML 태그가 제거된 설명 저장
         status,
         priority,
         assignee,

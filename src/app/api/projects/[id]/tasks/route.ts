@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { stripHtmlTags } from '@/lib/utils';
 
 // 프로젝트의 모든 태스크 가져오기
 export async function GET(
@@ -70,6 +71,9 @@ export async function POST(
       );
     }
     
+    // HTML 태그 제거
+    const cleanDescription = description ? stripHtmlTags(description) : '';
+    
     // 프로젝트가 존재하는지 확인
     const project = await prisma.project.findUnique({
       where: { id: projectId },
@@ -85,7 +89,7 @@ export async function POST(
     const task = await prisma.task.create({
       data: {
         title,
-        description,
+        description: cleanDescription,  // HTML 태그가 제거된 설명 저장
         status,
         priority,
         assignee,
