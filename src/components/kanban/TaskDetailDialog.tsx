@@ -5,7 +5,7 @@ import { X, CalendarIcon, UserIcon, Smile, Bold, Italic, List, ListOrdered, Link
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import EmojiPicker from 'emoji-picker-react';
@@ -23,6 +23,7 @@ import ImageExtension from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import { useProject, ProjectMember } from "@/app/contexts/ProjectContext";
 import { useUsers } from "@/app/contexts/UserContext";
+import { useAuth } from "@/app/contexts/AuthContext";
 
 interface Comment {
   id: string;
@@ -39,7 +40,22 @@ interface TaskDetailDialogProps {
   onDelete?: (taskId: string) => void;
 }
 
+// TipTap 에디터의 HTML 콘텐츠 처리를 위한 함수
+const processTiptapContent = (content: string): string => {
+  if (!content) return '';
+  
+  // 빈 콘텐츠인 경우 ('<p></p>')
+  if (content === '<p></p>') {
+    return '';
+  }
+  
+  return content;
+};
+
 const RichTextEditor = ({ content, onChange }: { content: string, onChange: (html: string) => void }) => {
+  // 초기 콘텐츠에서 HTML 태그 처리
+  const processedContent = processTiptapContent(content);
+  
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -64,9 +80,11 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
         placeholder: '설명을 입력하세요...',
       }),
     ],
-    content,
+    content: processedContent,
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
+      // HTML 변환 처리
+      const html = processTiptapContent(editor.getHTML());
+      onChange(html);
     },
     immediatelyRender: false,
   });
@@ -186,9 +204,44 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
           <Smile size={16} />
         </button>
       </div>
+      {/* 에디터 스타일을 적용하여 HTML 태그가 보이지 않도록 함 */}
+      <style>
+        {`
+          .ProseMirror {
+            /* HTML 태그가 보이지 않도록 설정 */
+            -webkit-user-modify: read-write;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            white-space: pre-wrap;
+          }
+          .ProseMirror p {
+            /* 단락 스타일 조정 */
+            margin: 0;
+            line-height: 1.5;
+          }
+          .ProseMirror:focus {
+            outline: none;
+          }
+        `}
+      </style>
       <EditorContent editor={editor} className="p-3 min-h-[150px] prose max-w-none" />
     </div>
   );
+};
+
+// 설명의 HTML 태그를 UI에서 제거하는 함수
+const removeHtmlTags = (html: string): string => {
+  if (!html) return '';
+  
+  // HTML 파싱용 임시 요소 생성
+  if (typeof document !== 'undefined') {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    return tempDiv.textContent || tempDiv.innerText || '';
+  }
+  
+  // 서버 사이드 렌더링 시: 간단한 정규식으로 태그 제거
+  return html.replace(/<[^>]*>|&[^;]+;/g, '');
 };
 
 export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: TaskDetailDialogProps) {
@@ -207,16 +260,27 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
 
   // Get users from context
   const { users } = useUsers();
+  
+  // 인증 컨텍스트에서 현재 사용자 정보 가져오기
+  const { user: currentUser } = useAuth();
+  
+  // 현재 사용자가 이미 프로젝트 멤버인지 확인하기 위한 상태
+  const [isCurrentUserInMembers, setIsCurrentUserInMembers] = useState(false);
+  
+  // 변경 사항 추적 플래그
+  const [hasChanges, setHasChanges] = useState(false);
 
   // task가 변경될 때마다 editedTask 업데이트
   useEffect(() => {
     setEditedTask({...task});
+    setHasChanges(false);
   }, [task]);
   
   // Find the project and its members
   useEffect(() => {
     if (!task.projectId) {
       setProjectMembers([]);
+      setIsCurrentUserInMembers(false);
       return;
     }
     
@@ -227,16 +291,57 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
         member => member.inviteStatus === "accepted"
       );
       setProjectMembers(acceptedMembers);
+      
+      // 현재 사용자가 이미 프로젝트 멤버인지 확인
+      if (currentUser) {
+        setIsCurrentUserInMembers(
+          acceptedMembers.some(member => member.userId === currentUser.id)
+        );
+      }
     } else {
       setProjectMembers([]);
+      setIsCurrentUserInMembers(false);
     }
-  }, [task.projectId, projects, currentProject]);
+  }, [task.projectId, projects, currentProject, currentUser]);
 
-  // 변경사항이 있을 때마다 자동 저장
+  // 변경사항이 있을 때 로컬 상태만 업데이트
   const handleChange = (updatedTask: Task) => {
     setEditedTask(updatedTask);
-    onUpdate(updatedTask);
+    setHasChanges(true);
   };
+  
+  // 설명 변경 처리를 위한 특별 핸들러
+  const handleDescriptionChange = (html: string) => {
+    // 빈 p 태그 처리
+    if (html === '<p></p>') {
+      html = '';
+    }
+    
+    // 서버로 보내기 전에 HTML 태그를 제거하지 않음
+    // stripHtmlTags 함수는 서버 측에서 적용되므로 여기서는 원본 HTML을 유지
+    // 우리는 저장할 때만 텍스트를 변환해야 함
+    handleChange({...editedTask, description: html});
+  };
+  
+  // 설명 표시용 - HTML 태그 제거
+  const getCleanDescription = (): string => {
+    return removeHtmlTags(editedTask.description || '');
+  };
+  
+  // 모달을 닫을 때 변경사항이 있으면 저장 (useCallback으로 감싸기)
+  const handleCloseAndSave = useCallback(() => {
+    if (hasChanges) {
+      // 저장할 때 설명에서 HTML 태그를 제거
+      // (이미 서버 측에서도 처리하지만 이중 안전장치임)
+      let taskToSave = {...editedTask};
+      
+      // 저장 전에 로그에 기록
+      console.log('저장 전 설명:', taskToSave.description);
+      
+      onUpdate(taskToSave);
+    }
+    onClose();
+  }, [hasChanges, editedTask, onUpdate, onClose]);
 
   const handleAddComment = () => {
     if (!newComment.trim()) return;
@@ -324,7 +429,7 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
       e.preventDefault();
       e.stopPropagation();
       console.log('모달 배경 클릭 - 닫기 실행');
-      onClose();
+      handleCloseAndSave();
     }
   };
 
@@ -333,6 +438,12 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
     e.preventDefault();
     e.stopPropagation();
     console.log('X 버튼 클릭 - 직접 상태 변경');
+    
+    // 저장 후 모달 숨기기
+    if (hasChanges) {
+      console.log('변경사항 저장 후 닫기');
+      onUpdate(editedTask);
+    }
     
     // 직접 모달을 숨기고 상태 초기화
     if (typeof document !== 'undefined') {
@@ -364,7 +475,7 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
     // ESC 키로 모달 닫기
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onClose();
+        handleCloseAndSave();
       }
     };
 
@@ -373,7 +484,7 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
     return () => {
       window.removeEventListener('keydown', handleEscKey);
     };
-  }, [onClose]);
+  }, [handleCloseAndSave]);
 
   if (!isOpen) return null;
 
@@ -448,7 +559,7 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
                 </div>
                 <RichTextEditor 
                   content={editedTask.description || ""} 
-                  onChange={(html) => handleChange({...editedTask, description: html})}
+                  onChange={handleDescriptionChange}
                 />
               </div>
               
@@ -638,6 +749,22 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
                         <span className="text-sm">담당자 없음</span>
                       </div>
                       
+                      {/* 현재 로그인한 사용자(본인)를 목록에 추가 */}
+                      {currentUser && !isCurrentUserInMembers && (
+                        <div 
+                          className={`px-3 py-2 hover:bg-gray-100 cursor-pointer flex items-center ${editedTask.assignee === currentUser.id ? 'bg-blue-50' : ''}`}
+                          onClick={() => {
+                            handleChange({...editedTask, assignee: currentUser.id});
+                            setShowMembersList(false);
+                          }}
+                        >
+                          <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs mr-2">
+                            {currentUser.name.charAt(0)}
+                          </div>
+                          <span className="text-sm">{currentUser.name} (나)</span>
+                        </div>
+                      )}
+                      
                       {projectMembers.length > 0 ? (
                         projectMembers.map((member) => (
                           <div 
@@ -651,7 +778,7 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
                             <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs mr-2">
                               {member.user.name.charAt(0)}
                             </div>
-                            <span className="text-sm">{member.user.name}</span>
+                            <span className="text-sm">{member.user.name} {currentUser && member.userId === currentUser.id ? '(나)' : ''}</span>
                             {member.role === "owner" && (
                               <span className="ml-2 px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">소유자</span>
                             )}

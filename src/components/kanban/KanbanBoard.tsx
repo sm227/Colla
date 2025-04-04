@@ -31,7 +31,7 @@ interface KanbanBoardProps {
 export function KanbanBoard({ projectId }: KanbanBoardProps) {
   console.log("KanbanBoard 렌더링 - projectId:", projectId);
   
-  const { tasks, loading, error, addTask, updateTaskStatus, deleteTask, fetchTasks } = useTasks(projectId);
+  const { tasks, loading, error, addTask, updateTaskStatus, updateTask, deleteTask, fetchTasks } = useTasks(projectId);
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
   const [tasksState, setTasksState] = useState<Task[]>(tasks);
   
@@ -86,12 +86,33 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
     setSelectedTask(null);
   };
 
-  // 작업 업데이트 함수
-  const handleUpdateTask = (updatedTask: Task) => {
-    const updatedTasks = tasksState.map(t => 
-      t.id === updatedTask.id ? updatedTask : t
-    );
-    setTasksState(updatedTasks);
+  // 작업 업데이트 함수 - 서버에 변경사항 저장하도록 수정
+  const handleUpdateTask = async (updatedTask: Task) => {
+    try {
+      console.log('작업 업데이트 시작:', updatedTask);
+      
+      // 로컬 상태 즉시 업데이트
+      const updatedTasks = tasksState.map(t => 
+        t.id === updatedTask.id ? updatedTask : t
+      );
+      setTasksState(updatedTasks);
+      
+      // 서버에 업데이트 요청 - DB에 저장
+      const result = await updateTask(updatedTask);
+      
+      if (result) {
+        console.log('작업 업데이트 성공:', result);
+      } else {
+        console.error('작업 업데이트 실패');
+        // 실패 시 로컬 상태 복구를 위해 다시 서버에서 데이터 가져오기
+        fetchTasks();
+      }
+    } catch (error) {
+      console.error('작업 업데이트 오류:', error);
+      alert('작업 업데이트 중 오류가 발생했습니다.');
+      // 오류 발생 시 최신 데이터로 복구
+      fetchTasks();
+    }
   };
 
   // 삭제 함수 구현 수정 - useTasks의 deleteTask 함수 사용

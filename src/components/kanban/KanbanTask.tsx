@@ -13,6 +13,21 @@ interface KanbanTaskProps {
   onDelete?: (taskId: string) => void;
 }
 
+// HTML 태그를 제거하는 함수
+const stripHtmlTags = (html: string): string => {
+  if (!html) return '';
+  
+  // HTML 파싱용 임시 요소 생성 (클라이언트 사이드)
+  if (typeof document !== 'undefined') {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    return tempDiv.textContent || tempDiv.innerText || '';
+  }
+  
+  // 서버 사이드 렌더링 시: 간단한 정규식으로 태그 제거
+  return html.replace(/<[^>]*>|&[^;]+;/g, '');
+};
+
 export function KanbanTask({ task, onUpdate, onDelete }: KanbanTaskProps) {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const { isDragging, setNodeRef } = useDrag({
@@ -51,6 +66,9 @@ export function KanbanTask({ task, onUpdate, onDelete }: KanbanTaskProps) {
     }
   };
 
+  // 설명에서 HTML 태그 제거
+  const cleanDescription = task.description ? stripHtmlTags(task.description) : '';
+
   // 해당 작업의 우선순위 설정 가져오기
   const prioritySettings = priorityConfig[task.priority];
 
@@ -81,7 +99,7 @@ export function KanbanTask({ task, onUpdate, onDelete }: KanbanTaskProps) {
         <div className="mb-2">
           <h4 className="font-medium text-gray-800 mb-1">{task.title}</h4>
           {task.description && (
-            <p className="text-xs text-gray-600 line-clamp-2 mb-2">{task.description}</p>
+            <p className="text-xs text-gray-600 line-clamp-2 mb-2">{cleanDescription}</p>
           )}
         </div>
         
