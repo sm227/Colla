@@ -114,7 +114,7 @@ export async function PATCH(
     
     const body = await request.json();
     
-    const { title, content, emoji, isStarred, folder, projectId, tags, folderId } = body;
+    const { title, content, emoji, isStarred, folder, projectId, tags, folderId, isReadOnly } = body;
     
     // 프로젝트 ID 필수 확인
     if (!projectId || projectId === '' || projectId === 'null' || projectId === undefined || projectId === null) {
@@ -208,11 +208,12 @@ export async function PATCH(
         content = $2,
         emoji = $3,
         "isStarred" = $4,
-        folder = $5,
-        tags = $6,
-        "folderId" = $7,
-        "updatedAt" = $8
-      WHERE id = $9
+        "isReadOnly" = $5,
+        folder = $6,
+        tags = $7,
+        "folderId" = $8,
+        "updatedAt" = $9
+      WHERE id = $10
       RETURNING *
     `;
     
@@ -221,6 +222,7 @@ export async function PATCH(
     const updateContent = content !== undefined ? content : existingDocument.content;
     const updateEmoji = emoji !== undefined ? emoji : existingDocument.emoji;
     const updateIsStarred = isStarred !== undefined ? isStarred : existingDocument.isStarred;
+    const updateIsReadOnly = isReadOnly !== undefined ? isReadOnly : existingDocument.isReadOnly;
     const updateFolder = folder !== undefined ? folder : existingDocument.folder;
     const updateTags = tags !== undefined 
       ? (Array.isArray(tags) ? JSON.stringify(tags) : tags) 
@@ -236,6 +238,7 @@ export async function PATCH(
         content = ${updateContent},
         emoji = ${updateEmoji},
         "isStarred" = ${updateIsStarred},
+        "isReadOnly" = ${updateIsReadOnly},
         folder = ${updateFolder},
         tags = ${updateTags},
         "folderId" = ${updateFolderId},
