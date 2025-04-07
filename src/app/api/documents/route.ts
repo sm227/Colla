@@ -145,14 +145,15 @@ export async function POST(request: NextRequest) {
     // 요청 본문 파싱
     const body = await request.json();
     
-    const { title, content, emoji, isStarred, folder, tags, projectId, folderId } = body;
+    if (!body) {
+      return NextResponse.json({ error: "요청 본문이 비어 있습니다." }, { status: 400 });
+    }
     
-    // 프로젝트 ID 검증
+    const { title, content, emoji, isStarred, folder, projectId, tags, folderId, isReadOnly } = body;
+    
+    // 프로젝트 ID 유효성 확인
     if (!projectId) {
-      return NextResponse.json(
-        { error: "프로젝트 ID는 필수입니다." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "프로젝트 ID는 필수입니다." }, { status: 400 });
     }
     
     // 프로젝트 존재 여부 및 사용자 권한 확인
@@ -212,10 +213,11 @@ export async function POST(request: NextRequest) {
       title: title || "제목 없음",
       content: content || "",
       emoji: emoji || "📄",
-      isStarred: isStarred || false,
-      folder: folder || null, // 하위 호환성 유지
+      isStarred: isStarred === true,
+      isReadOnly: isReadOnly === true,
+      folder: folder || "기본 폴더",
       tags: Array.isArray(tags) ? JSON.stringify(tags) : null,
-      projectId: projectId,
+      projectId,
       folderId: folderId || null
     };
     
@@ -223,13 +225,14 @@ export async function POST(request: NextRequest) {
     // Prisma 스키마와 실제 DB 컬럼 간 불일치가 있으므로 SQL 쿼리 직접 실행
     const insertResult = await prisma.$queryRaw`
       INSERT INTO "Document" (
-        id, title, content, emoji, "isStarred", folder, tags, "projectId", "folderId", "createdAt", "updatedAt"
+        id, title, content, emoji, "isStarred", "isReadOnly", folder, tags, "projectId", "folderId", "createdAt", "updatedAt"
       ) VALUES (
         ${`doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`}, 
         ${documentData.title}, 
         ${documentData.content}, 
         ${documentData.emoji}, 
         ${documentData.isStarred}, 
+        ${documentData.isReadOnly}, 
         ${documentData.folder}, 
         ${documentData.tags}, 
         ${documentData.projectId}, 

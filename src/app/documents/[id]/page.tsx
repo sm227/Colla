@@ -148,6 +148,14 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
   const [showFolderDropdown, setShowFolderDropdown] = useState(false);
   const [newFolderName, setNewFolderName] = useState<string>("");
   
+  // 사용자 프로젝트 역할 상태 추가
+  const [userProjectRole, setUserProjectRole] = useState<string | null>(null);
+  const [isProjectOwner, setIsProjectOwner] = useState(false);
+  
+  // 읽기 전용 모드 상태 추가
+  const [isReadOnlyMode, setIsReadOnlyMode] = useState(false);
+  const [isButtonDebouncing, setIsButtonDebouncing] = useState(false);
+  
   // 슬래시 커맨드 관련 상태
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashMenuPosition, setSlashMenuPosition] = useState({ x: 0, y: 0 });
@@ -483,6 +491,9 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
           setIsStarred(documentData.isStarred || false);
           setFolder(documentData.folder || "기본 폴더");
           setFolderId(documentData.folderId || null); // DB 컬럼명에 맞게 수정
+          
+          // 읽기 전용 모드 설정 (DB에서 가져온 값 사용)
+          setIsReadOnlyMode(documentData.isReadOnly || false);
           
           // Tags 처리 - JSON 문자열을 배열로 변환
           if (documentData.tags) {
@@ -1127,6 +1138,13 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       provider.destroy();
     }
     
+    // 역할 정보를 포함한 사용자 정보 준비
+    const userInfoWithRole = {
+      ...currentUser,
+      projectRole: userProjectRole,
+      isProjectOwner
+    };
+    
     // 새 프로바이더 생성
     const hocuspocusProvider = new HocuspocusProvider({
       url: process.env.NEXT_PUBLIC_SOCKET_URL || 'ws://localhost:1234',
@@ -1135,8 +1153,8 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       onConnect: () => {
         console.log('협업 서버에 연결되었습니다.');
         // 즉시 사용자 정보 설정
-        hocuspocusProvider.setAwarenessField('user', currentUser);
-        console.log('문서 ID 변경 시 사용자 정보 설정:', currentUser.name);
+        hocuspocusProvider.setAwarenessField('user', userInfoWithRole);
+        console.log('문서 ID 변경 시 사용자 정보 설정:', userInfoWithRole);
         
         // Y.js에서 데이터가 로드되면 플래그 설정
         setTimeout(() => {
@@ -1166,14 +1184,14 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
     });
     
     // 초기 사용자 정보 설정
-    hocuspocusProvider.setAwarenessField('user', currentUser);
+    hocuspocusProvider.setAwarenessField('user', userInfoWithRole);
     
     setProvider(hocuspocusProvider);
     
     return () => {
       hocuspocusProvider.destroy();
     };
-  }, [savedDocumentId, ydoc, currentUser]);
+  }, [savedDocumentId, ydoc, currentUser, userProjectRole, isProjectOwner]);
   
   // 프로바이더 변경 시 에디터 업데이트
   useEffect(() => {
@@ -1185,9 +1203,16 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       editor.commands.insertContent('<p></p>');
     }
     
+    // 역할 정보를 포함한 사용자 정보 준비
+    const userInfoWithRole = {
+      ...currentUser,
+      projectRole: userProjectRole,
+      isProjectOwner
+    };
+    
     // 명시적으로 사용자 정보 설정
-    provider.setAwarenessField('user', currentUser);
-    console.log('협업 프로바이더에 사용자 정보 설정:', currentUser.name);
+    provider.setAwarenessField('user', userInfoWithRole);
+    console.log('협업 프로바이더에 사용자 정보 설정:', userInfoWithRole);
     
     // 이미 확장이 있는지 확인
     const collaborationCursor = editor.extensionManager.extensions.find(
@@ -1198,8 +1223,8 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       try {
         // 이미 확장이 있으면 옵션 업데이트
         collaborationCursor.options.provider = provider;
-        collaborationCursor.options.user = currentUser;
-        console.log('협업 커서 옵션 업데이트 완료:', currentUser.name);
+        collaborationCursor.options.user = userInfoWithRole;
+        console.log('협업 커서 옵션 업데이트 완료:', userInfoWithRole);
       } catch (err) {
         console.error('협업 커서 옵션 업데이트 실패:', err);
       }
@@ -1209,7 +1234,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
         editor.extensionManager.extensions.push(
           CustomCollaborationCursor.configure({
             provider: provider,
-            user: currentUser,
+            user: userInfoWithRole,
             render: user => {
               const cursor = document.createElement('span');
               cursor.classList.add('collaboration-cursor');
@@ -1234,19 +1259,24 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               label.style.fontSize = '0.7rem';
               label.style.whiteSpace = 'nowrap';
               label.style.pointerEvents = 'none';
-              label.textContent = user.name;
+              
+              // 이름 표시 (역할 정보 추가)
+              const userLabel = user.name || '익명';
+              const roleLabel = user.isProjectOwner ? ' (소유자)' : 
+                                (user.projectRole ? ` (${user.projectRole})` : '');
+              label.textContent = userLabel + roleLabel;
               
               cursor.appendChild(label);
               return cursor;
             },
           })
         );
-        console.log('새 협업 커서 추가 완료:', currentUser.name);
+        console.log('새 협업 커서 추가 완료:', userInfoWithRole);
       } catch (err) {
         console.error('협업 커서 추가 실패:', err);
       }
     }
-  }, [editor, provider, currentUser]);
+  }, [editor, provider, currentUser, userProjectRole, isProjectOwner]);
   
   // 문서 저장
   const saveDocument = async () => {
@@ -1289,6 +1319,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
         content,
         emoji,
         isStarred,
+        isReadOnly: isReadOnlyMode,
         folder,
         tags,
         projectId: finalProjectId,
@@ -1340,9 +1371,37 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       if (response.ok) {
         const projectData = await response.json();
         setProjectName(projectData.name);
+        
+        // 프로젝트 소유자 확인
+        if (user && projectData.userId === user.id) {
+          setIsProjectOwner(true);
+          setUserProjectRole('owner');
+          console.log('사용자는 이 프로젝트의 소유자입니다.');
+        } else {
+          setIsProjectOwner(false);
+          
+          // 멤버인 경우 역할 확인
+          if (user && projectData.members) {
+            const currentUserMember = projectData.members.find(
+              (member: any) => member.userId === user.id && member.inviteStatus === "accepted"
+            );
+            
+            if (currentUserMember) {
+              setUserProjectRole(currentUserMember.role);
+              console.log(`사용자 역할: ${currentUserMember.role}`);
+            } else {
+              setUserProjectRole(null);
+              console.log('사용자는 이 프로젝트의 멤버가 아닙니다.');
+            }
+          } else {
+            setUserProjectRole(null);
+          }
+        }
       }
     } catch (error) {
       console.error('프로젝트 정보를 가져오는데 실패했습니다:', error);
+      setUserProjectRole(null);
+      setIsProjectOwner(false);
     }
   };
 
@@ -1350,8 +1409,12 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     if (selectedProjectId) {
       fetchProjectInfo(selectedProjectId);
+    } else {
+      // 프로젝트 ID가 없는 경우 역할 초기화
+      setUserProjectRole(null);
+      setIsProjectOwner(false);
     }
-  }, [selectedProjectId]);
+  }, [selectedProjectId, user]);
   
   // 폴더 목록 가져오기
   const fetchFolders = async () => {
@@ -1481,14 +1544,85 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
 
     console.log('사용자 정보를 협업 프로바이더에 적용:', currentUser.name);
     
+    // 역할 정보 추가
+    const userInfoWithRole = {
+      ...currentUser,
+      projectRole: userProjectRole,
+      isProjectOwner
+    };
+    
     // provider의 awareness 데이터 업데이트
     try {
-      provider.setAwarenessField('user', currentUser);
-      console.log('프로바이더 사용자 정보 설정 완료');
+      provider.setAwarenessField('user', userInfoWithRole);
+      console.log('프로바이더 사용자 정보 설정 완료', userInfoWithRole);
     } catch (error) {
       console.error('프로바이더 사용자 정보 설정 실패:', error);
     }
-  }, [provider, currentUser]);
+  }, [provider, currentUser, userProjectRole, isProjectOwner]);
+
+  // 읽기 전용 모드 변경 시 문서 메타데이터 업데이트 및 전파
+  useEffect(() => {
+    if (!provider || !ydoc) return;
+    
+    try {
+      // Y.js 문서 메타데이터 업데이트
+      const metaData = ydoc.getMap('metaData');
+      metaData.set('isReadOnlyMode', isReadOnlyMode);
+      
+      console.log(`문서 읽기 전용 모드 ${isReadOnlyMode ? '활성화' : '비활성화'} 정보 공유됨`);
+    } catch (error) {
+      console.error('문서 읽기 전용 모드 정보 공유 실패:', error);
+    }
+  }, [provider, ydoc, isReadOnlyMode]);
+  
+  // 다른 사용자의 읽기 전용 모드 변경 감지
+  useEffect(() => {
+    if (!ydoc) return;
+    
+    // 문서 메타데이터에서 읽기 전용 모드 상태 가져오기
+    const metaData = ydoc.getMap('metaData');
+    
+    // 초기값 설정
+    const initialReadOnlyMode = metaData.get('isReadOnlyMode');
+    if (initialReadOnlyMode !== undefined) {
+      // Y.js에서 반환되는 타입을 명시적으로 Boolean으로 변환
+      const readOnlyValue = typeof initialReadOnlyMode === 'boolean' ? initialReadOnlyMode : false;
+      setIsReadOnlyMode(readOnlyValue);
+      console.log(`다른 사용자가 설정한 읽기 전용 모드 상태 수신: ${readOnlyValue}`);
+    }
+    
+    // 메타데이터 변경 이벤트 구독
+    const handleMetaDataUpdate = () => {
+      const updatedReadOnlyMode = metaData.get('isReadOnlyMode');
+      if (updatedReadOnlyMode !== undefined) {
+        // Y.js에서 반환되는 타입을 명시적으로 Boolean으로 변환
+        const readOnlyValue = typeof updatedReadOnlyMode === 'boolean' ? updatedReadOnlyMode : false;
+        if (readOnlyValue !== isReadOnlyMode) {
+          setIsReadOnlyMode(readOnlyValue);
+          console.log(`다른 사용자가 읽기 전용 모드를 ${readOnlyValue ? '활성화' : '비활성화'}했습니다.`);
+        }
+      }
+    };
+    
+    metaData.observe(handleMetaDataUpdate);
+    
+    return () => {
+      metaData.unobserve(handleMetaDataUpdate);
+    };
+  }, [ydoc, isReadOnlyMode]);
+
+  // 읽기 전용 모드 변경 시 에디터 편집 가능 여부 업데이트
+  useEffect(() => {
+    if (!editor) return;
+    
+    // 읽기 전용 모드에서는 모든 사용자가 편집 불가능
+    const editableState = !isReadOnlyMode;
+    
+    if (editor.isEditable !== editableState) {
+      editor.setEditable(editableState);
+      console.log(`에디터 편집 가능 상태 변경: ${editableState}, 사용자 역할: ${userProjectRole || '역할 없음'}, 읽기 전용 모드: ${isReadOnlyMode}, 프로젝트 소유자: ${isProjectOwner}`);
+    }
+  }, [editor, isReadOnlyMode, userProjectRole, isProjectOwner]);
 
   // 에디터 컨테이너에 별도 레이어 추가
   useEffect(() => {
@@ -1516,6 +1650,48 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       cursorLayer.remove();
     };
   }, [editor]);
+
+  // 읽기 전용 모드 토글 함수
+  const toggleReadOnlyMode = () => {
+    if (isButtonDebouncing) return;
+    
+    // 디바운싱 상태 활성화
+    setIsButtonDebouncing(true);
+    
+    // 읽기 전용 모드 토글
+    setIsReadOnlyMode(prev => !prev);
+    
+    // 1초 후 디바운싱 상태 비활성화
+    setTimeout(() => {
+      setIsButtonDebouncing(false);
+    }, 1000);
+    
+    // 읽기 전용 모드가 변경되면 문서를 저장하여 DB에 반영
+    if (savedDocumentId) {
+      saveReadOnlyState(!isReadOnlyMode);
+    }
+  };
+  
+  // 읽기 전용 상태만 저장하는 함수
+  const saveReadOnlyState = async (newState: boolean) => {
+    try {
+      if (!savedDocumentId) return;
+      
+      // API 요청 - 읽기 전용 상태만 업데이트
+      await fetch(`/api/documents/${savedDocumentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          isReadOnly: newState,
+          projectId: selectedProjectId
+        })
+      });
+      
+      console.log(`문서 읽기 전용 모드 ${newState ? '활성화' : '비활성화'} 상태가 저장되었습니다.`);
+    } catch (error) {
+      console.error('읽기 전용 상태 저장 중 오류:', error);
+    }
+  };
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -1650,6 +1826,69 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               <UsersIcon className="w-5 h-5 text-gray-600" />
             </button>
             
+            {/* 읽기 전용 모드 버튼 또는 상태 표시 (관리자/소유자는 버튼, 일반 멤버는 상태 표시) */}
+            {((userProjectRole && userProjectRole !== 'member') || isProjectOwner) ? (
+              <div className="flex items-center bg-blue-50 border border-blue-100 rounded-md px-2 py-1 cursor-pointer"
+                onClick={!isLoading && !isButtonDebouncing ? toggleReadOnlyMode : undefined}
+                // title="읽기 전용 모드 전환"
+              >
+                {isReadOnlyMode ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-4 h-4 mr-1 text-blue-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-4 h-4 mr-1 text-blue-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
+                    />
+                  </svg>
+                )}
+                <div className="flex items-center justify-center">
+                  <span className="text-sm text-blue-700 font-medium"></span>
+                </div>
+              </div>
+            ) : (
+              isReadOnlyMode && (
+                <div className="flex items-center bg-blue-50 border border-blue-100 rounded-md px-2 py-1">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-4 h-4 mr-1 text-blue-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                    />
+                  </svg>
+                  <span className="text-sm text-blue-700 font-medium">읽기 전용</span>
+                </div>
+              )
+            )}
+            
             <Button 
               onClick={saveDocument}
               className="flex items-center bg-green-600 hover:bg-green-700 text-white w-[100px] h-[36px] justify-center"
@@ -1722,18 +1961,41 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
         </div>
       )}
       
+      {isReadOnlyMode && (
+        <div className="fixed top-16 left-1/2 transform -translate-x-1/2 bg-blue-50 border-l-4 border-blue-500 p-4 rounded shadow-md z-50">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-blue-800">
+                {((userProjectRole && userProjectRole !== 'member') || isProjectOwner) ? (
+                  <span className="font-bold">읽기 전용입니다</span>
+                ) : (
+                  <>
+                    <span className="font-bold">읽기 전용입니다.</span> 수정하시려면 관리자에게 권한을 요청하세요.
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* 문서 편집 영역 */}
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-lg shadow-sm p-6">
           {/* 문서 제목 */}
-          <div className="mb-6">
+          <div className="mb-6 flex items-center">
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full text-3xl font-bold text-gray-900 border-none outline-none focus:ring-0 p-0 placeholder-gray-400"
+              className={`w-full text-3xl font-bold text-gray-900 border-none outline-none focus:ring-0 p-0 placeholder-gray-400 ${isReadOnlyMode ? 'cursor-not-allowed' : ''}`}
               placeholder="제목 없음"
-              disabled={isLoading}
+              disabled={isLoading || isReadOnlyMode}
             />
           </div>
           
