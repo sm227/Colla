@@ -122,6 +122,41 @@ export function useTasks(projectId?: string | null) {
     }
   };
 
+  // 태스크 전체 정보 업데이트
+  const updateTask = async (updatedTask: Task) => {
+    try {
+      setLoading(true);
+      console.log('📝 작업 업데이트 요청:', updatedTask);
+      
+      const response = await fetch(`/api/tasks/${updatedTask.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedTask),
+      });
+      
+      if (!response.ok) {
+        throw new Error("태스크를 업데이트하는데 실패했습니다.");
+      }
+      
+      const resultTask = await response.json();
+      console.log('✅ 작업 업데이트 성공:', resultTask);
+      
+      setTasks((prevTasks) =>
+        prevTasks.map((task) => (task.id === updatedTask.id ? resultTask : task))
+      );
+      setError(null);
+      return resultTask;
+    } catch (err) {
+      console.error('❌ 작업 업데이트 오류:', err);
+      setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 태스크 삭제
   const deleteTask = async (taskId: string) => {
     try {
@@ -155,6 +190,7 @@ export function useTasks(projectId?: string | null) {
     fetchTasks,
     addTask,
     updateTaskStatus,
+    updateTask,
     deleteTask,
   };
 } 

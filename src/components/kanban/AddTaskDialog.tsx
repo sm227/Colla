@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useProject, ProjectMember } from "@/app/contexts/ProjectContext";
 import { useUsers } from "@/app/contexts/UserContext";
+import { useAuth } from "@/app/contexts/AuthContext";
 
 interface AddTaskDialogProps {
   isOpen: boolean;
@@ -41,11 +42,18 @@ export function AddTaskDialog({ isOpen, onClose, onAddTask, projectId }: AddTask
   
   // Get users from context
   const { users } = useUsers();
+
+  // 인증 컨텍스트에서 현재 사용자 정보 가져오기
+  const { user: currentUser } = useAuth();
+  
+  // 현재 사용자가 이미 프로젝트 멤버인지 확인하기 위한 상태
+  const [isCurrentUserInMembers, setIsCurrentUserInMembers] = useState(false);
   
   // Find the current project and its members
   useEffect(() => {
     if (!projectId) {
       setProjectMembers([]);
+      setIsCurrentUserInMembers(false);
       return;
     }
     
@@ -56,10 +64,18 @@ export function AddTaskDialog({ isOpen, onClose, onAddTask, projectId }: AddTask
         member => member.inviteStatus === "accepted"
       );
       setProjectMembers(acceptedMembers);
+      
+      // 현재 사용자가 이미 프로젝트 멤버인지 확인
+      if (currentUser) {
+        setIsCurrentUserInMembers(
+          acceptedMembers.some(member => member.userId === currentUser.id)
+        );
+      }
     } else {
       setProjectMembers([]);
+      setIsCurrentUserInMembers(false);
     }
-  }, [projectId, projects, currentProject]);
+  }, [projectId, projects, currentProject, currentUser]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -312,6 +328,22 @@ export function AddTaskDialog({ isOpen, onClose, onAddTask, projectId }: AddTask
                         <span>담당자 없음</span>
                       </div>
                       
+                      {/* 현재 로그인한 사용자(본인)를 목록에 추가 */}
+                      {currentUser && !isCurrentUserInMembers && (
+                        <div 
+                          className={`px-3 py-2 hover:bg-gray-100 cursor-pointer flex items-center ${assignee === currentUser.id ? 'bg-blue-50' : ''}`}
+                          onClick={() => {
+                            setAssignee(currentUser.id);
+                            setShowMembersList(false);
+                          }}
+                        >
+                          <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs mr-2">
+                            {currentUser.name.charAt(0)}
+                          </div>
+                          <span>{currentUser.name} (나)</span>
+                        </div>
+                      )}
+                      
                       {projectMembers.length > 0 ? (
                         projectMembers.map((member) => (
                           <div 
@@ -325,7 +357,7 @@ export function AddTaskDialog({ isOpen, onClose, onAddTask, projectId }: AddTask
                             <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs mr-2">
                               {member.user.name.charAt(0)}
                             </div>
-                            <span>{member.user.name}</span>
+                            <span>{member.user.name} {currentUser && member.userId === currentUser.id ? '(나)' : ''}</span>
                             {member.role === "owner" && (
                               <span className="ml-2 px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">소유자</span>
                             )}
