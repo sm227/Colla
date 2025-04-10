@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useContext } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay, differenceInDays, getDay, addDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,14 @@ interface CalendarTask extends Task {
   startPosition: number; // 시작 날짜의 위치 (인덱스)
   duration: number;     // 기간 (일수)
   row: number;          // 행 위치 (겹치는 태스크 처리용)
+}
+
+// 마우스 우클릭 이벤트
+interface ContextMenu {
+  show : boolean;
+  x : number;
+  y : number;
+  date : Date | null;
 }
 
 export default function CalendarPage() {
@@ -136,6 +144,9 @@ export default function CalendarPage() {
     if (!draggedTask) return;
     
     try {
+      const updatedDueDate = new Date(date);
+      updatedDueDate.setHours(23, 59, 999, 999); // 하루의 끝으로 설정
+
       // 태스크 업데이트 (dueDate 설정)
       const updatedTask: KanbanTask = {
         id: draggedTask.id,
@@ -143,7 +154,7 @@ export default function CalendarPage() {
         description: draggedTask.description,
         status: draggedTask.status as TaskStatus,
         priority: draggedTask.priority as "low" | "medium" | "high",
-        dueDate: date,
+        dueDate: updatedDueDate,
         projectId: draggedTask.projectId
       };
       
