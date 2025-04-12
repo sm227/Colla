@@ -73,6 +73,7 @@ model Document {
   projectId String?
   folder    String?
   isStarred Boolean  @default(false)
+  isReadOnly Boolean @default(false)
   tags      String?
   folderId  String?
   folderRef Folder?  @relation(fields: [folderId], references: [id])
