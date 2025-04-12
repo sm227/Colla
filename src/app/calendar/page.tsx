@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTasks } from "@/hooks/useTasks";
 import { Task as KanbanTask, TaskStatus } from "@/components/kanban/KanbanBoard";
+import { useTheme } from "next-themes";
 
 interface Task {
   id: string;
@@ -40,6 +41,7 @@ interface ContextMenu {
 }
 
 export default function CalendarPage() {
+  const { theme } = useTheme();
   const router = useRouter();
   const searchParams = useSearchParams();
   const projectId = searchParams?.get('projectId');
@@ -341,16 +343,16 @@ export default function CalendarPage() {
     : "모든 프로젝트";
 
   return (
-    <div className="bg-white min-h-screen flex">
+    <div className="bg-white dark:bg-[rgb(31,31,33)] min-h-screen flex">
       {/* 상단 네비게이션 바 */}
-      <div className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 py-4 px-6 z-10">
+      <div className="fixed top-0 left-0 right-0 bg-white dark:bg-[rgb(31,31,33)] border-b border-gray-200 dark:border-gray-700 py-4 px-6 z-10">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Link href="/" className="text-gray-500 hover:text-blue-600 transition-colors">
+            <Link href="/" className="text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
               <HomeIcon className="w-5 h-5" />
             </Link>
-            <span className="text-gray-500">/</span>
-            <span className="text-gray-900 font-medium">캘린더</span>
+            <span className="text-gray-500 dark:text-gray-400">/</span>
+            <span className="text-gray-900 dark:text-gray-100 font-medium">캘린더</span>
           </div>
           
           <div className="flex items-center space-x-2">
@@ -358,6 +360,7 @@ export default function CalendarPage() {
               variant="outline"
               size="sm"
               onClick={() => router.push(projectId ? `/?projectId=${projectId}` : '/')}
+              className="dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
             >
               <ChevronLeft className="w-4 h-4 mr-1" />
               대시보드로 돌아가기
@@ -366,6 +369,7 @@ export default function CalendarPage() {
             <Button 
               size="sm"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="dark:text-gray-100"
             >
               <CalendarIcon className="w-4 h-4 mr-1" />
               예약되지 않은 업무
@@ -378,30 +382,30 @@ export default function CalendarPage() {
         {/* 캘린더 헤더 */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center">
-            <CalendarIcon className="w-6 h-6 text-blue-600 mr-2" />
-            <h1 className="text-2xl font-bold">캘린더</h1>
+            <CalendarIcon className="w-6 h-6 text-blue-600 dark:text-gray-300 mr-2" />
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">캘린더</h1>
           </div>
           
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="icon" onClick={prevMonth} className="hover:bg-gray-100">
+            <Button variant="ghost" size="icon" onClick={prevMonth} className="hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-100">
               <ChevronLeft className="h-5 w-5" />
             </Button>
-            <div className="text-xl font-medium">
+            <div className="text-xl font-medium dark:text-white">
               {format(currentDate, 'yyyy년 MM월', { locale: ko })}
             </div>
-            <Button variant="ghost" size="icon" onClick={nextMonth} className="hover:bg-gray-100">
+            <Button variant="ghost" size="icon" onClick={nextMonth} className="hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-100">
               <ChevronRight className="h-5 w-5" />
             </Button>
           </div>
         </div>
         
         {/* 요일 헤더 */}
-        <div className="grid grid-cols-7 border-b border-gray-200 bg-white rounded-t-lg">
+        <div className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-[rgb(31,31,33)] rounded-t-lg">
           {weekDays.map((day, index) => (
             <div
               key={day}
               className={`text-center py-3 text-sm font-medium
-                ${index === 0 ? 'text-red-500' : index === 6 ? 'text-blue-500' : 'text-gray-600'}`}
+                ${index === 0 ? 'text-red-500 dark:text-red-400' : index === 6 ? 'text-blue-500 dark:text-blue-400' : 'text-gray-600 dark:text-gray-300'}`}
             >
               {day}
             </div>
@@ -409,7 +413,7 @@ export default function CalendarPage() {
         </div>
 
         {/* 캘린더 그리드 */}
-        <div className="relative bg-white rounded-b-lg border border-gray-200 border-t-0 shadow-sm">
+        <div className="relative bg-white dark:bg-[rgb(31,31,33)] rounded-b-lg border border-gray-200 dark:border-gray-700 border-t-0 shadow-sm">
           {/* 날짜 그리드 */}
           <div className="grid grid-cols-7">
             {calendarDays.map((day, index) => {
@@ -423,10 +427,10 @@ export default function CalendarPage() {
                 <div
                   key={day.toString()}
                   className={`
-                    min-h-[110px] p-2 border-r border-t border-gray-200 relative
-                    ${!isCurrentMonth ? 'bg-gray-50' : ''}
-                    ${isSelected ? 'bg-blue-50' : ''}
-                    ${isDropTargetDay ? 'bg-blue-100 ring-2 ring-blue-500' : ''}
+                    min-h-[110px] p-2 border-r border-t border-gray-200 dark:border-gray-700 relative
+                    ${!isCurrentMonth ? 'bg-gray-50 dark:bg-[rgb(31,31,33)]' : 'dark:bg-[rgb(31,31,33)]'}
+                    ${isSelected ? 'bg-blue-50 dark:bg-gray-700' : ''}
+                    ${isDropTargetDay ? 'bg-blue-100 dark:bg-gray-600 ring-2 ring-gray-500' : ''}
                     transition-colors duration-150 cursor-pointer
                   `}
                   onClick={() => setSelectedDate(day)}
@@ -436,9 +440,9 @@ export default function CalendarPage() {
                 >
                   <div className={`
                     h-5 w-5 flex items-center justify-center rounded-full text-xs
-                    ${isCurrentDay ? 'bg-blue-500 text-white' : ''}
-                    ${!isCurrentMonth ? 'text-gray-400' : ''}
-                    ${isWeekend && isCurrentMonth && !isCurrentDay ? (index % 7 === 0 ? 'text-red-500' : 'text-blue-500') : ''}
+                    ${isCurrentDay ? 'bg-blue-500 dark:bg-gray-500 text-white' : ''}
+                    ${!isCurrentMonth ? 'text-gray-400 dark:text-gray-500' : ''}
+                    ${isWeekend && isCurrentMonth && !isCurrentDay ? (index % 7 === 0 ? 'text-red-500 dark:text-red-400' : 'text-blue-500 dark:text-gray-400') : ''}
                   `}>
                     {format(day, 'd')}
                   </div>
@@ -450,24 +454,24 @@ export default function CalendarPage() {
           {/* 태스크 오버레이 */}
           <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
             {calendarTasks.map((task) => {
-              // 태스크 색상 결정
+              // 태스크 색상 결정 (다크 모드 지원)
               const bgColor = task.status === 'todo' 
-                ? 'bg-gray-100' 
+                ? 'bg-gray-100 dark:bg-gray-700' 
                 : task.status === 'in-progress' 
-                  ? 'bg-blue-100' 
-                  : 'bg-green-100';
+                  ? 'bg-blue-100 dark:bg-gray-600' 
+                  : 'bg-green-100 dark:bg-gray-600';
               
               const borderColor = task.status === 'todo' 
-                ? 'border-gray-300' 
+                ? 'border-gray-300 dark:border-gray-600' 
                 : task.status === 'in-progress' 
-                  ? 'border-blue-300' 
-                  : 'border-green-300';
+                  ? 'border-blue-300 dark:border-gray-500' 
+                  : 'border-green-300 dark:border-gray-500';
               
               const textColor = task.status === 'todo' 
-                ? 'text-gray-700' 
+                ? 'text-gray-700 dark:text-gray-300' 
                 : task.status === 'in-progress' 
-                  ? 'text-blue-700' 
-                  : 'text-green-700';
+                  ? 'text-blue-700 dark:text-gray-200' 
+                  : 'text-green-700 dark:text-gray-200';
               
               // 각 주에 맞게 태스크 세그먼트 분할
               const taskSegments = [];
@@ -528,72 +532,72 @@ export default function CalendarPage() {
 
       {/* 사이드바 (dueDate가 없는 태스크 목록) */}
       <div 
-        className={`fixed top-0 bottom-0 right-0 w-80 bg-white shadow-lg border-l border-gray-200 p-4 transition-transform duration-300 z-20 mt-16 
+        className={`fixed top-0 bottom-0 right-0 w-80 bg-white dark:bg-[rgb(31,31,33)] shadow-lg border-l border-gray-200 dark:border-gray-700 p-4 transition-transform duration-300 z-20 mt-16 
           ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}
         onDragOver={(e) => {
           e.preventDefault();
-          e.currentTarget.classList.add('bg-gray-50');
+          e.currentTarget.classList.add('bg-gray-50 dark:bg-gray-700');
         }}
         onDragLeave={(e) => {
-          e.currentTarget.classList.remove('bg-gray-50');
+          e.currentTarget.classList.remove('bg-gray-50 dark:bg-gray-700');
         }}
         onDrop={(e) => {
-          e.currentTarget.classList.remove('bg-gray-50');
+          e.currentTarget.classList.remove('bg-gray-50 dark:bg-gray-700');
           handleDropToSidebar(e);
         }}
       >
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium">예약되지 않은 업무</h3>
-          <Button variant="ghost" size="sm" onClick={() => setIsSidebarOpen(false)}>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">예약되지 않은 업무</h3>
+          <Button variant="ghost" size="sm" onClick={() => setIsSidebarOpen(false)} className="dark:text-gray-300 dark:hover:bg-gray-700">
             <X className="h-4 w-4" />
           </Button>
         </div>
         
         <div className="space-y-2">
           {sidebarTasks.length === 0 ? (
-            <div className="text-gray-500 text-center py-4">
+            <div className="text-gray-500 dark:text-gray-400 text-center py-4">
               예약되지 않은 업무가 없습니다
             </div>
           ) : (
             sidebarTasks.map(task => {
-              // 우선순위에 따른 색상 설정
+              // 우선순위에 따른 색상 설정 (다크 모드 지원)
               const borderColor = task.priority === 'high' 
-                ? 'border-red-300' 
+                ? 'border-red-300 dark:border-red-900' 
                 : task.priority === 'medium' 
-                  ? 'border-yellow-300' 
-                  : 'border-green-300';
+                  ? 'border-yellow-300 dark:border-yellow-900' 
+                  : 'border-green-300 dark:border-green-900';
               
               const bgColor = task.priority === 'high' 
-                ? 'bg-red-50' 
+                ? 'bg-red-50 dark:bg-gray-700' 
                 : task.priority === 'medium' 
-                  ? 'bg-yellow-50' 
-                  : 'bg-green-50';
+                  ? 'bg-yellow-50 dark:bg-gray-700' 
+                  : 'bg-green-50 dark:bg-gray-700';
 
               const statusBg = task.status === 'todo' 
-                ? 'bg-gray-100' 
+                ? 'bg-gray-100 dark:bg-gray-700' 
                 : task.status === 'in-progress' 
-                  ? 'bg-blue-100' 
+                  ? 'bg-blue-100 dark:bg-gray-600' 
                   : task.status === 'done' 
-                    ? 'bg-green-100' 
-                    : 'bg-yellow-100';
+                    ? 'bg-green-100 dark:bg-gray-600' 
+                    : 'bg-yellow-100 dark:bg-gray-600';
 
               return (
                 <div
                   key={task.id}
-                  className={`${bgColor} border ${borderColor} rounded-md p-3 shadow-sm cursor-pointer`}
+                  className={`${bgColor} border ${borderColor} rounded-md p-3 shadow-sm cursor-pointer dark:shadow-none`}
                   draggable
                   onDragStart={handleDragStart(task)}
                   onDragEnd={handleDragEnd}
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-medium text-sm">{task.title}</h4>
+                    <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100">{task.title}</h4>
                     <span className={`text-xs px-2 py-1 rounded-full ${statusBg}`}>
                       {task.status === 'todo' ? '할 일' : 
                        task.status === 'in-progress' ? '진행 중' : 
                        task.status === 'done' ? '완료' : '검토'}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
                     {task.priority === 'high' ? '높은 우선순위' : 
                      task.priority === 'medium' ? '중간 우선순위' : '낮은 우선순위'}
                   </div>

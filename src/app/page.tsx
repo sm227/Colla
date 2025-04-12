@@ -34,8 +34,10 @@ import { useProject } from "./contexts/ProjectContext";
 import { Task, TaskStatus } from "@/components/kanban/KanbanBoard";
 import { useTasks } from "@/hooks/useTasks";
 import { ThemeToggle } from "./components/ThemeToggle";
+import { useTheme } from "next-themes";
 
 export default function Home() {
+  const { theme } = useTheme();
   const router = useRouter();
   const [roomId, setRoomId] = useState("");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -72,10 +74,10 @@ export default function Home() {
   // 로딩 중이면 로딩 표시
   if (authLoading || projectLoading || tasksLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">로딩 중...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-600 dark:border-gray-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">로딩 중...</p>
         </div>
       </div>
     );
@@ -140,9 +142,9 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-[rgb(31,31,33)]">
       {/* 상단 네비게이션 바 */}
-      <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 fixed w-full z-30">
+      <nav className="bg-white dark:bg-[rgb(31,31,33)] border-b border-gray-200 dark:border-gray-700 fixed w-full z-30">
         <div className="px-4 py-3 flex justify-between items-center">
           <div className="flex items-center">
             <button
@@ -155,7 +157,7 @@ export default function Home() {
                 <MenuIcon className="w-6 h-6" />
               )}
             </button>
-            <div className="text-xl font-bold text-blue-600 dark:text-blue-400 flex items-center">
+            <div className="text-xl font-bold text-blue-600 dark:text-gray-300 flex items-center">
               <LayoutDashboardIcon className="w-6 h-6 mr-2" />
               워크스페이스
             </div>
@@ -166,7 +168,7 @@ export default function Home() {
               <input
                 type="text"
                 placeholder="검색..."
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400 dark:bg-gray-700 dark:text-white"
               />
               <SearchIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400 dark:text-gray-500" />
             </div>
@@ -198,7 +200,7 @@ export default function Home() {
       <div className="flex pt-16">
         {/* 사이드바 - 모바일에서는 오버레이로 표시 */}
         <aside
-          className={`fixed inset-y-0 left-0 z-20 w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 pt-16 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-20 w-64 bg-white dark:bg-[rgb(31,31,33)] border-r border-gray-200 dark:border-gray-700 pt-16 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
             mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
           } md:relative md:w-64 md:flex-shrink-0`}
         >
@@ -359,13 +361,13 @@ export default function Home() {
             <div className="mt-4 md:mt-0 flex space-x-3">
               <button
                 onClick={createNewMeeting}
-                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 dark:bg-gray-700 dark:hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
               >
                 <VideoIcon className="w-4 h-4" />새 회의
               </button>
               <Link
                 href="/kanban/new"
-                className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 dark:bg-gray-700 dark:hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
               >
                 <Trello className="w-4 h-4" />새 보드
               </Link>
@@ -375,7 +377,7 @@ export default function Home() {
                     ? `/documents/new?projectId=${currentProject.id}`
                     : "/documents/new"
                 }
-                className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 dark:bg-gray-700 dark:hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                 onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
                   if (currentProject?.id) {
                     e.preventDefault();
@@ -419,7 +421,7 @@ export default function Home() {
                     ? `/projects/${currentProject.id}/members`
                     : "/projects"
                 }
-                className="flex items-center justify-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 dark:bg-gray-700 dark:hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
               >
                 <UsersIcon className="w-4 h-4" />
                 팀원 관리
@@ -429,14 +431,14 @@ export default function Home() {
 
           {/* 새로운 섹션: 프로젝트 팀 */}
           {currentProject && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-6">
+            <div className="bg-white dark:bg-[rgb(31,31,33)] rounded-lg shadow-sm p-4 mb-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-gray-900 dark:text-white">
                   프로젝트 팀
                 </h2>
                 <Link
                   href={`/projects/${currentProject.id}/members`}
-                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                  className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100 flex items-center"
                 >
                   <UsersIcon className="w-4 h-4 mr-1" />
                   팀원 관리
@@ -447,7 +449,7 @@ export default function Home() {
                 <div className="flex -space-x-2">
                   {/* 프로젝트 소유자 아바타 */}
                   {currentProject.user && (
-                    <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white border-2 border-white z-10">
+                    <div className="w-10 h-10 rounded-full bg-gray-600 dark:bg-gray-500 flex items-center justify-center text-white border-2 border-white dark:border-gray-800 z-10">
                       {currentProject.user.name.charAt(0)}
                     </div>
                   )}
@@ -460,7 +462,7 @@ export default function Home() {
                       .map((member, index) => (
                         <div
                           key={member.id}
-                          className="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center text-white border-2 border-white"
+                          className="w-10 h-10 rounded-full bg-gray-400 dark:bg-gray-600 flex items-center justify-center text-white border-2 border-white dark:border-gray-800"
                           style={{ zIndex: 10 - index }}
                         >
                           {member.user?.name.charAt(0)}
@@ -472,7 +474,7 @@ export default function Home() {
                     currentProject.members.filter(
                       (m) => m.inviteStatus === "accepted"
                     ).length > 3 && (
-                      <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 border-2 border-white">
+                      <div className="w-10 h-10 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 border-2 border-white dark:border-gray-800">
                         +
                         {currentProject.members.filter(
                           (m) => m.inviteStatus === "accepted"
@@ -483,7 +485,7 @@ export default function Home() {
 
                 <Link
                   href={`/projects/${currentProject.id}/members`}
-                  className="flex items-center text-blue-600 hover:text-blue-800"
+                  className="flex items-center text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100"
                 >
                   <UserPlusIcon className="w-5 h-5 mr-1" />
                   팀원 초대
@@ -493,7 +495,7 @@ export default function Home() {
           )}
 
           {/* 빠른 액세스 - 회의 참여 */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-6">
+          <div className="bg-white dark:bg-[rgb(31,31,33)] rounded-lg shadow-sm p-4 mb-6">
             <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
               빠른 회의 참여
             </h2>
@@ -503,11 +505,11 @@ export default function Home() {
                 value={roomId}
                 onChange={(e) => setRoomId(e.target.value)}
                 placeholder="회의 코드 입력"
-                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:bg-gray-700 dark:text-white"
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-gray-400 outline-none dark:bg-gray-700 dark:text-white"
               />
               <button
                 type="submit"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                className="bg-blue-600 hover:bg-blue-700 dark:bg-gray-700 dark:hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
               >
                 참여하기
               </button>
@@ -517,12 +519,12 @@ export default function Home() {
           {/* 대시보드 그리드 */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* 간략한 칸반 보드 */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 lg:col-span-2">
+            <div className="bg-white dark:bg-[rgb(31,31,33)] rounded-lg shadow-sm p-4 lg:col-span-2">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-gray-900 dark:text-white">칸반 보드</h2>
                 <Link
                   href="/kanban"
-                  className="text-sm text-blue-600 hover:text-blue-800"
+                  className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100"
                 >
                   전체 보기
                 </Link>
@@ -531,14 +533,14 @@ export default function Home() {
             </div>
 
             {/* 예정된 일정 */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+            <div className="bg-white dark:bg-[rgb(31,31,33)] rounded-lg shadow-sm p-4">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-gray-900 dark:text-white">
                   예정된 일정
                 </h2>
                 <Link
                   href="/calendar"
-                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                  className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100 flex items-center"
                 >
                   <CalendarIcon className="w-4 h-4 mr-1" />
                   캘린더
@@ -549,7 +551,7 @@ export default function Home() {
                   title="디자인 팀 회의"
                   time="오늘, 14:00"
                   type="회의"
-                  icon={<VideoIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
+                  icon={<VideoIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />}
                 />
 
                 <ScheduleItem
@@ -563,20 +565,20 @@ export default function Home() {
                   title="클라이언트 미팅"
                   time="수요일, 11:00"
                   type="회의"
-                  icon={<VideoIcon className="w-4 h-4 text-blue-600" />}
+                  icon={<VideoIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />}
                 />
 
                 <ScheduleItem
                   title="주간 팀 회의"
                   time="금요일, 10:00"
                   type="회의"
-                  icon={<VideoIcon className="w-4 h-4 text-blue-600" />}
+                  icon={<VideoIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />}
                 />
               </div>
             </div>
 
             {/* 최근 문서 */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+            <div className="bg-white dark:bg-[rgb(31,31,33)] rounded-lg shadow-sm p-4">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-gray-900 dark:text-white">최근 문서</h2>
                 <Link
@@ -585,7 +587,7 @@ export default function Home() {
                       ? `/documents?projectId=${currentProject.id}`
                       : "/documents"
                   }
-                  className="text-sm text-blue-600 hover:text-blue-800"
+                  className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100"
                   onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
                     if (currentProject) {
                       e.preventDefault();
@@ -604,14 +606,14 @@ export default function Home() {
             </div>
 
             {/* 활성 칸반보드 */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+            <div className="bg-white dark:bg-[rgb(31,31,33)] rounded-lg shadow-sm p-4">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-gray-900 dark:text-white">
                   활성 칸반보드
                 </h2>
                 <Link
                   href="/kanban"
-                  className="text-sm text-blue-600 hover:text-blue-800"
+                  className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100"
                 >
                   모두 보기
                 </Link>
@@ -644,12 +646,12 @@ export default function Home() {
             </div>
 
             {/* 최근 회의 */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+            <div className="bg-white dark:bg-[rgb(31,31,33)] rounded-lg shadow-sm p-4">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-gray-900 dark:text-white">최근 회의</h2>
                 <Link
                   href="/meetings"
-                  className="text-sm text-blue-600 hover:text-blue-800"
+                  className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100"
                 >
                   모두 보기
                 </Link>
@@ -659,28 +661,28 @@ export default function Home() {
                   title="주간 팀 미팅"
                   date="2023-06-05"
                   participants={8}
-                  icon={<VideoIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
+                  icon={<VideoIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />}
                 />
 
                 <MeetingItem
                   title="제품 기획 회의"
                   date="2023-06-02"
                   participants={5}
-                  icon={<VideoIcon className="w-4 h-4 text-blue-600" />}
+                  icon={<VideoIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />}
                 />
 
                 <MeetingItem
                   title="디자인 리뷰"
                   date="2023-05-30"
                   participants={4}
-                  icon={<VideoIcon className="w-4 h-4 text-blue-600" />}
+                  icon={<VideoIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />}
                 />
 
                 <MeetingItem
                   title="클라이언트 미팅"
                   date="2023-05-28"
                   participants={6}
-                  icon={<VideoIcon className="w-4 h-4 text-blue-600" />}
+                  icon={<VideoIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />}
                 />
               </div>
             </div>
@@ -714,7 +716,7 @@ function SidebarLink({
         small ? "text-sm" : "text-base"
       } font-medium rounded-md ${
         active 
-          ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" 
+          ? "bg-blue-50 dark:bg-gray-700 text-blue-600 dark:text-gray-200" 
           : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
       }`}
     >
@@ -847,7 +849,7 @@ function KanbanItem({
         </div>
         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-1">
           <div
-            className="bg-purple-600 h-1.5 rounded-full"
+            className="bg-purple-600 dark:bg-gray-500 h-1.5 rounded-full"
             style={{ width: `${percentage}%` }}
           ></div>
         </div>
@@ -900,7 +902,7 @@ function SimplifiedKanbanBoard() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-40">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600 dark:border-gray-500"></div>
       </div>
     );
   }
@@ -908,11 +910,11 @@ function SimplifiedKanbanBoard() {
   // 태스크가 없으면 빈 상태 표시
   if (tasks.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-40 text-gray-500">
+      <div className="flex flex-col items-center justify-center h-40 text-gray-500 dark:text-gray-400">
         <p className="text-center mb-4">현재 프로젝트에 작업이 없습니다</p>
         <Link
           href="/kanban/new"
-          className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 dark:bg-gray-700 dark:hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >
           <PlusIcon className="w-4 h-4" />새 작업 추가
         </Link>
@@ -946,7 +948,7 @@ function SimplifiedKanbanBoard() {
               key={task.id}
               className="bg-white dark:bg-gray-700 p-2 rounded shadow-sm border border-gray-200 dark:border-gray-700"
             >
-              <p className="text-sm font-medium">{task.title}</p>
+              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{task.title}</p>
               <div className="flex justify-between items-center mt-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   {task.priority === "high"
@@ -959,7 +961,7 @@ function SimplifiedKanbanBoard() {
             </div>
           ))
         ) : (
-          <div className="bg-white dark:bg-gray-700 p-2 rounded shadow-sm border border-gray-200 text-center">
+          <div className="bg-white dark:bg-gray-700 p-2 rounded shadow-sm border border-gray-200 dark:border-gray-600 text-center">
             <p className="text-xs text-gray-400 dark:text-gray-500">작업 없음</p>
           </div>
         )}
@@ -978,13 +980,13 @@ function SimplifiedKanbanBoard() {
       <SimplifiedColumn
         title="진행 중"
         status="in-progress"
-        statusColor="bg-blue-400 dark:bg-blue-600"
+        statusColor="bg-gray-500 dark:bg-gray-500"
         tasks={inProgressTasks}
       />
       <SimplifiedColumn
         title="완료"
         status="done"
-        statusColor="bg-green-400 dark:bg-green-600"
+        statusColor="bg-gray-600 dark:bg-gray-400"
         tasks={doneTasks}
       />
     </div>
@@ -1063,14 +1065,14 @@ function RecentDocuments({ projectId }: { projectId?: string }) {
   if (loading) {
     return (
       <div className="flex justify-center items-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600 dark:border-gray-500"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
         <p>{error}</p>
       </div>
     );
@@ -1078,11 +1080,11 @@ function RecentDocuments({ projectId }: { projectId?: string }) {
 
   if (documents.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
         <p className="mb-4">아직 문서가 없습니다</p>
         <Link
           href={projectId ? `/documents/new?projectId=${projectId}` : "/documents/new"}
-          className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+          className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md"
         >
           <PlusIcon className="w-4 h-4 mr-2" />
           새 문서 만들기
@@ -1103,7 +1105,7 @@ function RecentDocuments({ projectId }: { projectId?: string }) {
             {doc.emoji ? (
               <span className="text-xl">{doc.emoji}</span>
             ) : (
-              <FileTextIcon className="w-4 h-4 text-green-600" />
+              <FileTextIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
             )}
           </div>
           <div className="flex-1 min-w-0">
@@ -1113,7 +1115,7 @@ function RecentDocuments({ projectId }: { projectId?: string }) {
             </p>
           </div>
           {doc.isStarred && (
-            <span className="ml-2 text-yellow-500">
+            <span className="ml-2 text-yellow-500 dark:text-yellow-400">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
                 <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z" clipRule="evenodd" />
               </svg>
