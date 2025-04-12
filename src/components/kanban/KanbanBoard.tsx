@@ -147,8 +147,8 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
 
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center">
-          <ClipboardListIcon className="h-5 w-5 text-gray-700 mr-2" />
-          <h2 className="text-xl font-semibold text-gray-900">
+          <ClipboardListIcon className="h-5 w-5 text-gray-700 dark:text-gray-300 mr-2" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
             {projectId ? "프로젝트 작업" : "모든 작업"}
           </h2>
         </div>
@@ -164,13 +164,13 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
-          <p className="ml-3 text-gray-600">작업 로딩 중...</p>
+          <p className="ml-3 text-gray-600 dark:text-gray-400">작업 로딩 중...</p>
         </div>
       ) : tasksState.length === 0 ? (
-        <div className="flex flex-col items-center justify-center bg-gray-50 rounded-lg p-8 border border-gray-200">
-          <ClipboardListIcon className="h-12 w-12 text-gray-400 mb-3" />
-          <h3 className="text-lg font-medium text-gray-900 mb-1">작업이 없습니다</h3>
-          <p className="text-gray-500 mb-4 text-center">이 프로젝트에 아직 작업이 추가되지 않았습니다.</p>
+        <div className="flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-800 rounded-lg p-8 border border-gray-200 dark:border-gray-700">
+          <ClipboardListIcon className="h-12 w-12 text-gray-400 dark:text-gray-500 mb-3" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">작업이 없습니다</h3>
+          <p className="text-gray-500 dark:text-gray-400 mb-4 text-center">이 프로젝트에 아직 작업이 추가되지 않았습니다.</p>
           <Button 
             onClick={() => setIsAddTaskDialogOpen(true)}
             className="flex items-center gap-1 bg-purple-600 hover:bg-purple-700"

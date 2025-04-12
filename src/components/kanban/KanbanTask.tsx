@@ -50,18 +50,18 @@ export function KanbanTask({ task, onUpdate, onDelete }: KanbanTaskProps) {
   // 우선순위에 따른 색상 및 아이콘 설정
   const priorityConfig = {
     low: {
-      classes: "bg-green-50 text-green-700 border-green-200",
-      icon: <CheckCircle2 className="h-3 w-3 text-green-600 mr-1" />,
+      classes: "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800",
+      icon: <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400 mr-1" />,
       label: "낮은 우선순위"
     },
     medium: {
-      classes: "bg-yellow-50 text-yellow-700 border-yellow-200",
-      icon: <Clock className="h-3 w-3 text-yellow-600 mr-1" />,
+      classes: "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800",
+      icon: <Clock className="h-3 w-3 text-yellow-600 dark:text-yellow-400 mr-1" />,
       label: "중간 우선순위"
     },
     high: {
-      classes: "bg-red-50 text-red-700 border-red-200",
-      icon: <AlertCircle className="h-3 w-3 text-red-600 mr-1" />,
+      classes: "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800",
+      icon: <AlertCircle className="h-3 w-3 text-red-600 dark:text-red-400 mr-1" />,
       label: "높은 우선순위"
     }
   };
@@ -92,14 +92,14 @@ export function KanbanTask({ task, onUpdate, onDelete }: KanbanTaskProps) {
       <div
         ref={setNodeRef}
         onClick={handleClick}
-        className={`bg-white p-3 rounded-md border border-gray-200 cursor-pointer hover:shadow-md transition-all ${
+        className={`bg-white dark:bg-gray-800 p-3 rounded-md border border-gray-200 dark:border-gray-700 cursor-pointer hover:shadow-md transition-all ${
           isDragging ? "opacity-50 scale-95" : ""
-        } ${task.status === 'done' ? 'border-l-4 border-l-green-500' : ''}`}
+        } ${task.status === 'done' ? 'border-l-4 border-l-green-500 dark:border-l-green-400' : ''}`}
       >
         <div className="mb-2">
-          <h4 className="font-medium text-gray-800 mb-1">{task.title}</h4>
+          <h4 className="font-medium text-gray-800 dark:text-gray-100 mb-1">{task.title}</h4>
           {task.description && (
-            <p className="text-xs text-gray-600 line-clamp-2 mb-2">{cleanDescription}</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 mb-2">{cleanDescription}</p>
           )}
         </div>
         
@@ -113,10 +113,10 @@ export function KanbanTask({ task, onUpdate, onDelete }: KanbanTaskProps) {
             {prioritySettings.label}
           </span>
           
-          <div className="flex items-center gap-2 text-xs text-gray-500">
+          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
             {task.dueDate && (
               <div className="flex items-center">
-                <CalendarIcon className="h-3 w-3 mr-1 text-gray-400" />
+                <CalendarIcon className="h-3 w-3 mr-1 text-gray-400 dark:text-gray-500" />
                 <span>{new Date(task.dueDate).toLocaleDateString()}</span>
               </div>
             )}
@@ -124,8 +124,8 @@ export function KanbanTask({ task, onUpdate, onDelete }: KanbanTaskProps) {
         </div>
         
         {task.assignee && (
-          <div className="mt-2 pt-2 border-t border-gray-100 flex items-center gap-1 text-xs text-gray-500">
-            <div className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-[10px]">
+          <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+            <div className="w-4 h-4 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 text-[10px]">
               {assigneeName ? assigneeName.charAt(0).toUpperCase() : "?"}
             </div>
             <span>{assigneeName || task.assignee}</span>

@@ -35,40 +35,40 @@ export function KanbanColumn({
     switch (color) {
       case 'blue':
         return {
-          bg: 'bg-blue-100',
-          text: 'text-blue-800',
-          indicator: 'bg-blue-500'
+          bg: 'bg-blue-100 dark:bg-blue-900/30',
+          text: 'text-blue-800 dark:text-blue-300',
+          indicator: 'bg-blue-500 dark:bg-blue-400'
         };
       case 'green':
         return {
-          bg: 'bg-green-100',
-          text: 'text-green-800',
-          indicator: 'bg-green-500'
+          bg: 'bg-green-100 dark:bg-green-900/30',
+          text: 'text-green-800 dark:text-green-300',
+          indicator: 'bg-green-500 dark:bg-green-400'
         };
       case 'yellow':
         return {
-          bg: 'bg-yellow-100',
-          text: 'text-yellow-800',
-          indicator: 'bg-yellow-500'
+          bg: 'bg-yellow-100 dark:bg-yellow-900/30',
+          text: 'text-yellow-800 dark:text-yellow-300',
+          indicator: 'bg-yellow-500 dark:bg-yellow-400'
         };
       case 'purple':
         return {
-          bg: 'bg-purple-100',
-          text: 'text-purple-800',
-          indicator: 'bg-purple-500'
+          bg: 'bg-purple-100 dark:bg-purple-900/30',
+          text: 'text-purple-800 dark:text-purple-300',
+          indicator: 'bg-purple-500 dark:bg-purple-400'
         };
       case 'red':
         return {
-          bg: 'bg-red-100',
-          text: 'text-red-800',
-          indicator: 'bg-red-500'
+          bg: 'bg-red-100 dark:bg-red-900/30',
+          text: 'text-red-800 dark:text-red-300',
+          indicator: 'bg-red-500 dark:bg-red-400'
         };
       case 'gray':
       default:
         return {
-          bg: 'bg-gray-100',
-          text: 'text-gray-800',
-          indicator: 'bg-gray-500'
+          bg: 'bg-gray-100 dark:bg-gray-800',
+          text: 'text-gray-800 dark:text-gray-300',
+          indicator: 'bg-gray-500 dark:bg-gray-400'
         };
     }
   };
@@ -78,17 +78,17 @@ export function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex flex-col ${
+      className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden flex flex-col ${
         isOver ? "ring-2 ring-blue-500" : ""
       }`}
     >
-      <div className={`${colorClasses.bg} px-4 py-3 border-b border-gray-200`}>
+      <div className={`${colorClasses.bg} px-4 py-3 border-b border-gray-200 dark:border-gray-700`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <div className={`w-3 h-3 rounded-full ${colorClasses.indicator} mr-2`}></div>
             <h3 className={`font-medium ${colorClasses.text}`}>{title}</h3>
           </div>
-          <span className={`${colorClasses.bg} ${colorClasses.text} border border-gray-200 rounded-full px-2 py-0.5 text-xs font-medium`}>
+          <span className={`${colorClasses.bg} ${colorClasses.text} border border-gray-200 dark:border-gray-700 rounded-full px-2 py-0.5 text-xs font-medium`}>
             {tasks.length}
           </span>
         </div>
@@ -109,7 +109,7 @@ export function KanbanColumn({
         
         {tasks.length === 0 && (
           <div className="flex-grow flex items-center justify-center py-8">
-            <p className="text-gray-400 text-sm">작업 없음</p>
+            <p className="text-gray-400 dark:text-gray-500 text-sm">작업 없음</p>
           </div>
         )}
       </div>

@@ -33,6 +33,7 @@ import { useAuth } from "./contexts/AuthContext";
 import { useProject } from "./contexts/ProjectContext";
 import { Task, TaskStatus } from "@/components/kanban/KanbanBoard";
 import { useTasks } from "@/hooks/useTasks";
+import { ThemeToggle } from "./components/ThemeToggle";
 
 export default function Home() {
   const router = useRouter();
@@ -139,13 +140,13 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* 상단 네비게이션 바 */}
-      <nav className="bg-white border-b border-gray-200 fixed w-full z-30">
+      <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 fixed w-full z-30">
         <div className="px-4 py-3 flex justify-between items-center">
           <div className="flex items-center">
             <button
-              className="md:hidden mr-2"
+              className="md:hidden mr-2 text-gray-600 dark:text-gray-300"
               onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
             >
               {mobileSidebarOpen ? (
@@ -154,7 +155,7 @@ export default function Home() {
                 <MenuIcon className="w-6 h-6" />
               )}
             </button>
-            <div className="text-xl font-bold text-blue-600 flex items-center">
+            <div className="text-xl font-bold text-blue-600 dark:text-blue-400 flex items-center">
               <LayoutDashboardIcon className="w-6 h-6 mr-2" />
               워크스페이스
             </div>
@@ -165,27 +166,27 @@ export default function Home() {
               <input
                 type="text"
                 placeholder="검색..."
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
               />
-              <SearchIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
+              <SearchIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400 dark:text-gray-500" />
             </div>
           </div>
 
           <div className="flex items-center space-x-4">
+            <ThemeToggle />
             <Link
               href="/projects/invitations"
-              className="relative p-2 rounded-full hover:bg-gray-100 transition-colors duration-200"
+              className="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
             >
-              <BellIcon className="w-5 h-5 text-gray-600" />
-              {/* 알림 배지 개선 */}
+              <BellIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
               <span className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full shadow-sm animate-pulse">
                 3
               </span>
             </Link>
             <div className="relative">
               <button className="flex items-center">
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                  <UserIcon className="w-5 h-5 text-gray-600" />
+                <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                  <UserIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
                 </div>
               </button>
             </div>
@@ -197,7 +198,7 @@ export default function Home() {
       <div className="flex pt-16">
         {/* 사이드바 - 모바일에서는 오버레이로 표시 */}
         <aside
-          className={`fixed inset-y-0 left-0 z-20 w-64 bg-white border-r border-gray-200 pt-16 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-20 w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 pt-16 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
             mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
           } md:relative md:w-64 md:flex-shrink-0`}
         >
@@ -297,7 +298,7 @@ export default function Home() {
               </nav>
 
               <div className="mt-8">
-                <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <h3 className="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   프로젝트
                 </h3>
                 <nav className="mt-2 space-y-1">
@@ -321,20 +322,20 @@ export default function Home() {
               <div className="mt-8">
                 <button
                   onClick={() => router.push("/projects/new")}
-                  className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-100 w-full"
+                  className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 w-full"
                 >
                   <PlusIcon className="w-5 h-5 mr-2" />새 프로젝트
                 </button>
               </div>
 
-              <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
-                <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-100 w-full">
+              <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-700">
+                <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 w-full">
                   <SettingsIcon className="w-5 h-5 mr-2" />
                   설정
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-100 w-full mt-2"
+                  className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 w-full mt-2"
                 >
                   <LogOutIcon className="w-5 h-5 mr-2" />
                   로그아웃
@@ -349,8 +350,8 @@ export default function Home() {
           {/* 대시보드 헤더 */}
           <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">대시보드</h1>
-              <p className="text-sm text-gray-600">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">대시보드</h1>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 안녕하세요, {user.name}님! {currentProject?.name || "프로젝트"}
                 의 업무를 확인하세요
               </p>
@@ -428,9 +429,9 @@ export default function Home() {
 
           {/* 새로운 섹션: 프로젝트 팀 */}
           {currentProject && (
-            <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium text-gray-900">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
                   프로젝트 팀
                 </h2>
                 <Link
@@ -492,8 +493,8 @@ export default function Home() {
           )}
 
           {/* 빠른 액세스 - 회의 참여 */}
-          <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-3">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-6">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
               빠른 회의 참여
             </h2>
             <form onSubmit={joinMeeting} className="flex gap-2">
@@ -502,7 +503,7 @@ export default function Home() {
                 value={roomId}
                 onChange={(e) => setRoomId(e.target.value)}
                 placeholder="회의 코드 입력"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:bg-gray-700 dark:text-white"
               />
               <button
                 type="submit"
@@ -516,9 +517,9 @@ export default function Home() {
           {/* 대시보드 그리드 */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* 간략한 칸반 보드 */}
-            <div className="bg-white rounded-lg shadow-sm p-4 lg:col-span-2">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 lg:col-span-2">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium text-gray-900">칸반 보드</h2>
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">칸반 보드</h2>
                 <Link
                   href="/kanban"
                   className="text-sm text-blue-600 hover:text-blue-800"
@@ -530,9 +531,9 @@ export default function Home() {
             </div>
 
             {/* 예정된 일정 */}
-            <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium text-gray-900">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
                   예정된 일정
                 </h2>
                 <Link
@@ -548,7 +549,7 @@ export default function Home() {
                   title="디자인 팀 회의"
                   time="오늘, 14:00"
                   type="회의"
-                  icon={<VideoIcon className="w-4 h-4 text-blue-600" />}
+                  icon={<VideoIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
                 />
 
                 <ScheduleItem
@@ -575,9 +576,9 @@ export default function Home() {
             </div>
 
             {/* 최근 문서 */}
-            <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium text-gray-900">최근 문서</h2>
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">최근 문서</h2>
                 <Link
                   href={
                     currentProject
@@ -603,9 +604,9 @@ export default function Home() {
             </div>
 
             {/* 활성 칸반보드 */}
-            <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium text-gray-900">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
                   활성 칸반보드
                 </h2>
                 <Link
@@ -619,7 +620,7 @@ export default function Home() {
                 <KanbanItem
                   title="마케팅 캠페인"
                   tasks={{ total: 12, completed: 9 }}
-                  icon={<Trello className="w-4 h-4 text-purple-600" />}
+                  icon={<Trello className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
                 />
 
                 <KanbanItem
@@ -643,9 +644,9 @@ export default function Home() {
             </div>
 
             {/* 최근 회의 */}
-            <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium text-gray-900">최근 회의</h2>
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">최근 회의</h2>
                 <Link
                   href="/meetings"
                   className="text-sm text-blue-600 hover:text-blue-800"
@@ -658,7 +659,7 @@ export default function Home() {
                   title="주간 팀 미팅"
                   date="2023-06-05"
                   participants={8}
-                  icon={<VideoIcon className="w-4 h-4 text-blue-600" />}
+                  icon={<VideoIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
                 />
 
                 <MeetingItem
@@ -712,7 +713,9 @@ function SidebarLink({
       className={`flex items-center px-3 py-2 ${
         small ? "text-sm" : "text-base"
       } font-medium rounded-md ${
-        active ? "bg-blue-50 text-blue-600" : "text-gray-600 hover:bg-gray-100"
+        active 
+          ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" 
+          : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
       }`}
     >
       <div className={`${small ? "mr-2" : "mr-3"}`}>{icon}</div>
@@ -779,15 +782,15 @@ function ScheduleItem({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
+    <div className="flex items-center justify-between p-3 border border-gray-100 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
       <div className="flex items-center">
-        <div className="mr-3 p-2 bg-gray-100 rounded-full">{icon}</div>
+        <div className="mr-3 p-2 bg-gray-100 dark:bg-gray-700 rounded-full">{icon}</div>
         <div>
-          <h4 className="font-medium text-gray-900">{title}</h4>
-          <p className="text-sm text-gray-500">{time}</p>
+          <h4 className="font-medium text-gray-900 dark:text-white">{title}</h4>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{time}</p>
         </div>
       </div>
-      <span className="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded-full">
+      <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 px-2 py-1 rounded-full">
         {type}
       </span>
     </div>
@@ -808,24 +811,11 @@ function DocumentItem({
   const router = useRouter();
 
   return (
-    <div
-      onClick={() => {
-        const url = `/documents/${title.toLowerCase().replace(/\s+/g, "-")}${
-          currentProject ? `?projectId=${currentProject.id}` : ""
-        }`;
-        console.log("문서 아이템 클릭:", {
-          title,
-          url,
-          projectId: currentProject?.id,
-        });
-        router.push(url);
-      }}
-      className="flex items-center p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer"
-    >
-      <div className="mr-3 p-2 bg-gray-100 rounded-full">{icon}</div>
+    <div className="flex items-center p-3 border border-gray-100 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
+      <div className="mr-3 p-2 bg-gray-100 dark:bg-gray-700 rounded-full">{icon}</div>
       <div>
-        <h4 className="font-medium text-gray-900">{title}</h4>
-        <p className="text-sm text-gray-500">수정됨: {updatedAt}</p>
+        <h4 className="font-medium text-gray-900 dark:text-white">{title}</h4>
+        <p className="text-sm text-gray-500 dark:text-gray-400">수정됨: {updatedAt}</p>
       </div>
     </div>
   );
@@ -843,31 +833,26 @@ function KanbanItem({
   const percentage = Math.round((tasks.completed / tasks.total) * 100);
 
   return (
-    <Link
-      href={`/kanban/${title.toLowerCase().replace(/\s+/g, "-")}`}
-      className="block"
-    >
-      <div className="flex items-center p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
-        <div className="mr-3 p-2 bg-gray-100 rounded-full">{icon}</div>
-        <div className="flex-1">
-          <h4 className="font-medium text-gray-900">{title}</h4>
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-500">
-              {tasks.completed}/{tasks.total} 작업 완료
-            </p>
-            <span className="text-xs font-medium text-gray-700">
-              {percentage}%
-            </span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
-            <div
-              className="bg-purple-600 h-1.5 rounded-full"
-              style={{ width: `${percentage}%` }}
-            ></div>
-          </div>
+    <div className="flex items-center p-3 border border-gray-100 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+      <div className="mr-3 p-2 bg-gray-100 dark:bg-gray-700 rounded-full">{icon}</div>
+      <div className="flex-1">
+        <h4 className="font-medium text-gray-900 dark:text-white">{title}</h4>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {tasks.completed}/{tasks.total} 작업 완료
+          </p>
+          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+            {percentage}%
+          </span>
+        </div>
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-1">
+          <div
+            className="bg-purple-600 h-1.5 rounded-full"
+            style={{ width: `${percentage}%` }}
+          ></div>
         </div>
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -883,24 +868,19 @@ function MeetingItem({
   icon: React.ReactNode;
 }) {
   return (
-    <Link
-      href={`/meetings/${title.toLowerCase().replace(/\s+/g, "-")}`}
-      className="block"
-    >
-      <div className="flex items-center p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
-        <div className="mr-3 p-2 bg-gray-100 rounded-full">{icon}</div>
-        <div>
-          <h4 className="font-medium text-gray-900">{title}</h4>
-          <div className="flex items-center text-sm text-gray-500">
-            <span className="mr-3">{date}</span>
-            <div className="flex items-center">
-              <UsersIcon className="w-3 h-3 mr-1" />
-              <span>{participants}명</span>
-            </div>
+    <div className="flex items-center p-3 border border-gray-100 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+      <div className="mr-3 p-2 bg-gray-100 dark:bg-gray-700 rounded-full">{icon}</div>
+      <div>
+        <h4 className="font-medium text-gray-900 dark:text-white">{title}</h4>
+        <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+          <span className="mr-3">{date}</span>
+          <div className="flex items-center">
+            <UsersIcon className="w-3 h-3 mr-1" />
+            <span>{participants}명</span>
           </div>
         </div>
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -952,8 +932,8 @@ function SimplifiedKanbanBoard() {
     statusColor: string;
     tasks: Task[];
   }) => (
-    <div className="bg-gray-50 rounded-lg p-3">
-      <h3 className="font-medium text-gray-700 mb-2 flex items-center">
+    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+      <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center">
         <span
           className={`inline-block w-3 h-3 ${statusColor} rounded-full mr-2`}
         ></span>
@@ -964,11 +944,11 @@ function SimplifiedKanbanBoard() {
           tasks.map((task) => (
             <div
               key={task.id}
-              className="bg-white p-2 rounded shadow-sm border border-gray-200"
+              className="bg-white dark:bg-gray-700 p-2 rounded shadow-sm border border-gray-200 dark:border-gray-700"
             >
               <p className="text-sm font-medium">{task.title}</p>
               <div className="flex justify-between items-center mt-2">
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
                   {task.priority === "high"
                     ? "우선순위 높음"
                     : task.priority === "medium"
@@ -979,8 +959,8 @@ function SimplifiedKanbanBoard() {
             </div>
           ))
         ) : (
-          <div className="bg-white p-2 rounded shadow-sm border border-gray-200 text-center">
-            <p className="text-xs text-gray-400">작업 없음</p>
+          <div className="bg-white dark:bg-gray-700 p-2 rounded shadow-sm border border-gray-200 text-center">
+            <p className="text-xs text-gray-400 dark:text-gray-500">작업 없음</p>
           </div>
         )}
       </div>
@@ -992,19 +972,19 @@ function SimplifiedKanbanBoard() {
       <SimplifiedColumn
         title="할 일"
         status="todo"
-        statusColor="bg-gray-400"
+        statusColor="bg-gray-400 dark:bg-gray-600"
         tasks={todoTasks}
       />
       <SimplifiedColumn
         title="진행 중"
         status="in-progress"
-        statusColor="bg-blue-400"
+        statusColor="bg-blue-400 dark:bg-blue-600"
         tasks={inProgressTasks}
       />
       <SimplifiedColumn
         title="완료"
         status="done"
-        statusColor="bg-green-400"
+        statusColor="bg-green-400 dark:bg-green-600"
         tasks={doneTasks}
       />
     </div>
@@ -1117,9 +1097,9 @@ function RecentDocuments({ projectId }: { projectId?: string }) {
         <div
           key={doc.id}
           onClick={() => router.push(`/documents/${doc.id}${projectId ? `?projectId=${projectId}` : ''}`)}
-          className="flex items-center p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer"
+          className="flex items-center p-3 border border-gray-100 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
         >
-          <div className="mr-3 p-2 bg-gray-100 rounded-full">
+          <div className="mr-3 p-2 bg-gray-100 dark:bg-gray-700 rounded-full">
             {doc.emoji ? (
               <span className="text-xl">{doc.emoji}</span>
             ) : (
@@ -1127,8 +1107,8 @@ function RecentDocuments({ projectId }: { projectId?: string }) {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className="font-medium text-gray-900 truncate">{doc.title || "무제 문서"}</h4>
-            <p className="text-sm text-gray-500">
+            <h4 className="font-medium text-gray-900 dark:text-white truncate">{doc.title || "무제 문서"}</h4>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               수정됨: {formatDate(doc.updatedAt || doc.createdAt)}
             </p>
           </div>

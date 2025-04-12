@@ -5,6 +5,7 @@ import { Inter } from 'next/font/google';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProjectProvider } from './contexts/ProjectContext';
 import { UserProvider } from './contexts/UserContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -20,14 +21,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body className={inter.className}>
-        <AuthProvider>
-          <ProjectProvider>
-            <UserProvider>
-              {children}
-            </UserProvider>
-          </ProjectProvider>
-        </AuthProvider>
+      <body className={`${inter.className} bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100`}>
+        <ThemeProvider>
+          <AuthProvider>
+            <ProjectProvider>
+              <UserProvider>
+                {children}
+              </UserProvider>
+            </ProjectProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

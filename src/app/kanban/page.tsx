@@ -57,20 +57,20 @@ export default function KanbanPage() {
     : "모든 프로젝트";
 
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className="bg-gray-50 dark:bg-gray-900 min-h-screen">
       {/* 상단 네비게이션 바 */}
-      <div className="bg-white border-b border-gray-200 py-4 px-6">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 py-4 px-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Link href="/" className="text-gray-500 hover:text-blue-600 transition-colors">
+            <Link href="/" className="text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
               <HomeIcon className="w-5 h-5" />
             </Link>
-            <span className="text-gray-500">/</span>
-            <Link href="/" className="text-gray-500 hover:text-blue-600 transition-colors">
+            <span className="text-gray-500 dark:text-gray-400">/</span>
+            <Link href="/" className="text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
               워크스페이스
             </Link>
-            <span className="text-gray-500">/</span>
-            <span className="text-gray-900 font-medium">{currentProjectName} 칸반보드</span>
+            <span className="text-gray-500 dark:text-gray-400">/</span>
+            <span className="text-gray-900 dark:text-white font-medium">{currentProjectName} 칸반보드</span>
           </div>
           
           <div className="flex items-center space-x-2">
@@ -78,7 +78,7 @@ export default function KanbanPage() {
               variant="outline"
               size="sm"
               onClick={() => router.push('/')}
-              className="flex items-center space-x-1"
+              className="flex items-center space-x-1 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
             >
               <ArrowLeftIcon className="w-4 h-4" />
               <span>대시보드로 돌아가기</span>
@@ -103,18 +103,18 @@ export default function KanbanPage() {
 
       <div className="container mx-auto py-8 px-4">
         <div className="mb-6 flex items-center space-x-2">
-          <Trello className="w-6 h-6 text-purple-600" />
-          <h1 className="text-2xl font-bold">칸반보드</h1>
+          <Trello className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">칸반보드</h1>
         </div>
         
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
           <ProjectSelector 
             selectedProjectId={selectedProjectId}
             onSelectProject={handleSelectProject}
           />
         </div>
         
-        <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
           <KanbanBoard projectId={selectedProjectId} />
         </div>
       </div>

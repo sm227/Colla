@@ -45,18 +45,18 @@ export function ProjectSelector({
   }
 
   if (error) {
-    return <div className="p-3 bg-red-50 text-red-600 rounded-md">{error}</div>;
+    return <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-md">{error}</div>;
   }
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-medium text-gray-900">프로젝트 선택</h3>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white">프로젝트 선택</h3>
         <Button
           variant="outline"
           size="sm"
           onClick={() => setIsAddingProject(!isAddingProject)}
-          className="flex items-center gap-1 text-sm"
+          className="flex items-center gap-1 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
         >
           <Plus className="h-4 w-4" />
           새 프로젝트
@@ -64,27 +64,27 @@ export function ProjectSelector({
       </div>
 
       {isAddingProject && (
-        <div className="bg-gray-50 p-4 rounded-md mb-4 border border-gray-200">
+        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-md mb-4 border border-gray-200 dark:border-gray-700">
           <div className="mb-3">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               프로젝트 이름
             </label>
             <input
               type="text"
               value={newProjectName}
               onChange={(e) => setNewProjectName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:bg-gray-700 dark:text-white"
               placeholder="프로젝트 이름 입력"
             />
           </div>
           <div className="mb-3">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               설명 (선택사항)
             </label>
             <textarea
               value={newProjectDescription}
               onChange={(e) => setNewProjectDescription(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:bg-gray-700 dark:text-white"
               rows={2}
               placeholder="프로젝트 설명 입력"
             />
@@ -94,6 +94,7 @@ export function ProjectSelector({
               variant="outline"
               size="sm"
               onClick={() => setIsAddingProject(false)}
+              className="dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
             >
               취소
             </Button>
@@ -108,20 +109,20 @@ export function ProjectSelector({
         <div 
           className={`border rounded-md p-3 cursor-pointer transition-colors ${
             selectedProjectId === null 
-              ? 'bg-blue-50 border-blue-300 text-blue-700' 
-              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+              ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' 
+              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
           }`}
           onClick={() => handleSelectProject(null)}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <div className="p-2 rounded-full bg-gray-100 mr-3">
-                <FolderIcon className="h-5 w-5 text-gray-600" />
+              <div className="p-2 rounded-full bg-gray-100 dark:bg-gray-700 mr-3">
+                <FolderIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
               </div>
               <span className="font-medium">모든 작업</span>
             </div>
             {selectedProjectId === null && (
-              <CheckIcon className="h-5 w-5 text-blue-600" />
+              <CheckIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             )}
           </div>
         </div>
@@ -131,20 +132,20 @@ export function ProjectSelector({
             key={project.id}
             className={`border rounded-md p-3 cursor-pointer transition-colors ${
               selectedProjectId === project.id 
-                ? 'bg-blue-50 border-blue-300 text-blue-700' 
-                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300' 
+                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
             }`}
             onClick={() => handleSelectProject(project.id)}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <div className="p-2 rounded-full bg-gray-100 mr-3">
-                  <FolderIcon className="h-5 w-5 text-gray-600" />
+                <div className="p-2 rounded-full bg-gray-100 dark:bg-gray-700 mr-3">
+                  <FolderIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                 </div>
                 <span className="font-medium truncate">{project.name}</span>
               </div>
               {selectedProjectId === project.id && (
-                <CheckIcon className="h-5 w-5 text-blue-600" />
+                <CheckIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               )}
             </div>
           </div>
