@@ -3,10 +3,9 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
-import { ProjectSelector } from "@/components/kanban/ProjectSelector";
 import { useProject } from "@/app/contexts/ProjectContext";
 import Link from "next/link";
-import { HomeIcon, ArrowLeftIcon, Trello, PlusIcon } from "lucide-react";
+import { HomeIcon, ArrowLeftIcon, Trello, PlusIcon, FolderIcon, ChevronDownIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function KanbanPage() {
@@ -15,6 +14,33 @@ export default function KanbanPage() {
   const projectIdParam = searchParams.get('projectId');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const { currentProject, projects, loading: projectLoading } = useProject();
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+
+  // 드롭다운 메뉴 외부 클릭 시 닫히도록 이벤트 핸들러 등록
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      // 드롭다운 메뉴 외부를 클릭한 경우 닫기
+      if (!target.closest('.project-dropdown') && showProjectDropdown) {
+        setShowProjectDropdown(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // ESC 키 눌렀을 때 드롭다운 닫기
+      if (event.key === 'Escape' && showProjectDropdown) {
+        setShowProjectDropdown(false);
+      }
+    };
+
+    // 이벤트 리스너 등록 및 정리
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showProjectDropdown]);
 
   // URL 쿼리 파라미터로부터 프로젝트 ID를 가져옴
   useEffect(() => {
@@ -38,6 +64,7 @@ export default function KanbanPage() {
     
     // 프로젝트 ID 변경 시 상태를 즉시 업데이트
     setSelectedProjectId(projectId);
+    setShowProjectDropdown(false);
     
     // 선택한 프로젝트 ID를 로컬 스토리지에 저장
     if (projectId) {
@@ -74,6 +101,51 @@ export default function KanbanPage() {
           </div>
           
           <div className="flex items-center space-x-2">
+            {/* 프로젝트 선택 드롭다운 */}
+            <div className="relative mr-3 project-dropdown">
+              <div 
+                className="flex items-center px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50"
+                onClick={() => setShowProjectDropdown(!showProjectDropdown)}
+              >
+                <FolderIcon className="h-4 w-4 text-gray-600 mr-2" />
+                <span className="mr-1">{currentProjectName}</span>
+                <ChevronDownIcon className="h-4 w-4 text-gray-500" />
+              </div>
+              
+              {/* 드롭다운 메뉴 */}
+              {showProjectDropdown && (
+                <div className="absolute right-0 mt-1 w-64 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-72 overflow-y-auto">
+                  <div 
+                    className={`px-3 py-2 hover:bg-gray-100 cursor-pointer flex items-center ${
+                      selectedProjectId === null ? 'bg-blue-50 text-blue-700' : ''
+                    }`}
+                    onClick={() => handleSelectProject(null)}
+                  >
+                    <div className="p-1 rounded-full bg-gray-100 mr-2">
+                      <FolderIcon className="h-4 w-4 text-gray-600" />
+                    </div>
+                    <span className="font-medium">모든 작업</span>
+                  </div>
+                  
+                  {/* 프로젝트 목록 */}
+                  {projects.map((project) => (
+                    <div
+                      key={project.id}
+                      className={`px-3 py-2 hover:bg-gray-100 cursor-pointer flex items-center ${
+                        selectedProjectId === project.id ? 'bg-blue-50 text-blue-700' : ''
+                      }`}
+                      onClick={() => handleSelectProject(project.id)}
+                    >
+                      <div className="p-1 rounded-full bg-gray-100 mr-2">
+                        <FolderIcon className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <span className="font-medium truncate">{project.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
             <Button
               variant="outline"
               size="sm"
@@ -105,13 +177,6 @@ export default function KanbanPage() {
         <div className="mb-6 flex items-center space-x-2">
           <Trello className="w-6 h-6 text-purple-600" />
           <h1 className="text-2xl font-bold">칸반보드</h1>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <ProjectSelector 
-            selectedProjectId={selectedProjectId}
-            onSelectProject={handleSelectProject}
-          />
         </div>
         
         <div className="bg-white rounded-lg shadow-sm p-6">
