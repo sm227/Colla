@@ -39,6 +39,12 @@ interface ContextMenu {
   date : Date | null;
 }
 
+// 일정 추가 다이얼로그 인터페이스
+interface AddEventDialog {
+  show: boolean;
+  date: Date | null;
+}
+
 export default function CalendarPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -53,6 +59,101 @@ export default function CalendarPage() {
   const [sidebarTasks, setSidebarTasks] = useState<Task[]>([]);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [dropTarget, setDropTarget] = useState<Date | null>(null);
+  
+  // 일정 추가 다이얼로그 상태
+  const [addEventDialog, setAddEventDialog] = useState<AddEventDialog>({
+    show: false,
+    date: null
+  });
+  
+  // 새 일정 상태
+  const [newEvent, setNewEvent] = useState({
+    title: '',
+    description: '',
+    startDate: '',
+    endDate: '',
+    isAllDay: false
+  });
+  
+  // 캘린더 API 요청 함수들
+  const fetchCalendarEvents = async () => {
+    try {
+      const url = projectId 
+        ? `/api/calendar?projectId=${projectId}`
+        : '/api/calendar?showAll=true';
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('캘린더 일정을 가져오는데 실패했습니다.');
+      }
+      
+      const data = await response.json();
+      
+      // 여기서 일정을 처리하는 로직 추가 가능
+      // 지금은 콘솔에만 표시
+      console.log('캘린더 일정:', data);
+    } catch (error) {
+      console.error('캘린더 일정 가져오기 오류:', error);
+    }
+  };
+  
+  // 일정 추가 함수
+  const addCalendarEvent = async () => {
+    try {
+      if (!addEventDialog.date || !newEvent.title || !newEvent.startDate) {
+        alert('제목과 시작 날짜는 필수입니다.');
+        return;
+      }
+      
+      // 요청 데이터 구성
+      const requestData = {
+        ...newEvent,
+        projectId: projectId || undefined
+      };
+      
+      console.log('Calendar API 요청 데이터:', requestData);
+      
+      const response = await fetch('/api/calendar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestData)
+      });
+      
+      // 응답 디버깅
+      console.log('Calendar API 응답 상태:', response.status);
+      const responseData = await response.json();
+      console.log('Calendar API 응답 데이터:', responseData);
+      
+      if (!response.ok) {
+        throw new Error(responseData.error || '일정 추가에 실패했습니다.');
+      }
+      
+      // 다이얼로그 닫기 및 상태 초기화
+      setAddEventDialog({ show: false, date: null });
+      setNewEvent({
+        title: '',
+        description: '',
+        startDate: '',
+        endDate: '',
+        isAllDay: false
+      });
+      
+      // 일정 다시 불러오기
+      fetchCalendarEvents();
+      
+      alert('일정이 추가되었습니다.');
+    } catch (error) {
+      console.error('일정 추가 오류:', error);
+      alert(`일정 추가 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+    }
+  };
+  
+  // 컴포넌트 마운트 시 일정 불러오기
+  useEffect(() => {
+    fetchCalendarEvents();
+  }, [projectId]);
 
   // 사이드바에 표시할 태스크 (dueDate가 없는 태스크들)
   useEffect(() => {
@@ -429,7 +530,19 @@ export default function CalendarPage() {
                     ${isDropTargetDay ? 'bg-blue-100 ring-2 ring-blue-500' : ''}
                     transition-colors duration-150 cursor-pointer
                   `}
-                  onClick={() => setSelectedDate(day)}
+                  onClick={() => {
+                    setSelectedDate(day);
+                    // 날짜 클릭 시 일정 추가 다이얼로그 표시
+                    setAddEventDialog({ 
+                      show: true, 
+                      date: day 
+                    });
+                    // 선택한 날짜로 시작일 자동 설정
+                    setNewEvent({
+                      ...newEvent,
+                      startDate: format(day, 'yyyy-MM-dd')
+                    });
+                  }}
                   onDragOver={handleDragOver(day)}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop(day)}
@@ -603,6 +716,116 @@ export default function CalendarPage() {
           )}
         </div>
       </div>
+      
+      {/* 일정 추가 다이얼로그 */}
+      {addEventDialog.show && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
+            {/* 헤더 */}
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <CalendarIcon className="h-5 w-5 text-blue-600" />
+                새 일정 추가
+              </h2>
+              <button
+                onClick={() => setAddEventDialog({ show: false, date: null })}
+                className="text-gray-500 hover:text-gray-700 rounded-full p-1 hover:bg-gray-100 transition-colors"
+                aria-label="닫기"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="space-y-4">
+                {/* 제목 입력 */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700 flex items-center">
+                    제목 <span className="text-red-500 ml-1">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newEvent.title}
+                    onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    placeholder="일정 제목 입력"
+                    required
+                  />
+                </div>
+
+                {/* 설명 입력 */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">설명</label>
+                  <textarea
+                    value={newEvent.description}
+                    onChange={(e) => setNewEvent({...newEvent, description: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    rows={3}
+                    placeholder="일정에 대한 설명 입력"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {/* 시작 날짜 */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700 flex items-center">
+                      시작 날짜 <span className="text-red-500 ml-1">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={newEvent.startDate}
+                      onChange={(e) => setNewEvent({...newEvent, startDate: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      required
+                    />
+                  </div>
+
+                  {/* 종료 날짜 */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">종료 날짜</label>
+                    <input
+                      type="date"
+                      value={newEvent.endDate}
+                      onChange={(e) => setNewEvent({...newEvent, endDate: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* 종일 체크박스 */}
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="isAllDay"
+                    checked={newEvent.isAllDay}
+                    onChange={(e) => setNewEvent({...newEvent, isAllDay: e.target.checked})}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="isAllDay" className="ml-2 block text-sm text-gray-700">
+                    종일
+                  </label>
+                </div>
+              </div>
+
+              {/* 버튼 영역 */}
+              <div className="mt-6 flex justify-end space-x-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setAddEventDialog({ show: false, date: null })}
+                >
+                  취소
+                </Button>
+                <Button
+                  onClick={addCalendarEvent}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  일정 추가
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
