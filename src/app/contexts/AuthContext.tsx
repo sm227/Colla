@@ -54,7 +54,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const response = await fetch("/api/auth/me", {
+        // 타임스탬프를 추가하여 캐시를 방지
+        const timestamp = new Date().getTime();
+        const response = await fetch(`/api/auth/me?t=${timestamp}`, {
+          method: 'GET',
           // 캐시 방지 설정 추가
           cache: 'no-store',
           headers: {
@@ -62,6 +65,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             'Pragma': 'no-cache'
           }
         });
+        
+        // 응답 상태 코드를 확인하여 404 오류 처리
+        if (response.status === 404) {
+          console.error('API 엔드포인트를 찾을 수 없습니다: /api/auth/me');
+          setUser(null);
+          setLoading(false);
+          
+          // 인증이 필요한 페이지에 있고 로그인되지 않은 경우 로그인 페이지로 리디렉션
+          if (pathname !== '/auth/login' && 
+              pathname !== '/auth/register' && 
+              !pathname.startsWith('/api/')) {
+            // 단순한 경로만 callbackUrl로 설정
+            router.push(`/auth/login?callbackUrl=${pathname}`);
+          }
+          return;
+        }
         
         const data = await response.json();
         

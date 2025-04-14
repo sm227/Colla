@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,36 +7,87 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 사용자 모델 추가
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String          @id @default(uuid())
+  name        String
+  email       String          @unique
+  password    String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  projects    Project[]
+  memberships ProjectMember[]
 }
 
-// 칸반보드 관련 모델
 model Task {
   id          String    @id @default(cuid())
   title       String
   description String?
-  status      String    // "todo", "in-progress", "review", "done"
-  priority    String    // "low", "medium", "high"
+  status      String
+  priority    String
   assignee    String?
   dueDate     DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   projectId   String?
+  endDate     DateTime?
+  isAllDay    Boolean   @default(false)
+  startDate   DateTime?
   project     Project?  @relation(fields: [projectId], references: [id])
 }
 
 model Project {
-  id          String   @id @default(cuid())
+  id          String          @id @default(cuid())
   name        String
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  userId      String?
+  documents   Document[]
+  folders     Folder[]
+  user        User?           @relation(fields: [userId], references: [id])
+  members     ProjectMember[]
   tasks       Task[]
-} 
+}
+
+model ProjectMember {
+  id           String   @id @default(cuid())
+  userId       String
+  projectId    String
+  role         String   @default("member")
+  inviteStatus String   @default("pending")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  project      Project  @relation(fields: [projectId], references: [id])
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, projectId])
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  emoji     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  projectId String?
+  folder    String?
+  isStarred Boolean  @default(false)
+  isReadOnly Boolean @default(false)
+  tags      String?
+  folderId  String?
+  folderRef Folder?  @relation(fields: [folderId], references: [id])
+  project   Project? @relation(fields: [projectId], references: [id])
+  ycontent  Bytes?   // Y.js 문서 바이너리 데이터
+}
+
+model Folder {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  projectId   String?
+  documents   Document[]
+  project     Project?   @relation(fields: [projectId], references: [id])
+}

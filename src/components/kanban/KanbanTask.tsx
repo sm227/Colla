@@ -2,30 +2,89 @@
 
 import { Task } from "./KanbanBoard";
 import { useDrag } from "./useDragDrop";
-import { CalendarIcon, UserIcon } from "lucide-react";
-import { useState } from "react";
+import { CalendarIcon, UserIcon, Clock, CheckCircle2, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
 import { TaskDetailDialog } from "./TaskDetailDialog";
+import { useUsers } from "@/app/contexts/UserContext";
 
 interface KanbanTaskProps {
   task: Task;
   onUpdate: (task: Task) => void;
+  onDelete?: (taskId: string) => void;
 }
 
-export function KanbanTask({ task, onUpdate }: KanbanTaskProps) {
+// HTML 태그를 제거하는 함수
+const stripHtmlTags = (html: string): string => {
+  if (!html) return '';
+  
+  // HTML 파싱용 임시 요소 생성 (클라이언트 사이드)
+  if (typeof document !== 'undefined') {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    return tempDiv.textContent || tempDiv.innerText || '';
+  }
+  
+  // 서버 사이드 렌더링 시: 간단한 정규식으로 태그 제거
+  return html.replace(/<[^>]*>|&[^;]+;/g, '');
+};
+
+export function KanbanTask({ task, onUpdate, onDelete }: KanbanTaskProps) {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const { isDragging, setNodeRef } = useDrag({
     id: task.id,
   });
+  const { getUserName } = useUsers();
+  const [assigneeName, setAssigneeName] = useState<string>("");
 
-  // 우선순위에 따른 색상 설정
-  const priorityColors = {
-    low: "bg-green-100 text-green-800",
-    medium: "bg-yellow-100 text-yellow-800",
-    high: "bg-red-100 text-red-800",
+  // 담당자 이름 가져오기
+  useEffect(() => {
+    if (task.assignee) {
+      const fetchName = async () => {
+        const name = await getUserName(task.assignee as string);
+        setAssigneeName(name);
+      };
+      fetchName();
+    }
+  }, [task.assignee, getUserName]);
+
+  // 우선순위에 따른 색상 및 아이콘 설정
+  const priorityConfig = {
+    low: {
+      classes: "bg-green-50 text-green-700 border-green-200",
+      icon: <CheckCircle2 className="h-3 w-3 text-green-600 mr-1" />,
+      label: "낮은 우선순위"
+    },
+    medium: {
+      classes: "bg-yellow-50 text-yellow-700 border-yellow-200",
+      icon: <Clock className="h-3 w-3 text-yellow-600 mr-1" />,
+      label: "중간 우선순위"
+    },
+    high: {
+      classes: "bg-red-50 text-red-700 border-red-200",
+      icon: <AlertCircle className="h-3 w-3 text-red-600 mr-1" />,
+      label: "높은 우선순위"
+    }
   };
+
+  // 설명에서 HTML 태그 제거
+  const cleanDescription = task.description ? stripHtmlTags(task.description) : '';
+
+  // 해당 작업의 우선순위 설정 가져오기
+  const prioritySettings = priorityConfig[task.priority];
 
   const handleClick = () => {
     setIsDetailOpen(true);
+  };
+
+  const handleCloseDetail = () => {
+    setIsDetailOpen(false);
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    if (onDelete) {
+      onDelete(taskId);
+      handleCloseDetail();
+    }
   };
 
   return (
@@ -33,45 +92,53 @@ export function KanbanTask({ task, onUpdate }: KanbanTaskProps) {
       <div
         ref={setNodeRef}
         onClick={handleClick}
-        className={`bg-white p-3 rounded-md shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition-shadow ${
-          isDragging ? "opacity-50" : ""
-        }`}
+        className={`bg-white p-3 rounded-md border border-gray-200 cursor-pointer hover:shadow-md transition-all ${
+          isDragging ? "opacity-50 scale-95" : ""
+        } ${task.status === 'done' ? 'border-l-4 border-l-green-500' : ''}`}
       >
-        <div className="flex justify-between items-start mb-2">
-          <h4 className="font-medium text-gray-800">{task.title}</h4>
+        <div className="mb-2">
+          <h4 className="font-medium text-gray-800 mb-1">{task.title}</h4>
+          {task.description && (
+            <p className="text-xs text-gray-600 line-clamp-2 mb-2">{cleanDescription}</p>
+          )}
+        </div>
+        
+        <div className="flex items-center justify-between">
           <span
-            className={`text-xs px-2 py-1 rounded-full ${
-              priorityColors[task.priority]
+            className={`text-xs px-2 py-0.5 rounded-full border flex items-center ${
+              prioritySettings.classes
             }`}
           >
-            {task.priority}
+            {prioritySettings.icon}
+            {prioritySettings.label}
           </span>
-        </div>
-        
-        <p className="text-sm text-gray-600 mb-3">{task.description}</p>
-        
-        <div className="flex items-center justify-between text-xs text-gray-500">
-          {task.assignee && (
-            <div className="flex items-center gap-1">
-              <UserIcon className="h-3 w-3" />
-              <span>{task.assignee}</span>
-            </div>
-          )}
           
-          {task.dueDate && (
-            <div className="flex items-center gap-1">
-              <CalendarIcon className="h-3 w-3" />
-              <span>{new Date(task.dueDate).toLocaleDateString()}</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            {task.dueDate && (
+              <div className="flex items-center">
+                <CalendarIcon className="h-3 w-3 mr-1 text-gray-400" />
+                <span>{new Date(task.dueDate).toLocaleDateString()}</span>
+              </div>
+            )}
+          </div>
         </div>
+        
+        {task.assignee && (
+          <div className="mt-2 pt-2 border-t border-gray-100 flex items-center gap-1 text-xs text-gray-500">
+            <div className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-[10px]">
+              {assigneeName ? assigneeName.charAt(0).toUpperCase() : "?"}
+            </div>
+            <span>{assigneeName || task.assignee}</span>
+          </div>
+        )}
       </div>
 
       <TaskDetailDialog
         task={task}
         isOpen={isDetailOpen}
-        onClose={() => setIsDetailOpen(false)}
+        onClose={handleCloseDetail}
         onUpdate={onUpdate}
+        onDelete={handleDeleteTask}
       />
     </>
   );
