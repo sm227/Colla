@@ -374,7 +374,7 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
   const summarizeMessages = async (messages: Message[]) => {
     try {
       const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
-      const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
       const messageText = messages.map(msg => 
         `${msg.userId === myPeerIdRef.current ? '나' : '참가자 ' + msg.userId.slice(0, 4)}: ${msg.content}`
