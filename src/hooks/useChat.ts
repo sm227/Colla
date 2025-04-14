@@ -21,6 +21,20 @@ export const useChat = () => {
     error: null,
   });
 
+  // 사용자 메시지만 추가하는 함수 (API 호출 없음)
+  const addUserMessage = useCallback((content: string) => {
+    if (!content.trim()) return;
+    
+    const userMessage: Message = { role: 'user', content, hidden: false };
+    
+    setState((prev) => ({
+      ...prev,
+      messages: [...prev.messages, userMessage],
+    }));
+    
+    return userMessage;
+  }, []);
+
   const sendMessage = useCallback(async (content: string, hidden: boolean = false) => {
     if (!content.trim()) return;
 
@@ -97,6 +111,22 @@ export const useChat = () => {
     }
   }, [state.messages]);
 
+  // 어시스턴트 메시지를 직접 추가하는 함수
+  const addAssistantMessage = useCallback((content: string) => {
+    const assistantMessage: Message = {
+      role: 'assistant',
+      content,
+      hidden: false
+    };
+
+    setState((prev) => ({
+      ...prev,
+      messages: [...prev.messages, assistantMessage],
+    }));
+
+    return assistantMessage;
+  }, []);
+
   const clearChat = useCallback(() => {
     setState({
       messages: [],
@@ -110,6 +140,8 @@ export const useChat = () => {
     isLoading: state.isLoading,
     error: state.error,
     sendMessage,
+    addAssistantMessage,
+    addUserMessage,
     clearChat,
   };
 }; 
