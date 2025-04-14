@@ -19,7 +19,11 @@ import {
   AlignLeft,
   HomeIcon,
   ChevronDown,
-  CheckIcon
+  CheckIcon,
+  SparklesIcon,
+  // 추가 아이콘
+  FileTextIcon,
+  ChevronRightIcon
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -58,6 +62,61 @@ interface Document {
   tags: string[];
   content: string;
   projectId?: string;
+}
+
+// 요약 모달 인터페이스
+interface SummaryModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  summary: string;
+  isLoading: boolean;
+}
+
+// 요약 모달 컴포넌트
+function SummaryModal({ isOpen, onClose, summary, isLoading }: SummaryModalProps) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+        <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+          <h3 className="text-lg font-medium">AI 문서 요약</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="p-4 max-h-[400px] overflow-auto">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center p-8">
+              <svg className="animate-spin h-8 w-8 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span className="text-gray-700">요약 생성 중...</span>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {summary.split('\n').map((line, index) => (
+                <p key={index} className="text-gray-700">
+                  {line || <span className="text-gray-400 italic">내용 없음</span>}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="p-4 border-t border-gray-100 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg text-white bg-blue-600 hover:bg-blue-700"
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // 커스텀 협업 커서 확장 생성
@@ -112,6 +171,82 @@ const CustomCollaborationCursor = CollaborationCursor.extend({
   }
 });
 
+// 템플릿 모달 컴포넌트
+function TemplateModal({ isOpen, onClose, templates, onSelect, isLoading, selectedTemplate }: {
+  isOpen: boolean;
+  onClose: () => void;
+  templates: { id: string; name: string; description: string }[];
+  onSelect: (templateId: string) => void;
+  isLoading: boolean;
+  selectedTemplate: string | null;
+}) {
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+        <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+          <h3 className="text-lg font-medium">문서 템플릿 선택</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="p-4 max-h-[400px] overflow-auto">
+          <p className="text-sm text-gray-500 mb-4">
+            템플릿을 선택하면 AI가 자동으로 문서 구조를 생성합니다
+          </p>
+          <div className="space-y-2">
+            {templates.map((template) => (
+              <button
+                key={template.id}
+                onClick={() => onSelect(template.id)}
+                disabled={isLoading}
+                className={`w-full text-left p-3 rounded-lg border ${
+                  selectedTemplate === template.id 
+                    ? 'border-blue-500 bg-blue-50' 
+                    : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
+                } transition-colors`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{template.name}</span>
+                  {selectedTemplate === template.id && isLoading && (
+                    <svg className="animate-spin h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                </div>
+                <p className="text-sm text-gray-500 mt-1">{template.description}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="p-4 border-t border-gray-100 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 mr-2 hover:bg-gray-50"
+          >
+            취소
+          </button>
+          <button
+            onClick={() => selectedTemplate && onSelect(selectedTemplate)}
+            disabled={!selectedTemplate || isLoading}
+            className={`px-4 py-2 rounded-lg text-white ${
+              !selectedTemplate || isLoading
+                ? 'bg-blue-400 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+          >
+            {isLoading ? '생성 중...' : '템플릿 생성'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DocumentPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { user } = useAuth(); // AuthContext에서 사용자 정보 가져오기
@@ -159,6 +294,28 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
   // 슬래시 커맨드 관련 상태
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashMenuPosition, setSlashMenuPosition] = useState({ x: 0, y: 0 });
+  
+  // 요약 모달 관련 상태 추가
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [documentSummary, setDocumentSummary] = useState('');
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  
+  // 템플릿 관련 상태
+  const [showTemplateMenu, setShowTemplateMenu] = useState(false);
+  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
+  const [templateContent, setTemplateContent] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  
+  // 템플릿 타입
+  const templates = [
+    { id: 'meeting', name: '회의록', description: '회의 내용과 결정사항을 기록하는 템플릿' },
+    { id: 'weekly', name: '주간 보고서', description: '주간 업무 성과와 계획을 정리하는 템플릿' },
+    { id: 'project', name: '프로젝트 계획서', description: '프로젝트 목표와 일정을 정리하는 템플릿' },
+    { id: 'research', name: '연구 문서', description: '연구 내용과 결과를 정리하는 템플릿' }
+  ];
+  
+  // 템플릿 모달 ref
+  const templateMenuRef = useRef<HTMLDivElement | null>(null);
   
   const menuRef = useRef<HTMLDivElement | null>(null);
   const slashMenuRef = useRef<HTMLDivElement | null>(null);
@@ -650,9 +807,116 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
           editor.chain().focus().setImage({ src: url }).run();
         }
         break;
+      case 'ai':
+        summarizeDocument();
+        break;
+      case 'template':
+        showTemplates();
+        break;
     }
     
     setShowSlashMenu(false);
+  };
+  
+  // 문서 요약 함수
+  const summarizeDocument = async () => {
+    if (!editor) return;
+    
+    try {
+      setIsSummarizing(true);
+      setShowSummaryModal(true);
+      
+      // 에디터 내용 가져오기
+      const content = editor.getHTML();
+      
+      // AI 요약 API 호출
+      const response = await fetch('/api/ai/summarize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('문서 요약 중 오류가 발생했습니다.');
+      }
+      
+      const data = await response.json();
+      setDocumentSummary(data.summary);
+    } catch (error) {
+      console.error('문서 요약 중 오류:', error);
+      setDocumentSummary('문서 요약 중 오류가 발생했습니다.');
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+  
+  // 템플릿 생성 함수
+  const createDocumentTemplate = async (templateType: string) => {
+    if (!editor) return;
+    
+    try {
+      setIsCreatingTemplate(true);
+      setSelectedTemplate(templateType);
+      
+      // 회의록 템플릿일 경우 접속 중인 사용자 정보 추가
+      let participants = '';
+      if (templateType === 'meeting' && connectedUsers.length > 0) {
+        participants = connectedUsers
+          .map(user => user.name || '익명 사용자')
+          .join(', ');
+      }
+      
+      // AI 템플릿 생성 API 호출
+      const response = await fetch('/api/ai/template', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          templateType,
+          participants: participants // 참석자 정보 전달
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('템플릿 생성 중 오류가 발생했습니다.');
+      }
+      
+      const data = await response.json();
+      
+      // 에디터에 템플릿 내용 삽입 (기존 내용 대체)
+      editor.commands.setContent(data.content);
+      
+      // 문서 제목 설정 (템플릿에 맞게)
+      const templateInfo = templates.find(t => t.id === templateType);
+      if (templateInfo) {
+        // 문서 제목 업데이트
+        const titleInput = document.querySelector('input[placeholder="제목 없음"]') as HTMLInputElement;
+        if (titleInput) {
+          titleInput.value = templateInfo.name;
+          // 강제로 change 이벤트 발생시키기
+          const event = new Event('input', { bubbles: true });
+          titleInput.dispatchEvent(event);
+          
+          // title 상태 업데이트 (React 상태 동기화)
+          setTitle(templateInfo.name);
+        }
+      }
+      
+    } catch (error) {
+      console.error('템플릿 생성 중 오류:', error);
+    } finally {
+      setIsCreatingTemplate(false);
+      setShowTemplateMenu(false);
+      setSelectedTemplate(null);
+    }
+  };
+  
+  // 슬래시 메뉴에서 템플릿 보기
+  const showTemplates = () => {
+    setShowTemplateMenu(true);
   };
   
   // 단축키 핸들러 추가
@@ -1693,6 +1957,18 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
     }
   };
 
+  const [documentData, setDocumentData] = useState<Document>({
+    id: params.id,
+    title: '',
+    emoji: '📄',
+    isStarred: false,
+    folder: 'Root',
+    folderId: null,
+    tags: [],
+    content: '',
+    projectId: '',
+  });
+
   return (
     <div className="bg-gray-50 min-h-screen">
       {/* 상단 네비게이션 바 */}
@@ -2293,166 +2569,148 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
           {showSlashMenu && (
             <div
               ref={slashMenuRef}
-              className="fixed bg-white shadow-xl rounded-lg border border-gray-200 z-50 w-72"
-              style={{ left: `${slashMenuPosition.x}px`, top: `${slashMenuPosition.y}px` }}
+              className="absolute bg-white dark:bg-white shadow-xl rounded-xl p-1 z-50 border-none max-h-[420px] overflow-auto w-[280px] transition-all duration-200 ease-in-out scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-200"
+              style={{
+                top: slashMenuPosition.y,
+                left: slashMenuPosition.x
+              }}
             >
-              <div className="overflow-hidden max-h-80 overflow-y-auto">
-                <button 
-                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+              <div className="text-sm font-medium text-slate-800 dark:text-slate-800 p-3 border-b border-slate-100 dark:border-slate-200 sticky top-0 bg-white dark:bg-white backdrop-blur-sm">
+                <span className="flex items-center gap-1.5">
+                  <span className="bg-blue-100 text-blue-600 rounded-md p-0.5">
+                    <span className="text-xs">/</span>
+                  </span>
+                  블록 선택
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-0.5 p-1">
+                <button
+                  onClick={() => applyBlockType('ai')}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
+                >
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-purple-100 text-purple-600 group-hover:bg-purple-200 transition-colors">
+                    <SparklesIcon className="w-4 h-4" />
+                  </span>
+                  <div className="flex flex-col">
+                    <span className="font-medium">문서 요약</span>
+                    <span className="text-xs text-slate-500">AI로 문서를 요약합니다</span>
+                  </div>
+                </button>
+                <button
                   onClick={() => applyBlockType('paragraph')}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
                 >
-                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-600 group-hover:bg-gray-200 transition-colors">
                     <AlignLeft className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium">텍스트</div>
-                    <div className="text-xs text-gray-500">일반 텍스트를 입력합니다</div>
-                  </div>
-                  <div className="text-xs text-gray-400 ml-2">Ctrl+0</div>
+                  </span>
+                  <span className="font-medium">본문</span>
                 </button>
-                
-                <button 
-                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                <button
                   onClick={() => applyBlockType('heading1')}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
                 >
-                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
-                    <span className="font-bold">H1</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium">제목 1</div>
-                    <div className="text-xs text-gray-500">큰 제목</div>
-                  </div>
-                  <div className="text-xs text-gray-400 ml-2">Ctrl+1</div>
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 text-blue-600 group-hover:bg-blue-200 transition-colors">
+                    <TypeIcon className="w-4 h-4" />
+                  </span>
+                  <span className="font-medium">제목 1</span>
                 </button>
-                
-                <button 
-                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                <button
                   onClick={() => applyBlockType('heading2')}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
                 >
-                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
-                    <span className="font-bold">H2</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium">제목 2</div>
-                    <div className="text-xs text-gray-500">중간 제목</div>
-                  </div>
-                  <div className="text-xs text-gray-400 ml-2">Ctrl+2</div>
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 text-blue-600 group-hover:bg-blue-200 transition-colors">
+                    <TypeIcon className="w-4 h-4" />
+                  </span>
+                  <span className="font-medium">제목 2</span>
                 </button>
-                
-                <button 
-                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                <button
                   onClick={() => applyBlockType('heading3')}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
                 >
-                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
-                    <span className="font-bold">H3</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium">제목 3</div>
-                    <div className="text-xs text-gray-500">작은 제목</div>
-                  </div>
-                  <div className="text-xs text-gray-400 ml-2">Ctrl+3</div>
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 text-blue-600 group-hover:bg-blue-200 transition-colors">
+                    <TypeIcon className="w-4 h-4" />
+                  </span>
+                  <span className="font-medium">제목 3</span>
                 </button>
-                
-                <button 
-                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                <button
                   onClick={() => applyBlockType('bulletList')}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
                 >
-                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 text-green-600 group-hover:bg-green-200 transition-colors">
                     <ListIcon className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium">글머리 기호</div>
-                    <div className="text-xs text-gray-500">글머리 기호가 있는 목록</div>
-                  </div>
-                  <div className="text-xs text-gray-400 ml-2">Ctrl+Shift+8</div>
+                  </span>
+                  <span className="font-medium">글머리 기호</span>
                 </button>
-                
-                <button 
-                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                <button
                   onClick={() => applyBlockType('orderedList')}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
                 >
-                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
-                    <span className="font-mono">1.</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium">번호 매기기</div>
-                    <div className="text-xs text-gray-500">번호가 매겨진 목록</div>
-                  </div>
-                  <div className="text-xs text-gray-400 ml-2">Ctrl+Shift+7</div>
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 text-green-600 group-hover:bg-green-200 transition-colors">
+                    <ListIcon className="w-4 h-4" />
+                  </span>
+                  <span className="font-medium">번호 매기기</span>
                 </button>
-                
-                <button 
-                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                <button
                   onClick={() => applyBlockType('taskList')}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
                 >
-                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-100 text-amber-600 group-hover:bg-amber-200 transition-colors">
                     <CheckSquareIcon className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium">할 일 목록</div>
-                    <div className="text-xs text-gray-500">체크박스가 있는 목록</div>
-                  </div>
-                  <div className="text-xs text-gray-400 ml-2">Ctrl+Shift+9</div>
+                  </span>
+                  <span className="font-medium">할 일 목록</span>
                 </button>
-                
-                <button 
-                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                <button
                   onClick={() => applyBlockType('blockquote')}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
                 >
-                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-orange-100 text-orange-600 group-hover:bg-orange-200 transition-colors">
                     <QuoteIcon className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium">인용구</div>
-                    <div className="text-xs text-gray-500">인용문을 추가합니다</div>
-                  </div>
-                  <div className="text-xs text-gray-400 ml-2">Ctrl+B</div>
+                  </span>
+                  <span className="font-medium">인용</span>
                 </button>
-                
-                <button 
-                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                <button
                   onClick={() => applyBlockType('codeBlock')}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
                 >
-                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 group-hover:bg-indigo-200 transition-colors">
                     <CodeIcon className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium">코드 블록</div>
-                    <div className="text-xs text-gray-500">코드 블록을 추가합니다</div>
-                  </div>
-                  <div className="text-xs text-gray-400 ml-2">Ctrl+Alt+C</div>
+                  </span>
+                  <span className="font-medium">코드</span>
                 </button>
-                
-                <button 
-                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
-                  onClick={() => applyBlockType('horizontalRule')}
-                >
-                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
-                    <span>—</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium">구분선</div>
-                    <div className="text-xs text-gray-500">수평선을 추가합니다</div>
-                  </div>
-                  <div className="text-xs text-gray-400 ml-2">Ctrl+L</div>
-                </button>
-                
-                <button 
-                  className="w-full px-3 py-2 flex items-center text-left hover:bg-gray-100"
+                <button
                   onClick={() => applyBlockType('image')}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
                 >
-                  <div className="mr-2 w-6 h-6 flex items-center justify-center text-gray-500">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-rose-100 text-rose-600 group-hover:bg-rose-200 transition-colors">
                     <ImageIcon className="w-4 h-4" />
+                  </span>
+                  <span className="font-medium">이미지</span>
+                </button>
+                <button
+                  onClick={() => applyBlockType('template')}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
+                >
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-teal-100 text-teal-600 group-hover:bg-teal-200 transition-colors">
+                    <FileTextIcon className="w-4 h-4" />
+                  </span>
+                  <div className="flex flex-col">
+                    <span className="font-medium">문서 템플릿</span>
+                    <span className="text-xs text-slate-500">템플릿으로 문서 생성</span>
                   </div>
-                  <div className="flex-1">
-                    <div className="font-medium">이미지</div>
-                    <div className="text-xs text-gray-500">이미지를 추가합니다</div>
-                  </div>
-                  <div className="text-xs text-gray-400 ml-2">Ctrl+Alt+I</div>
                 </button>
               </div>
             </div>
           )}
+          
+          {/* 템플릿 모달 */}
+          <TemplateModal 
+            isOpen={showTemplateMenu} 
+            onClose={() => setShowTemplateMenu(false)} 
+            templates={templates}
+            onSelect={createDocumentTemplate}
+            isLoading={isCreatingTemplate}
+            selectedTemplate={selectedTemplate}
+          />
           
           {/* Tiptap 에디터 */}
           <div className="prose max-w-none bg-white rounded-lg">
@@ -2462,6 +2720,14 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               placeholder="여기에 내용을 입력하세요..."
             />
           </div>
+          
+          {/* 요약 모달 */}
+          <SummaryModal 
+            isOpen={showSummaryModal} 
+            onClose={() => setShowSummaryModal(false)} 
+            summary={documentSummary}
+            isLoading={isSummarizing}
+          />
         </div>
       </div>
     </div>
