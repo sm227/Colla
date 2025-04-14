@@ -28,8 +28,15 @@ import { useAuth } from "@/app/contexts/AuthContext";
 interface Comment {
   id: string;
   content: string;
-  author: string;
+  userId: string;
+  taskId: string;
   createdAt: Date;
+  updatedAt: Date;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+  };
 }
 
 interface TaskDetailDialogProps {
@@ -253,6 +260,13 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
   const [showActivity, setShowActivity] = useState(false);
   const [showMembersList, setShowMembersList] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const [isLoadingComments, setIsLoadingComments] = useState<boolean>(false);
+  const [isAddingComment, setIsAddingComment] = useState<boolean>(false);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editedCommentContent, setEditedCommentContent] = useState<string>("");
+  const [isEditingComment, setIsEditingComment] = useState<boolean>(false);
+  const [isDeletingComment, setIsDeletingComment] = useState<boolean>(false);
+  const [showCommentMenu, setShowCommentMenu] = useState<string | null>(null);
   
   // Get project members from context
   const { projects, currentProject } = useProject();
@@ -343,18 +357,63 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
     onClose();
   }, [hasChanges, editedTask, onUpdate, onClose]);
 
-  const handleAddComment = () => {
-    if (!newComment.trim()) return;
+  // 댓글 불러오기
+  const fetchComments = useCallback(async () => {
+    if (!task.id) return;
     
-    const comment: Comment = {
-      id: Date.now().toString(),
-      content: newComment,
-      author: "현재 사용자", // 실제 구현시 로그인된 사용자 정보 사용
-      createdAt: new Date()
-    };
+    setIsLoadingComments(true);
+    try {
+      const response = await fetch(`/api/comments?taskId=${task.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setComments(data);
+      } else {
+        console.error('댓글 로딩 실패:', await response.text());
+      }
+    } catch (error) {
+      console.error('댓글 로딩 중 오류 발생:', error);
+    } finally {
+      setIsLoadingComments(false);
+    }
+  }, [task.id]);
+  
+  // 컴포넌트 마운트 시 댓글 로드
+  useEffect(() => {
+    if (isOpen && task.id) {
+      fetchComments();
+    }
+  }, [isOpen, task.id, fetchComments]);
+
+  const handleAddComment = async () => {
+    if (!newComment.trim() || isAddingComment) return;
     
-    setComments([...comments, comment]);
-    setNewComment("");
+    setIsAddingComment(true);
+    try {
+      const response = await fetch('/api/comments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: newComment,
+          taskId: task.id,
+        }),
+      });
+      
+      if (response.ok) {
+        const savedComment = await response.json();
+        setComments(prev => [...prev, savedComment]);
+        setNewComment("");
+      } else {
+        console.error('댓글 저장 실패:', await response.text());
+        alert('댓글을 저장하는 중 오류가 발생했습니다.');
+      }
+    } catch (error) {
+      console.error('댓글 저장 중 오류 발생:', error);
+      alert('댓글을 저장하는 중 오류가 발생했습니다.');
+    } finally {
+      setIsAddingComment(false);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -486,6 +545,87 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
     };
   }, [handleCloseAndSave]);
 
+  // 댓글 수정 시작 함수
+  const handleEditComment = (comment: Comment) => {
+    setEditingCommentId(comment.id);
+    setEditedCommentContent(comment.content);
+    setShowCommentMenu(null);
+  };
+
+  // 댓글 수정 취소 함수
+  const handleCancelEdit = () => {
+    setEditingCommentId(null);
+    setEditedCommentContent("");
+  };
+
+  // 댓글 수정 저장 함수
+  const handleSaveCommentEdit = async (commentId: string) => {
+    if (!editedCommentContent.trim() || isEditingComment) return;
+    
+    setIsEditingComment(true);
+    try {
+      const response = await fetch(`/api/comments/${commentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: editedCommentContent,
+        }),
+      });
+      
+      if (response.ok) {
+        const updatedComment = await response.json();
+        // 댓글 목록 업데이트
+        setComments(prev => 
+          prev.map(comment => comment.id === commentId ? updatedComment : comment)
+        );
+        // 수정 모드 종료
+        setEditingCommentId(null);
+        setEditedCommentContent("");
+      } else {
+        console.error('댓글 수정 실패:', await response.text());
+        alert('댓글을 수정하는 중 오류가 발생했습니다.');
+      }
+    } catch (error) {
+      console.error('댓글 수정 중 오류 발생:', error);
+      alert('댓글을 수정하는 중 오류가 발생했습니다.');
+    } finally {
+      setIsEditingComment(false);
+    }
+  };
+
+  // 댓글 삭제 함수
+  const handleDeleteComment = async (commentId: string) => {
+    if (!window.confirm('정말로 이 댓글을 삭제하시겠습니까?') || isDeletingComment) return;
+    
+    setIsDeletingComment(true);
+    try {
+      const response = await fetch(`/api/comments/${commentId}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        // 댓글 목록에서 삭제
+        setComments(prev => prev.filter(comment => comment.id !== commentId));
+        setShowCommentMenu(null);
+      } else {
+        console.error('댓글 삭제 실패:', await response.text());
+        alert('댓글을 삭제하는 중 오류가 발생했습니다.');
+      }
+    } catch (error) {
+      console.error('댓글 삭제 중 오류 발생:', error);
+      alert('댓글을 삭제하는 중 오류가 발생했습니다.');
+    } finally {
+      setIsDeletingComment(false);
+    }
+  };
+
+  // 현재 사용자가 댓글 작성자인지 확인하는 함수
+  const isCommentOwner = (comment: Comment) => {
+    return currentUser && comment.userId === currentUser.id;
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -585,22 +725,89 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
                 {!showActivity ? (
                   <>
                     <div className="space-y-4 mb-4">
-                      {comments.length > 0 ? (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <MessageSquare className="h-4 w-4 text-gray-500" />
+                          <span className="text-sm font-medium">댓글</span>
+                          <span className="text-xs bg-gray-200 text-gray-700 rounded-full px-2">{comments.length}</span>
+                        </div>
+                      </div>
+                      
+                      {isLoadingComments ? (
+                        <div className="flex justify-center py-4">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                        </div>
+                      ) : comments.length > 0 ? (
                         comments.map((comment) => (
                           <div key={comment.id} className="bg-gray-50 p-3 rounded-md border">
                             <div className="flex justify-between text-sm mb-1">
                               <div className="flex items-center gap-2">
                                 <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium">
-                                  {comment.author.charAt(0)}
+                                  {comment.user?.name?.charAt(0) || 'U'}
                                 </div>
-                                <span className="font-medium">{comment.author}</span>
+                                <span className="font-medium">{comment.user?.name || '사용자'}</span>
                                 <span className="text-gray-500 text-xs">{format(comment.createdAt, 'PPP p', { locale: ko })}</span>
                               </div>
-                              <button className="text-gray-400 hover:text-gray-600">
-                                <MoreHorizontal size={16} />
-                              </button>
+                              {isCommentOwner(comment) && (
+                                <div className="relative">
+                                  <button 
+                                    className="text-gray-400 hover:text-gray-600 p-1"
+                                    onClick={() => setShowCommentMenu(showCommentMenu === comment.id ? null : comment.id)}
+                                  >
+                                    <MoreHorizontal size={16} />
+                                  </button>
+                                  {showCommentMenu === comment.id && (
+                                    <div className="absolute right-0 mt-1 bg-white border rounded-md shadow-lg z-10 w-32">
+                                      <button 
+                                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                                        onClick={() => handleEditComment(comment)}
+                                      >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        수정
+                                      </button>
+                                      <button 
+                                        className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center"
+                                        onClick={() => handleDeleteComment(comment.id)}
+                                      >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        삭제
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                            <p className="text-gray-800 ml-10">{comment.content}</p>
+                            {editingCommentId === comment.id ? (
+                              <div className="ml-10">
+                                <Textarea
+                                  value={editedCommentContent}
+                                  onChange={(e) => setEditedCommentContent(e.target.value)}
+                                  className="w-full border bg-white focus-visible:ring-1 focus-visible:ring-blue-500 resize-none min-h-[80px] p-2 rounded-md mb-2"
+                                />
+                                <div className="flex justify-end gap-2">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={handleCancelEdit}
+                                  >
+                                    취소
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    onClick={() => handleSaveCommentEdit(comment.id)}
+                                    disabled={isEditingComment}
+                                  >
+                                    {isEditingComment ? '저장 중...' : '저장'}
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-gray-800 ml-10">{comment.content}</p>
+                            )}
                           </div>
                         ))
                       ) : (
@@ -643,8 +850,9 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: 
                               onClick={handleAddComment} 
                               size="sm"
                               className="bg-blue-600 hover:bg-blue-700"
+                              disabled={isAddingComment}
                             >
-                              댓글 작성
+                              {isAddingComment ? '저장 중...' : '댓글 작성'}
                             </Button>
                           </div>
                           

@@ -16,6 +16,7 @@ model User {
   updatedAt   DateTime        @updatedAt
   projects    Project[]
   memberships ProjectMember[]
+  comments    Comment[]
 }
 
 model Task {
@@ -33,6 +34,18 @@ model Task {
   isAllDay    Boolean   @default(false)
   startDate   DateTime?
   project     Project?  @relation(fields: [projectId], references: [id])
+  comments    Comment[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  taskId    String
+  userId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Project {
