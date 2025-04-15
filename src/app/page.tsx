@@ -543,7 +543,7 @@ export default function Home() {
                   캘린더
                 </Link>
               </div>
-              <div className="space-y-3">
+              {/* <div className="space-y-3">
                 <ScheduleItem
                   title="디자인 팀 회의"
                   time="오늘, 14:00"
@@ -571,7 +571,7 @@ export default function Home() {
                   type="회의"
                   icon={<VideoIcon className="w-4 h-4 text-blue-600" />}
                 />
-              </div>
+              </div> */}
             </div>
 
             {/* 최근 문서 */}
