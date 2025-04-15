@@ -95,6 +95,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
   const [tempResponse, setTempResponse] = useState<string>("");
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lastCreatedTask, setLastCreatedTask] = useState<any>(null);
   
   // 현재 진행 중인 API 요청을 취소하기 위한 AbortController
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -102,136 +103,21 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
   // useChat의 내부 상태에 접근하기 위한 변수 추가
   const chatStateRef = useRef<any>(null);
 
-  // 일정 상태별 응답 템플릿
+  // 일정 상태별 응답 템플릿 - 기본 "일정 없음" 메시지만 남김
   const taskStatusResponses = {
-    todo: [
-      "## 📋 아직 시작되지 않은 할 일 목록\n\n{taskDetails}",
-      "## 🔜 예정된 작업 목록\n\n{taskDetails}",
-      "## 🗒️ 할 일로 등록된 작업\n\n{taskDetails}",
-      "## 🚩 대기 중인 일정들이에요\n\n{taskDetails}",
-      "## 📌 아직 시작하지 않은 작업들\n\n{taskDetails}"
-    ],
-    in_progress: [
-      "## 🚧 현재 진행 중인 일정\n\n{taskDetails}",
-      "## ⚙️ 작업 중인 태스크 목록\n\n{taskDetails}",
-      "## 🔄 진행 상태의 일정들\n\n{taskDetails}",
-      "## 📊 현재 작업 중인 태스크\n\n{taskDetails}",
-      "## 🏗️ 진행 중인 프로젝트 작업\n\n{taskDetails}"
-    ],
-    review: [
-      "## 🔍 검토 중인 일정 목록\n\n{taskDetails}",
-      "## 👀 리뷰가 필요한 작업들\n\n{taskDetails}",
-      "## 📝 검토 단계의 태스크\n\n{taskDetails}",
-      "## 📑 검토 진행 중인 태스크\n\n{taskDetails}",
-      "## 🧐 현재 검토 상태인 일정\n\n{taskDetails}"
-    ],
-    done: [
-      "## ✅ 완료된 일정 목록\n\n{taskDetails}",
-      "## 🏆 성공적으로 마무리된 작업\n\n{taskDetails}",
-      "## 🎯 목표 달성한 태스크들\n\n{taskDetails}",
-      "## 📦 완료 처리된 작업 목록\n\n{taskDetails}",
-      "## 🎊 마무리된 프로젝트 작업\n\n{taskDetails}"
-    ],
-    general: [
-      "## 📅 일정 정보\n\n{taskDetails}",
-      "## 🗓️ 작업 일정 목록\n\n{taskDetails}",
-      "## 📋 태스크 정보\n\n{taskDetails}",
-      "## 📊 프로젝트 작업 현황\n\n{taskDetails}",
-      "## 📌 일정 목록이에요\n\n{taskDetails}"
-    ],
     noTasks: [
       "현재 등록된 일정이 없습니다. 새로운 일정을 추가해보세요!",
       "아직 일정이 없네요. 새 일정을 만들어볼까요?",
       "표시할 일정이 없습니다. 칸반보드에서 새 태스크를 추가해 보세요.",
       "일정 목록이 비어 있습니다. 새 작업을 시작해 보세요!",
       "등록된 일정을 찾을 수 없네요. 작업을 추가하시겠어요?"
-    ],
-    noMatchingTasks: [
-      "\"{searchTerm}\" 일정이 존재하지 않습니다. 다른 일정명으로 다시 시도해 주세요.",
-      "\"{searchTerm}\" 관련 일정을 찾을 수 없습니다. 다른 키워드로 검색해보세요.",
-      "\"{searchTerm}\"에 해당하는 일정이 없네요. 정확한 일정명을 입력해 주세요.",
-      "죄송해요, \"{searchTerm}\" 일정을 찾지 못했어요. 다른 이름으로 찾아볼까요?",
-      "\"{searchTerm}\" 일정은 현재 없는 것 같아요. 다른 키워드로 시도해 보세요."
-    ]
-  };
-  
-  // 담당자 관련 응답 템플릿
-  const assigneeResponses = {
-    singleTask: [
-      "**{taskTitle}** 일정의 담당자는 **{assigneeName}**입니다.",
-      "**{assigneeName}**님이 **{taskTitle}** 일정을 담당하고 있습니다.",
-      "**{taskTitle}** 작업은 **{assigneeName}**님이 맡고 계십니다.",
-      "**{assigneeName}**님께서 **{taskTitle}** 일정을 진행 중입니다.",
-      "**{taskTitle}** 태스크의 담당자는 **{assigneeName}**님이에요."
-    ],
-    noAssignee: [
-      "**{taskTitle}** 일정에는 지정된 담당자가 없습니다.",
-      "**{taskTitle}** 작업은 현재 담당자가 배정되지 않았습니다.",
-      "**{taskTitle}** 태스크에는 아직, 담당자가 지정되지 않았네요.",
-      "**{taskTitle}** 일정의 담당자가 설정되어 있지 않습니다.",
-      "**{taskTitle}** 작업에 담당자 정보가 없습니다. 담당자를 지정해보세요."
-    ],
-    multipleAssignees: [
-      "## 👥 담당자 정보\n\n{assigneeList}",
-      "## 👤 일정별 담당자 목록\n\n{assigneeList}",
-      "## 📋 태스크 담당자 정보\n\n{assigneeList}",
-      "## 🧑‍💼 작업별 담당자 현황\n\n{assigneeList}",
-      "## 👨‍💻 담당자 배정 현황\n\n{assigneeList}"
-    ],
-    noTasks: [
-      "조회할 수 있는 일정이 없어 담당자 정보를 확인할 수 없습니다.",
-      "담당자 정보를 조회할 일정이 존재하지 않습니다.",
-      "등록된 일정이 없어 담당자 정보를 볼 수 없습니다.",
-      "담당자를 확인할 일정이 아직 없네요. 일정을 먼저 추가해보세요.",
-      "담당자 정보를 표시할 일정이 없습니다. 새 일정을 만들어보세요."
-    ]
-  };
-  
-  // 마감일 관련 응답 템플릿
-  const dueDateResponses = {
-    singleTask: [
-      "**{taskTitle}** 일정의 마감일은 **{dueDate}**입니다.",
-      "**{taskTitle}** 작업은 **{dueDate}**까지 완료해야 합니다.",
-      "**{taskTitle}** 일정의 기한은 **{dueDate}**입니다.",
-      "**{taskTitle}** 태스크는 **{dueDate}**이 마감일이에요.",
-      "**{taskTitle}** 작업의 데드라인은 **{dueDate}**까지입니다."
-    ],
-    noDueDate: [
-      "**{taskTitle}** 일정에는 설정된 마감일이 없습니다.",
-      "**{taskTitle}** 작업은 마감일이 지정되어 있지 않습니다.",
-      "**{taskTitle}** 태스크에 마감일이 설정되지 않았네요.",
-      "**{taskTitle}** 일정의 마감일이 없습니다. 마감일을 추가해보세요.",
-      "**{taskTitle}** 작업은 현재 마감일 없이 진행 중입니다."
-    ],
-    multipleDueDates: [
-      "## 📅 일정 마감일 정보\n\n{dueDateList}",
-      "## ⏱️ 작업별 마감일 목록\n\n{dueDateList}",
-      "## 🗓️ 태스크 기한 정보\n\n{dueDateList}",
-      "## 📆 일정 데드라인 목록\n\n{dueDateList}",
-      "## ⏰ 마감 예정 일정들\n\n{dueDateList}"
-    ],
-    noTasks: [
-      "마감일을 확인할 일정이 없습니다.",
-      "마감일 정보를 조회할 일정이 존재하지 않네요.",
-      "등록된 일정이 없어 마감일을 볼 수 없습니다.",
-      "마감일을 표시할 일정이 아직 없습니다. 일정을 먼저 추가해보세요.",
-      "마감일 정보를 확인할 일정이 없습니다. 새 일정을 만들어보세요."
     ]
   };
   
   // 랜덤 응답 생성 함수
-  const getRandomResponse = (responses: string[], context?: Record<string, any>) => {
+  const getRandomResponse = (responses: string[]) => {
     const randomIndex = Math.floor(Math.random() * responses.length);
-    let response = responses[randomIndex];
-    
-    // 컨텍스트가 있으면 응답에 대체
-    if (context) {
-      Object.entries(context).forEach(([key, value]) => {
-        response = response.replace(new RegExp(`\\{${key}\\}`, 'g'), String(value));
-      });
-    }
-    
-    return response;
+    return responses[randomIndex];
   };
 
   // Utility function to scroll to bottom
@@ -300,49 +186,6 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
     return null;
   };
 
-  // 자연어 질문에서 프로젝트 관련 의도 감지 함수
-  const detectProjectIntent = useCallback((message: string) => {
-    // 칸반보드 관련 키워드가 포함된 경우 일정 관련 질문으로 인식하지 않도록 합니다.
-    if (message.includes('칸반') || 
-        message.includes('칸반보드') || 
-        message.includes('kanban') ||
-        message.includes('할 일') ||
-        message.includes('투두')) {
-      return false;
-    }
-    
-    // 명시적인 프로젝트 정보 요청 키워드
-    const directProjectKeywords = [
-      '프로젝트 정보', '내 프로젝트 보여줘', '내 프로젝트', '프로젝트 목록', 
-      '프로젝트 상태', '프로젝트 현황', '진행중인 프로젝트'
-    ];
-    
-    // 특정 프로젝트 정보 질문 패턴
-    const projectQuestionPatterns = [
-      /프로젝트.*태스크/i, /태스크.*몇/i, /몇.*태스크/i,
-      /프로젝트.*정보/i, /프로젝트.*상태/i, /프로젝트.*진행/i,
-      /작업.*현황/i, /할일.*목록/i, /태스크.*목록/i,
-      /프로젝트.*멤버/i, /누가.*참여/i, /참여자/i,
-      /언제.*생성/i, /언제.*만들/i, /생성.*날짜/i
-    ];
-    
-    // 명시적 키워드 체크
-    for (const keyword of directProjectKeywords) {
-      if (message.includes(keyword)) {
-        return true;
-      }
-    }
-    
-    // 패턴 매칭 체크
-    for (const pattern of projectQuestionPatterns) {
-      if (pattern.test(message)) {
-        return true;
-      }
-    }
-    
-    return false;
-  }, []);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (input.trim() === '' || isSubmitting || isLoading) return;
@@ -353,88 +196,34 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
       const userContent = input.trim();
       setInput('');
       
-      // 사용자 메시지 복사본 저장
-      const copyOfUserContent = userContent;
-      
-      // 일정 관련 질문인지 확인
-      const isTaskQuery = userContent.includes('새로 추가된 일정') || 
-                          userContent.includes('새 일정') || 
-                          userContent.includes('새로운 일정') ||
-                          userContent.includes('최근 일정') ||
-                          userContent.includes('최근 추가된 일정') ||
-                          userContent.includes('새로 생긴 일정') ||
-                          userContent.includes('일정 있어') ||
-                          userContent.includes('일정 있나') ||
-                          userContent.includes('일정 추가됐어') ||
-                          userContent.includes('일정 생겼어') ||
-                          userContent.includes('일정 알려') ||
-                          userContent.includes('일정 좀') ||
-                          userContent.includes('일정 보여') ||
-                          userContent.includes('일정 확인') ||
-                          userContent.includes('현재 일정') ||
-                          userContent.includes('칸반') ||
-                          userContent.includes('칸반보드') ||
-                          userContent.includes('kanban') ||
-                          userContent.includes('할 일') ||
-                          userContent.includes('할일') ||
-                          userContent.includes('투두');
-
-      // 마감일 관련 질문 패턴 별도 추가
-      const isDueDateQuery = userContent.includes('마감일') || 
-                             userContent.includes('기한') || 
-                             userContent.includes('데드라인') ||
-                             userContent.includes('언제까지') ||
-                             userContent.includes('일정 마감') ||
-                             userContent.includes('마감 날짜');
-                             
-      // 특정 일정명 검색 질문 여부 (주간 회의, 월간 회의 등의 특정 일정을 검색하는 경우)
-      const specificTaskKeywords = ['회의', '미팅', '프로젝트', '팀', '주간', '월간', '디자인'];
-      const isSpecificTaskQuery = specificTaskKeywords.some(keyword => userContent.includes(keyword));
-
-      // 상태별 일정 검색 패턴
-      const statusKeywords = [
-        '할 일', '예정', '대기', '진행', '진행중', '작업중', '검토', '리뷰', '완료', '끝', '종료', '마침', 
-        '미완료', '지난', '지난 일정', '완료된', '완료된 일정', '리뷰된', '검토된'
-      ];
-      
-      // 어떤 상태를 필터링해야 하는지 결정
-      let statusFilter = '';
-      
-      // 상태별 키워드 매핑
-      const statusMap: { [key: string]: string[] } = {
-        'todo': ['할 일', '예정', '대기', '미완료'],
-        'in_progress': ['진행', '진행중', '작업중'],
-        'review': ['검토', '리뷰'],
-        'done': ['완료', '끝', '종료', '마침', '완료된', '완료된 일정', '지난', '지난 일정', '리뷰된', '검토된']
-      };
-      
-      // 어떤 상태를 필터링해야 하는지 결정
-      for (const [status, keywords] of Object.entries(statusMap)) {
-        if (keywords.some(keyword => userContent.includes(keyword))) {
-          statusFilter = status;
-          break;
-        }
-      }
-      
-      const isStatusQuery = userContent && 
-        statusKeywords.some(keyword => userContent.includes(keyword));
-
-      // 담당자 관련 질문 여부 (담당자가 누구인지, 담당자 정보 등)
-      const assigneeKeywords = ['담당자', '담당', '맡은 사람', '책임자', '누가 맡', '누구 담당', '누가 담당'];
-      const isAssigneeQuery = assigneeKeywords.some(keyword => userContent.includes(keyword));
-
-      // Check if it's a summarize request
+      // 일정 관련 질문인지 간단하게 확인 - 핵심 키워드만 유지
+      const isScheduleRelatedQuery = 
+        userContent.includes('일정') || 
+        userContent.includes('할일') || 
+        userContent.includes('태스크') ||
+        userContent.includes('마감일') || 
+        userContent.includes('담당자');
+        
+      // 일정 추가/생성 요청인지 확인 - 강화된 로직
+      const isTaskCreationRequest = 
+        (userContent.includes('일정') || userContent.includes('태스크') || userContent.includes('할일')) &&
+        (userContent.includes('추가') || userContent.includes('생성') || 
+         userContent.includes('만들') || userContent.includes('새로운') || 
+         userContent.includes('등록') || userContent.includes('새로') || 
+         userContent.includes('만들어') || userContent.includes('추가해'));
+    
+    // Check if it's a summarize request
       if (userContent === "요약해줘") {
         // 요약 작업 전에 사용자 메시지 추가
-        addUserMessage(copyOfUserContent);
+        addUserMessage(userContent);
         
         // 요약 처리
-        await handleSummarizeRequest();
-      } 
+      await handleSummarizeRequest();
+    } 
       // 일정 관련 질문인 경우
-      else if (isTaskQuery || isDueDateQuery || isSpecificTaskQuery || isStatusQuery || isAssigneeQuery) {
+      else if (isScheduleRelatedQuery || isTaskCreationRequest) {
         // 일정 관련 질문인 경우 사용자 메시지 추가
-        addUserMessage(copyOfUserContent);
+        addUserMessage(userContent);
         
         // 로딩 표시 시작
         setLoading(true);
@@ -442,686 +231,319 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
         try {
           // 현재 프로젝트 ID 가져오기
           const projectId = getCurrentProjectId();
-          let recentTasksData = [];
+          let tasksData = [];
+          let projectName = '';
           
           if (projectId) {
             // 현재 프로젝트의 태스크 가져오기
             const tasksResponse = await fetch(`/api/projects/${projectId}/tasks`);
             if (tasksResponse.ok) {
-              const allTasks = await tasksResponse.json();
-              // 생성일 기준으로 정렬 (최신순)
-              recentTasksData = allTasks
-                .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+              tasksData = await tasksResponse.json();
+              
+              // 프로젝트 이름 가져오기
+              if (currentProject) {
+                projectName = currentProject.name;
+              } else {
+                try {
+                  const projectResponse = await fetch(`/api/projects/${projectId}`);
+                  if (projectResponse.ok) {
+                    const projectData = await projectResponse.json();
+                    projectName = projectData.name;
+                  }
+                } catch (error) {
+                  console.error('프로젝트 정보 가져오기 오류:', error);
+                }
+              }
             }
           } else {
             // 모든 프로젝트의 태스크 가져오기
             const tasksResponse = await fetch(`/api/tasks`);
             if (tasksResponse.ok) {
-              const allTasks = await tasksResponse.json();
-              // 생성일 기준으로 정렬 (최신순)
-              recentTasksData = allTasks
-                .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+              tasksData = await tasksResponse.json();
             }
           }
           
-          // 상태별 일정 필터링
-          if (isStatusQuery) {
-            let matchingTasks: any[] = [];
-            
-            // 상태에 따른 필터링
-            if (statusFilter) {
-              matchingTasks = recentTasksData.filter((task: any) => {
-                const taskStatus = task.status.toLowerCase();
-                
-                if (statusFilter === 'todo' && (taskStatus === 'todo' || taskStatus === 'to do' || taskStatus === 'backlog')) {
-                  return true;
-                } else if (statusFilter === 'in_progress' && (taskStatus === 'in progress' || taskStatus === 'in_progress' || taskStatus === 'doing')) {
-                  return true;
-                } else if (statusFilter === 'review' && (taskStatus === 'review' || taskStatus === 'in review')) {
-                  return true;
-                } else if (statusFilter === 'done' && (taskStatus === 'done' || taskStatus === 'completed' || taskStatus === 'finish' || taskStatus === 'finished')) {
-                  return true;
-                }
-                
-                return false;
-              });
-            }
-            
-            // 매칭된 일정이 있으면 적용
-            if (matchingTasks.length > 0) {
-              recentTasksData = matchingTasks;
-            } else {
-              // 해당 상태의 일정이 없는 경우 메시지 표시 후 종료
-              const statusName = statusFilter === 'todo' ? '할 일' : 
-                                statusFilter === 'in_progress' ? '진행 중인' : 
-                                statusFilter === 'review' ? '검토 중인' :
-                                statusFilter === 'done' ? '완료된' : '해당';
-                                
-              addAssistantMessage(`${statusName} 상태의 일정이 존재하지 않습니다.`);
-              setLoading(false);
-              return;
-            }
-          }
-          
-          // 특정 일정명 검색인 경우, 일정 필터링
-          if (isSpecificTaskQuery) {
-            // 가능한 일정 제목 목록 정의
-            const possibleTaskTitles = [
-              '주간 회의', '월간 회의', '디자인 팀 회의', '주간 팀 회의', 
-              '프로젝트 마감일', '클라이언트 미팅', '팀 미팅'
-            ];
-            
-            // 사용자 질문에서 키워드 추출
-            let queryKeywords = userContent.toLowerCase();
-            for (const stopWord of ['일정', '알려줘', '있어', '뭐야', '언제', '정보', '있나요', '있나', '은', '는', '이', '가', '좀', '에']) {
-              queryKeywords = queryKeywords.replace(stopWord, ' ');
-            }
-            queryKeywords = queryKeywords.trim();
-            
-            // 사용자 질문에서 일정명 확인
-            let matchingTasks = [];
-            let searchedTitle = ""; // 사용자가 검색한 일정명 저장
-            
-            // 정확한 일정명 매칭 시도
-            for (const taskTitle of possibleTaskTitles) {
-              if (userContent.includes(taskTitle)) {
-                searchedTitle = taskTitle;
-                // 해당 일정명을 포함하는 태스크만 필터링
-                const matchedTasks = recentTasksData.filter((task: any) => 
-                  task.title && task.title.includes(taskTitle)
-                );
-                if (matchedTasks.length > 0) {
-                  matchingTasks = matchedTasks;
-                  break;
-                }
-              }
-            }
-            
-            // 정확한 일정명 매칭 실패 시 키워드로 검색
-            if (matchingTasks.length === 0) {
-              for (const keyword of specificTaskKeywords) {
-                if (userContent.includes(keyword)) {
-                  // 검색한 키워드 저장
-                  if (!searchedTitle) searchedTitle = keyword;
-                  
-                  const matchedTasks = recentTasksData.filter((task: any) => 
-                    task.title && task.title.toLowerCase().includes(keyword.toLowerCase())
-                  );
-                  if (matchedTasks.length > 0) {
-                    matchingTasks = matchedTasks;
-                    break;
-                  }
-                }
-              }
-              
-              // 사용자 질문에서 추출한 키워드로 한번 더 검색 시도
-              if (matchingTasks.length === 0 && queryKeywords) {
-                // 검색한 키워드 저장
-                if (!searchedTitle) searchedTitle = queryKeywords;
-                
-                const words = queryKeywords.split(/\s+/);
-                const filteredWords = words.filter(word => word.length > 1); // 1글자 이하 단어 제외
-                
-                if (filteredWords.length > 0) {
-                  for (const word of filteredWords) {
-                    const matchedTasks = recentTasksData.filter((task: any) => 
-                      task.title && task.title.toLowerCase().includes(word.toLowerCase())
-                    );
-                    if (matchedTasks.length > 0) {
-                      matchingTasks = matchedTasks;
-                      break;
-                    }
-                  }
-                }
-              }
-            }
-            
-            // 필터링된 결과가 있으면 적용
-            if (matchingTasks.length > 0) {
-              recentTasksData = matchingTasks;
-            } else {
-              // 일치하는 일정이 없는 경우 메시지 표시 후 종료
-              if (searchedTitle) {
-                addAssistantMessage(`"${searchedTitle}" 일정이 존재하지 않아 담당자 정보를 확인할 수 없습니다.`);
-              } else {
-                addAssistantMessage("검색하신 일정이 존재하지 않아 담당자 정보를 확인할 수 없습니다.");
-              }
-              setLoading(false);
-              return;
-            }
-          } else {
-            // 일반 일정 질문은 최대 5개만 표시
-            recentTasksData = recentTasksData.slice(0, 5);
-          }
-          
-          // 최신 일정이 없는 경우
-          if (recentTasksData.length === 0) {
+          // 일정 추가 요청의 경우 빈 태스크 데이터여도 처리 (AI에게 태스크 생성 명령 전달)
+          if (tasksData.length === 0 && !isTaskCreationRequest) {
             addAssistantMessage(getRandomResponse(taskStatusResponses.noTasks));
             setLoading(false);
             return;
           }
           
-          // 직접 마크다운 응답 생성 (AI 호출 없이)
-          let markdownResponse = '';
+          // 사용자 이름 데이터 추가 (담당자 이름 표시용)
+          const assignees = Array.from(new Set(tasksData.map((task: any) => task.assignee).filter(Boolean))) as string[];
+          const assigneeNames: Record<string, string> = {};
+          const nameToIdMap: Record<string, string> = {}; // 이름 -> ID 매핑 추가
           
-          // 담당자 관련 질문인 경우
-          if (isAssigneeQuery) {
-            markdownResponse = `## 👤 일정 담당자 정보\n\n`;
-            
-            // 특정 상태를 지정한 경우 해당 상태의 일정만 필터링
-            if (isStatusQuery) {
-              const statusFilteredTasks = recentTasksData.filter((task: any) => 
-                task.status && task.status.toLowerCase() === statusFilter.toLowerCase()
-              );
-              
-              if (statusFilteredTasks.length > 0) {
-                recentTasksData = statusFilteredTasks;
-              } else {
-                // 해당 상태의 일정이 없는 경우 메시지 표시
-                const statusName = statusFilter === 'todo' ? '할 일' : 
-                                statusFilter === 'in_progress' ? '진행 중인' : 
-                                statusFilter === 'review' ? '검토 중인' :
-                                statusFilter === 'done' ? '완료된' : '해당';
-                addAssistantMessage(`${statusName} 상태의 일정이 존재하지 않아 담당자 정보를 확인할 수 없습니다.`);
-                setLoading(false);
-                return;
-              }
+          for (const assigneeId of assignees) {
+            try {
+              const name = await getUserName(assigneeId);
+              assigneeNames[assigneeId] = name;
+              nameToIdMap[name.toLowerCase()] = assigneeId; // 이름으로 ID를 찾을 수 있도록 매핑
+            } catch (error) {
+              console.error('사용자 이름 가져오기 오류:', error);
+              assigneeNames[assigneeId] = assigneeId;
             }
-            
-            // 특정 일정명을 지정한 경우 해당 일정만 필터링
-            if (isSpecificTaskQuery) {
-              // 사용자 질문에서 키워드 추출
-              let queryKeywords = userContent.toLowerCase();
-              for (const stopWord of ['담당자', '담당', '맡은 사람', '책임자', '누가 맡', '누구 담당', '누가 담당', '일정', '알려줘', '있어', '뭐야', '언제', '정보', '있나요', '있나', '은', '는', '이', '가', '좀', '에']) {
-                queryKeywords = queryKeywords.replace(stopWord, ' ');
-              }
-              queryKeywords = queryKeywords.trim();
-              
-              const possibleTaskTitles = [
-                '주간 회의', '월간 회의', '디자인 팀 회의', '주간 팀 회의', 
-                '프로젝트 마감일', '클라이언트 미팅', '팀 미팅'
-              ];
-              
-              let matchingTasks: any[] = [];
-              let searchedTitle = ""; // 사용자가 검색한 일정명 저장
-              
-              // 일정명으로 정확히 매칭 시도
-              for (const taskTitle of possibleTaskTitles) {
-                if (userContent.includes(taskTitle)) {
-                  searchedTitle = taskTitle;
-                  const titleMatchedTasks = recentTasksData.filter((task: any) => 
-                    task.title && task.title.toLowerCase().includes(taskTitle.toLowerCase())
-                  );
-                  if (titleMatchedTasks.length > 0) {
-                    matchingTasks = titleMatchedTasks;
-                    break;
-                  }
+          }
+          
+          // 프로젝트의 모든 사용자 정보 가져오기
+          let projectUsers: Record<string, string> = {};
+          try {
+            if (projectId) {
+              const projectResponse = await fetch(`/api/projects/${projectId}`);
+              if (projectResponse.ok) {
+                const projectData = await projectResponse.json();
+                // 프로젝트 소유자 추가
+                if (projectData.userId && projectData.user) {
+                  projectUsers[projectData.user.name.toLowerCase()] = projectData.userId;
+                  nameToIdMap[projectData.user.name.toLowerCase()] = projectData.userId;
                 }
-              }
-              
-              // 키워드 기반 매칭 시도
-              if (matchingTasks.length === 0) {
-                for (const keyword of specificTaskKeywords) {
-                  if (userContent.includes(keyword)) {
-                    // 검색한 키워드 저장
-                    if (!searchedTitle) searchedTitle = keyword;
-                    
-                    const keywordMatchedTasks = recentTasksData.filter((task: any) => 
-                      task.title && task.title.toLowerCase().includes(keyword.toLowerCase())
-                    );
-                    if (keywordMatchedTasks.length > 0) {
-                      matchingTasks = keywordMatchedTasks;
-                      break;
+                // 프로젝트 멤버 추가
+                if (projectData.members && Array.isArray(projectData.members)) {
+                  projectData.members.forEach((member: any) => {
+                    if (member.userId && member.user && member.user.name) {
+                      projectUsers[member.user.name.toLowerCase()] = member.userId;
+                      nameToIdMap[member.user.name.toLowerCase()] = member.userId;
                     }
-                  }
-                }
-              }
-              
-              // 사용자 질문에서 추출한 키워드로 한번 더 검색 시도
-              if (matchingTasks.length === 0 && queryKeywords) {
-                // 검색한 키워드 저장
-                if (!searchedTitle) searchedTitle = queryKeywords;
-                
-                const words = queryKeywords.split(/\s+/);
-                const filteredWords = words.filter(word => word.length > 1); // 1글자 이하 단어 제외
-                
-                if (filteredWords.length > 0) {
-                  for (const word of filteredWords) {
-                    const matchedTasks = recentTasksData.filter((task: any) => 
-                      task.title && task.title.toLowerCase().includes(word.toLowerCase())
-                    );
-                    if (matchedTasks.length > 0) {
-                      matchingTasks = matchedTasks;
-                      break;
-                    }
-                  }
-                }
-              }
-              
-              // 매칭된 결과가 있는 경우에만 적용
-              if (matchingTasks.length > 0) {
-                recentTasksData = matchingTasks;
-              } else {
-                // 일치하는 일정이 없는 경우 메시지 표시 후 종료
-                addAssistantMessage(getRandomResponse(assigneeResponses.noMatchingTasks, { searchTerm: searchedTitle || '검색한 키워드' }));
-                setLoading(false);
-                return;
-              }
-            }
-            
-            if (recentTasksData.length === 0) {
-              addAssistantMessage(getRandomResponse(assigneeResponses.noTasks));
-            } else if (recentTasksData.length === 1) {
-              // 일정이 하나만 있는 경우 해당 일정의 담당자 정보만 표시
-              const task = recentTasksData[0];
-              
-              if (task.assignee) {
-                try {
-                  const assigneeName = await getUserName(task.assignee);
-                  addAssistantMessage(getRandomResponse(assigneeResponses.singleTask, { 
-                    taskTitle: task.title,
-                    assigneeName: assigneeName
-                  }));
-                } catch (error) {
-                  console.error('담당자 이름 가져오기 오류:', error);
-                  addAssistantMessage(getRandomResponse(assigneeResponses.singleTask, { 
-                    taskTitle: task.title,
-                    assigneeName: task.assignee
-                  }));
-                }
-              } else {
-                addAssistantMessage(getRandomResponse(assigneeResponses.noAssignee, { 
-                  taskTitle: task.title
-                }));
-              }
-              
-              // 상태, 마감일 정보도 함께 표시
-              let additionalInfo = '';
-              if (task.status) {
-                additionalInfo += `\n\n현재 상태는 **${task.status}**입니다.`;
-              }
-              
-              if (task.dueDate) {
-                try {
-                  const dueDate = new Date(task.dueDate);
-                  const formattedDate = dueDate.toLocaleDateString('ko-KR', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
                   });
-                  additionalInfo += `\n마감일은 **${formattedDate}**입니다.`;
-                } catch (error) {
-                  console.error('마감일 형식 변환 오류:', error);
-                  additionalInfo += `\n마감일은 **${task.dueDate}**입니다.`;
                 }
               }
-              
-              if (additionalInfo) {
-                addAssistantMessage(additionalInfo);
-              }
-            } else {
-              // 여러 일정이 있는 경우 담당자 정보 목록 표시
-              let assigneeList = '';
-              
-              for (let i = 0; i < recentTasksData.length; i++) {
-                const task = recentTasksData[i];
-                assigneeList += `${i+1}. **${task.title}**`;
-                
-                if (task.assignee) {
-                  try {
-                    const assigneeName = await getUserName(task.assignee);
-                    assigneeList += `: **${assigneeName}**`;
-                  } catch (error) {
-                    console.error('담당자 이름 가져오기 오류:', error);
-                    assigneeList += `: **${task.assignee}**`;
-                  }
-                } else {
-                  assigneeList += `: 담당자 미지정`;
-                }
-                
-                if (task.status) {
-                  assigneeList += ` (상태: ${task.status})`;
-                }
-                
-                assigneeList += '\n';
-              }
-              
-              addAssistantMessage(getRandomResponse(assigneeResponses.multipleAssignees, { assigneeList }));
             }
+          } catch (error) {
+            console.error('프로젝트 사용자 정보 가져오기 오류:', error);
           }
-          // 상태별 일정 검색인 경우
-          else if (isStatusQuery) {
-            const statusDisplayNames: Record<string, string> = {
-              'todo': '할 일',
-              'in_progress': '진행 중인',
-              'review': '검토 중인',
-              'done': '완료된'
-            };
-            
-            const displayStatus = statusDisplayNames[statusFilter] || statusFilter;
-            
-            // 상태에 맞는 응답 템플릿 선택
-            let responseTemplates;
-            if (statusFilter === 'todo' || statusFilter.includes('todo')) {
-              responseTemplates = taskStatusResponses.todo;
-            } else if (statusFilter === 'in_progress' || statusFilter.includes('progress')) {
-              responseTemplates = taskStatusResponses.in_progress;
-            } else if (statusFilter === 'review' || statusFilter.includes('review')) {
-              responseTemplates = taskStatusResponses.review;
-            } else if (statusFilter === 'done' || statusFilter.includes('done')) {
-              responseTemplates = taskStatusResponses.done;
-            } else {
-              responseTemplates = taskStatusResponses.general;
-            }
-            
-            // 태스크 상세 정보 생성
-            let taskDetails = '';
-            
-            // 첫 번째 일정 상세 정보 표시
-            const mainTask = recentTasksData[0];
-            taskDetails += `1. **${mainTask.title}**\n`;
-            
-            if (mainTask.assignee) {
-              try {
-                const assigneeName = await getUserName(mainTask.assignee);
-                taskDetails += `   - 담당자: **${assigneeName}**\n`;
-              } catch (error) {
-                console.error('담당자 이름 가져오기 오류:', error);
-                taskDetails += `   - 담당자: **${mainTask.assignee}**\n`;
+          
+          // 일정 추가 요청인 경우 projectId도 함께 전송
+          const dataForAI = isTaskCreationRequest
+            ? {
+                userQuestion: userContent,
+                projectId: projectId || '',
+                projectName: projectName,
+                existingTasks: tasksData,
+                assigneeNames: assigneeNames,
+                nameToIdMap: nameToIdMap, // 이름-ID 매핑 추가
+                projectUsers: projectUsers, // 프로젝트 사용자 정보 추가
+                isCreationRequest: true
               }
-            }
-            
-            if (mainTask.dueDate) {
-              try {
-                const dueDate = new Date(mainTask.dueDate);
-                const formattedDate = dueDate.toLocaleDateString('ko-KR', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                });
-                taskDetails += `   - 마감일: **${formattedDate}**\n`;
-              } catch (error) {
-                console.error('마감일 형식 변환 오류:', error);
-                taskDetails += `   - 마감일: **${mainTask.dueDate}**\n`;
-              }
-            }
-            
-            if (mainTask.priority) {
-              taskDetails += `   - 우선순위: **${mainTask.priority}**\n`;
-            }
-            
-            if (mainTask.description) {
-              taskDetails += `   - 설명: ${mainTask.description}\n`;
-            }
-            
-            // 추가 관련 일정이 있으면 표시
-            if (recentTasksData.length > 1) {
-              taskDetails += `\n**더 많은 ${displayStatus} 일정:**\n`;
-              
-              for (let i = 1; i < recentTasksData.length; i++) {
-                const task = recentTasksData[i];
-                taskDetails += `\n${i+1}. **${task.title}**`;
-                
-                if (task.assignee) {
-                  try {
-                    const assigneeName = await getUserName(task.assignee);
-                    taskDetails += ` (담당: ${assigneeName})`;
-                  } catch (error) {
-                    console.error('담당자 이름 가져오기 오류:', error);
-                    taskDetails += ` (담당: ${task.assignee})`;
-                  }
+            : {
+                tasksData,
+                projectName,
+                assigneeNames
+              };
+          
+          // AI API 호출하여 자연어 응답 생성
+          const aiResponse = await fetch('/api/ai/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messages: [
+                {
+                  role: 'user',
+                  content: isTaskCreationRequest
+                    ? `${userContent}\n\n---\n일정 생성 요청 데이터:\n${JSON.stringify(dataForAI, null, 2)}`
+                    : `${userContent}\n\n---\n일정 데이터(이 데이터에 있는 일정만 답변하고 없는 정보는 절대 만들어내지 마세요):\n${JSON.stringify(tasksData, null, 2)}\n\n프로젝트 이름: ${projectName}\n\n담당자 이름 매핑:\n${JSON.stringify(assigneeNames, null, 2)}`
                 }
-                
-                if (task.dueDate) {
-                  try {
-                    const dueDate = new Date(task.dueDate);
-                    const formattedDate = dueDate.toLocaleDateString('ko-KR', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    });
-                    taskDetails += ` (마감: ${formattedDate})`;
-                  } catch (error) {
-                    taskDetails += ` (마감: ${task.dueDate})`;
-                  }
-                }
-              }
-            }
+              ],
+              systemMessage: isTaskCreationRequest ? "일정 생성 전문가" : undefined
+            }),
+          });
+          
+          if (aiResponse.ok) {
+            const data = await aiResponse.json();
             
-            addAssistantMessage(getRandomResponse(responseTemplates, { taskDetails }));
-          }
-          // 특정 일정명 검색인 경우
-          else if (isSpecificTaskQuery) {
-            markdownResponse = `## 🔍 일정 검색 결과\n\n`;
-            
-            // 첫 번째 일정 상세 정보 표시
-            const mainTask = recentTasksData[0];
-            markdownResponse += `**${mainTask.title}** 일정 정보:\n\n`;
-            
-            if (mainTask.status) {
-              markdownResponse += `- 상태: **${mainTask.status}**\n`;
-            }
-            
-            if (mainTask.assignee) {
+            // 태스크 생성 요청이고 JSON 형식의 태스크 데이터가 포함된 경우
+            if (isTaskCreationRequest && data.content) {
               try {
-                const assigneeName = await getUserName(mainTask.assignee);
-                markdownResponse += `- 담당자: **${assigneeName}**\n`;
-              } catch (error) {
-                console.error('담당자 이름 가져오기 오류:', error);
-                markdownResponse += `- 담당자: **${mainTask.assignee}**\n`;
-              }
-            }
-            
-            if (mainTask.dueDate) {
-              try {
-                const dueDate = new Date(mainTask.dueDate);
-                const formattedDate = dueDate.toLocaleDateString('ko-KR', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  weekday: 'long'
-                });
-                markdownResponse += `- 마감일: **${formattedDate}**\n`;
-              } catch (error) {
-                console.error('마감일 형식 변환 오류:', error);
-                markdownResponse += `- 마감일: **${mainTask.dueDate}**\n`;
-              }
-            }
-            
-            if (mainTask.priority) {
-              markdownResponse += `- 우선순위: **${mainTask.priority}**\n`;
-            }
-            
-            if (mainTask.description) {
-              markdownResponse += `- 설명: ${mainTask.description}\n`;
-            }
-            
-            // 추가 관련 일정이 있으면 표시
-            if (recentTasksData.length > 1) {
-              markdownResponse += `\n관련된 다른 일정:\n`;
-              
-              for (let i = 1; i < recentTasksData.length; i++) {
-                const task = recentTasksData[i];
-                markdownResponse += `\n${i}. **${task.title}**`;
+                console.log('AI 응답 내용:', data.content);
                 
-                if (task.dueDate) {
-                  try {
-                    const dueDate = new Date(task.dueDate);
-                    const formattedDate = dueDate.toLocaleDateString('ko-KR', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    });
-                    markdownResponse += ` (마감: ${formattedDate})`;
-                  } catch (error) {
-                    markdownResponse += ` (마감: ${task.dueDate})`;
-                  }
-                }
-              }
-            }
-          }
-          // 마감일 관련 질문인 경우
-          else if (isDueDateQuery) {
-            markdownResponse = `## 🗓️ 일정 마감일 정보\n\n`;
-            
-            if (recentTasksData.length > 0) {
-              // 가장 최근 일정의 마감일 정보 표시
-              const latestTask = recentTasksData[0];
-              markdownResponse += `**${latestTask.title}** 일정`;
-              
-              if (latestTask.dueDate) {
-                try {
-                  const dueDate = new Date(latestTask.dueDate);
-                  const formattedDate = dueDate.toLocaleDateString('ko-KR', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    weekday: 'long'
-                  });
-                  markdownResponse += `의 마감일은 **${formattedDate}**입니다.`;
-                } catch (error) {
-                  console.error('마감일 형식 변환 오류:', error);
-                  markdownResponse += `의 마감일은 **${latestTask.dueDate}**입니다.`;
-                }
-              } else {
-                markdownResponse += `에는 설정된 마감일이 없습니다.`;
-              }
-              
-              // 추가 일정이 있을 경우 마감일 정보만 표시
-              if (recentTasksData.length > 1) {
-                markdownResponse += `\n\n다른 일정의 마감일:`;
+                // 먼저 ```json 표기 안에 있는 JSON 찾기
+                const jsonRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
+                const match = data.content.match(jsonRegex);
                 
-                for (let i = 1; i < recentTasksData.length; i++) {
-                  const task = recentTasksData[i];
-                  markdownResponse += `\n${i}. **${task.title}**`;
+                // 그 다음 { "action": "create_task" 패턴이 포함된 JSON 찾기
+                const jsonObjectRegex = /\{\s*["']action["']\s*:\s*["']create_task["']/;
+                const plainJsonMatch = data.content.match(jsonObjectRegex);
+                
+                // JSON 문자열 추출
+                let jsonString = '';
+                if (match && match[1]) {
+                  console.log('마크다운 코드 블록에서 JSON 찾음');
+                  jsonString = match[1];
+                } else if (plainJsonMatch) {
+                  console.log('일반 텍스트에서 JSON 찾음');
+                  // 중괄호로 시작하는 부분부터 가능한 JSON 추출
+                  const startIdx = data.content.indexOf('{');
+                  let endIdx = -1;
+                  let depth = 0;
                   
-                  if (task.dueDate) {
+                  // 중첩된 중괄호 처리
+                  for (let i = startIdx; i < data.content.length; i++) {
+                    if (data.content[i] === '{') depth++;
+                    else if (data.content[i] === '}') {
+                      depth--;
+                      if (depth === 0) {
+                        endIdx = i + 1;
+                        break;
+                      }
+                    }
+                  }
+                  
+                  if (endIdx > startIdx) {
+                    jsonString = data.content.substring(startIdx, endIdx);
+                  }
+                }
+                
+                let jsonData;
+                // JSON 파싱 시도
+                if (jsonString) {
+                  try {
+                    jsonData = JSON.parse(jsonString);
+                    console.log('파싱된 JSON 데이터:', jsonData);
+                  } catch (parseError) {
+                    console.error('JSON 파싱 오류:', parseError, jsonString);
+                    // JSON 파싱 오류 복구 시도 - 따옴표 수정 등
+                    const fixedJsonString = jsonString
+                      .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?\s*:/g, '"$2":') // 키 따옴표 수정
+                      .replace(/:\s*['"]([^'"]*)['"](\s*[,}])/g, ':"$1"$2'); // 값 따옴표 수정
+                    
                     try {
-                      const dueDate = new Date(task.dueDate);
-                      const formattedDate = dueDate.toLocaleDateString('ko-KR', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      });
-                      markdownResponse += `: ${formattedDate}`;
-                    } catch (error) {
-                      console.error('마감일 형식 변환 오류:', error);
-                      markdownResponse += `: ${task.dueDate}`;
+                      jsonData = JSON.parse(fixedJsonString);
+                      console.log('수정 후 파싱된 JSON 데이터:', jsonData);
+                    } catch (e) {
+                      console.error('JSON 파싱 수정 실패:', e);
+                    }
+                  }
+                }
+                
+                // JSON 데이터가 있고, action이 create_task인 경우
+                if (jsonData && jsonData.action === 'create_task' && jsonData.data) {
+                  // 담당자 정보 처리 - 이름을 ID로 변환
+                  let assigneeId = null;
+                  const assigneeName = jsonData.data.assignee;
+                  
+                  if (assigneeName) {
+                    console.log('담당자 이름:', assigneeName);
+                    
+                    // 이름으로 ID 찾기 (nameToIdMap에서 찾기)
+                    if (typeof assigneeName === 'string') {
+                      const lowerName = assigneeName.toLowerCase();
+                      
+                      if (dataForAI && dataForAI.nameToIdMap && dataForAI.nameToIdMap[lowerName]) {
+                        assigneeId = dataForAI.nameToIdMap[lowerName];
+                        console.log('담당자 ID 찾음:', assigneeId);
+                      } else if (dataForAI && dataForAI.projectUsers && dataForAI.projectUsers[lowerName]) {
+                        assigneeId = dataForAI.projectUsers[lowerName];
+                        console.log('프로젝트 사용자 ID 찾음:', assigneeId);
+                      } else {
+                        // 이름으로 사용자 검색 시도
+                        try {
+                          console.log('사용자 검색 시도:', assigneeName);
+                          const searchResponse = await fetch(`/api/users/search?name=${encodeURIComponent(assigneeName)}`);
+                          if (searchResponse.ok) {
+                            const searchResult = await searchResponse.json();
+                            if (searchResult.length > 0) {
+                              assigneeId = searchResult[0].id;
+                              console.log('검색으로 담당자 ID 찾음:', assigneeId);
+                            }
+                          }
+                        } catch (error) {
+                          console.error('사용자 검색 오류:', error);
+                        }
+                      }
+                    }
+                  }
+                  
+                  // dueDate 처리: 년도가 포함된 전체 날짜 확인
+                  let dueDateValue = jsonData.data.dueDate || (new Date().toISOString().split('T')[0]);
+                  
+                  // 날짜 형식이 맞는지 확인하고, 년도가 현재와 맞지 않으면 수정
+                  if (dueDateValue && dueDateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                    const currentYear = new Date().getFullYear();
+                    const dueDateYear = parseInt(dueDateValue.split('-')[0]);
+                    
+                    // 년도가 2023이거나 현재 년도와 다르면 수정
+                    if (dueDateYear !== currentYear) {
+                      // 월-일만 유지하고 현재 년도로 변경
+                      const monthDay = dueDateValue.substring(5); // MM-DD 부분만 추출
+                      dueDateValue = `${currentYear}-${monthDay}`;
+                      console.log(`날짜 년도 수정: ${jsonData.data.dueDate} → ${dueDateValue}`);
+                    }
+                  }
+                  
+                  const taskData = {
+                    title: jsonData.data.title,
+                    description: jsonData.data.description || '',
+                    status: jsonData.data.status || 'todo',
+                    priority: jsonData.data.priority || 'medium',
+                    projectId: projectId,
+                    dueDate: dueDateValue,
+                    assignee: assigneeId  // 이름에서 변환된 ID 또는 null
+                  };
+                  
+                  console.log('생성할 태스크 데이터:', taskData);
+                  
+                  // 태스크 생성 API 호출
+                  const createTaskResponse = await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(taskData)
+                  });
+                  
+                  if (createTaskResponse.ok) {
+                    const createdTask = await createTaskResponse.json();
+                    setLastCreatedTask(createdTask);
+                    
+                    // JSON 데이터 제거하고 성공 메시지만 표시
+                    const successMessage = jsonData.message || `새 일정을 추가했습니다: ${taskData.title}`;
+                    // 코드 블록 또는 원본 JSON 제거
+                    let cleanedContent = data.content;
+                    if (match) {
+                      cleanedContent = data.content.replace(jsonRegex, '');
+                    } else if (jsonString) {
+                      cleanedContent = data.content.replace(jsonString, '');
+                    }
+                    
+                    // 정리된 내용이 있으면 추가 메시지와 함께 표시, 아니면 성공 메시지만 표시
+                    const cleanedText = cleanedContent.trim();
+                    if (cleanedText && !cleanedText.includes(successMessage)) {
+                      addAssistantMessage(`${cleanedText}\n\n${successMessage}`);
+                    } else {
+                      addAssistantMessage(successMessage);
                     }
                   } else {
-                    markdownResponse += `: 마감일 미설정`;
+                    const errorData = await createTaskResponse.json();
+                    addAssistantMessage(`일정 추가 중 오류가 발생했습니다: ${errorData.error || '알 수 없는 오류'}`);
                   }
+                } else if (jsonData && jsonData.action === 'request_more_info') {
+                  // 추가 정보 요청 메시지
+                  const infoRequestMessage = jsonData.message || '일정 추가를 위해 더 많은 정보가 필요합니다.';
+                  addAssistantMessage(infoRequestMessage);
+                } else {
+                  // JSON은 파싱되었지만 유효한 태스크 데이터가 아닌 경우
+                  // 또는 JSON이 없거나 완전하지 않은 경우 전체 응답 표시
+                  addAssistantMessage(data.content);
                 }
+              } catch (error) {
+                console.error('일정 생성 응답 처리 오류:', error);
+                addAssistantMessage(data.content);
               }
             } else {
-              markdownResponse += `현재 등록된 일정이 없습니다.`;
+              // 일반 응답인 경우
+              addAssistantMessage(data.content);
             }
-          } 
-          // 일반 일정 관련 질문인 경우 (기존 응답 방식 유지)
-          else {
-            markdownResponse = `## 🗓️ 일정 정보\n\n`;
-            
-            if (recentTasksData.length > 0) {
-              // 가장 최근 일정 정보 표시
-              const latestTask = recentTasksData[0];
-              markdownResponse += `최근 일정은 **${latestTask.title}**입니다.`;
-              
-              if (latestTask.assignee) {
-                // assignee가 있으면 사용자 이름으로 변환
-                try {
-                  const assigneeName = await getUserName(latestTask.assignee);
-                  markdownResponse += `\n담당자는 **${assigneeName}**입니다.`;
-                } catch (error) {
-                  console.error('담당자 이름 가져오기 오류:', error);
-                  markdownResponse += `\n담당자는 **${latestTask.assignee}**입니다.`;
-                }
-              }
-              
-              // 마감일 정보 추가
-              if (latestTask.dueDate) {
-                try {
-                  const dueDate = new Date(latestTask.dueDate);
-                  const formattedDate = dueDate.toLocaleDateString('ko-KR', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    weekday: 'long'
-                  });
-                  markdownResponse += `\n마감일: **${formattedDate}**`;
-                } catch (error) {
-                  console.error('마감일 형식 변환 오류:', error);
-                  markdownResponse += `\n마감일: **${latestTask.dueDate}**`;
-                }
-              }
-              
-              if (latestTask.status) {
-                markdownResponse += `\n상태: **${latestTask.status}**`;
-              }
-              
-              // 추가 일정이 있을 경우에만 표시
-              if (recentTasksData.length > 1) {
-                markdownResponse += `\n\n다른 일정:`;
-                
-                for (let i = 1; i < recentTasksData.length; i++) {
-                  const task = recentTasksData[i];
-                  markdownResponse += `\n${i}. **${task.title}**`;
-                  
-                  if (task.status) {
-                    markdownResponse += ` (상태: ${task.status})`;
-                  }
-                  
-                  if (task.assignee) {
-                    try {
-                      const assigneeName = await getUserName(task.assignee);
-                      markdownResponse += ` (담당: ${assigneeName})`;
-                    } catch (error) {
-                      console.error('담당자 이름 가져오기 오류:', error);
-                      markdownResponse += ` (담당: ${task.assignee})`;
-                    }
-                  }
-                  
-                  // 다른 일정의 마감일 정보 추가
-                  if (task.dueDate) {
-                    try {
-                      const dueDate = new Date(task.dueDate);
-                      const formattedDate = dueDate.toLocaleDateString('ko-KR', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      });
-                      markdownResponse += ` (마감: ${formattedDate})`;
-                    } catch (error) {
-                      console.error('마감일 형식 변환 오류:', error);
-                      markdownResponse += ` (마감: ${task.dueDate})`;
-                    }
-                  }
-                }
-              }
-            } else {
-              markdownResponse += `현재 등록된 일정이 없습니다.`;
-            }
+          } else {
+            throw new Error('AI 응답을 처리하는 중 오류가 발생했습니다.');
           }
-          
-          addAssistantMessage(markdownResponse);
         } catch (error) {
           console.error('일정 정보 처리 오류:', error);
-          addAssistantMessage('죄송합니다. 일정 정보를 가져오는 중 오류가 발생했습니다.');
+          addAssistantMessage('죄송합니다. 일정 정보를 처리하는 중 오류가 발생했습니다.');
         } finally {
           setLoading(false);
         }
-      } 
-      // Check if it's a project info request
-      else if (
-        userContent === "프로젝트 정보" || 
-        userContent === "내 프로젝트 보여줘" || 
-        userContent === "내 프로젝트" ||
-        userContent === "프로젝트 목록" ||
-        detectProjectIntent(userContent)
-      ) {
-        // 프로젝트 정보 요청 시 메시지 추가
-        addUserMessage(copyOfUserContent);
-        
-        await handleEnhancedProjectRequest(userContent);
     }
     else {
         // 일반 메시지인 경우 sendMessage 호출
@@ -1229,7 +651,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
         document.head.appendChild(style);
         scrollToBottom('smooth');
       }
-    } else {
+        } else {
       // 로딩 종료 시 요소 제거
       const loadingDiv = document.getElementById('thinking-bubble-container');
       if (loadingDiv) {
@@ -1261,36 +683,36 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
           
           try {
             // 요약 API 호출
-            const response = await fetch('/api/ai/summarize', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
+        const response = await fetch('/api/ai/summarize', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
                 content: pageText,
                 title: pageTitle,
                 contextData: {
                   currentUrl: window.location.href,
                   timestamp: new Date().toISOString()
                 }
-              }),
-            });
-            
-            if (!response.ok) {
+          }),
+        });
+        
+        if (!response.ok) {
               throw new Error('요약 중 오류가 발생했습니다.');
-            }
-            
-            const data = await response.json();
-            
+        }
+        
+        const data = await response.json();
+        
             // 요약 결과 메시지로 추가
             if (data.summary) {
               addAssistantMessage(data.summary);
             } else if (data.error) {
               addAssistantMessage(`요약에 실패했습니다: ${data.error}`);
-            } else {
+        } else {
               addAssistantMessage('요약에 실패했습니다.');
-            }
-          } catch (error) {
+        }
+      } catch (error) {
             console.error('요약 API 호출 오류:', error);
             addAssistantMessage('요약하는 동안 오류가 발생했습니다.');
           } finally {
@@ -1332,7 +754,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
             
             // 요약 결과 메시지로 추가
             if (data.summary) {
-              addAssistantMessage(data.summary);
+          addAssistantMessage(data.summary);
             } else if (data.error) {
               addAssistantMessage(`요약에 실패했습니다: ${data.error}`);
             } else {
@@ -1354,184 +776,6 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
       addAssistantMessage('요약을 처리하는 중 오류가 발생했습니다.');
     }
   };
-
-  // 향상된 프로젝트 정보 요청 처리
-  const handleEnhancedProjectRequest = useCallback(async (userQuery: string) => {
-    try {
-      // 로딩 표시 시작
-      setLoading(true);
-      
-      // 프로젝트 정보 수집을 위한 타입 정의
-      interface ProjectInfo {
-        id: string;
-        name: string;
-        description?: string;
-        createdAt: string;
-        updatedAt: string;
-        userId: string;
-        user?: {
-          id: string;
-          name: string;
-          email: string;
-        };
-        members?: Array<{
-          id: string;
-          userId: string;
-          projectId: string;
-          role?: string;
-          inviteStatus: string;
-          createdAt: string;
-          updatedAt: string;
-          user: {
-            id: string;
-            name: string;
-            email: string;
-          };
-        }>;
-      }
-
-      interface TaskInfo {
-        id: string;
-        title: string;
-        description?: string;
-        status: string;
-        priority: string;
-        assignee?: string;
-        dueDate?: string;
-        startDate?: string;
-        endDate?: string;
-        isAllDay: boolean;
-        createdAt: string;
-        updatedAt: string;
-        projectId: string;
-      }
-
-      interface DocumentInfo {
-        id: string;
-        title: string;
-        content?: string;
-        emoji?: string;
-        createdAt: string;
-        updatedAt: string;
-        projectId?: string;
-        folder?: string;
-        isStarred: boolean;
-        isReadOnly: boolean;
-        tags?: string;
-        folderId?: string;
-      }
-
-      interface FolderInfo {
-        id: string;
-        name: string;
-        description?: string;
-        createdAt: string;
-        updatedAt: string;
-        projectId?: string;
-      }
-      
-      // 프로젝트 정보 수집
-      let projectInfoData: {
-        projects: ProjectInfo[];
-        currentProject: ProjectInfo | null;
-        currentProjectTasks: TaskInfo[];
-        projectDocuments: DocumentInfo[];
-        projectFolders: FolderInfo[];
-      } = {
-        projects: [],
-        currentProject: null,
-        currentProjectTasks: [],
-        projectDocuments: [],
-        projectFolders: []
-      };
-      
-      // 모든 프로젝트 가져오기
-      try {
-        const projectsResponse = await fetch('/api/projects');
-        if (projectsResponse.ok) {
-          projectInfoData.projects = await projectsResponse.json() as ProjectInfo[];
-        }
-      } catch (error) {
-        console.error('프로젝트 목록 가져오기 오류:', error);
-      }
-      
-      // 현재 프로젝트 정보 가져오기
-      const currentProjectId = getCurrentProjectId();
-      if (currentProjectId) {
-        try {
-          const projectResponse = await fetch(`/api/projects/${currentProjectId}`);
-          if (projectResponse.ok) {
-            projectInfoData.currentProject = await projectResponse.json() as ProjectInfo;
-            
-            // 현재 프로젝트의 태스크 가져오기
-            const tasksResponse = await fetch(`/api/projects/${currentProjectId}/tasks`);
-            if (tasksResponse.ok) {
-              projectInfoData.currentProjectTasks = await tasksResponse.json() as TaskInfo[];
-            }
-            
-            // 현재 프로젝트의 문서 가져오기
-            try {
-              const documentsResponse = await fetch(`/api/documents?projectId=${currentProjectId}`);
-              if (documentsResponse.ok) {
-                projectInfoData.projectDocuments = await documentsResponse.json() as DocumentInfo[];
-              }
-            } catch (error) {
-              console.error('문서 목록 가져오기 오류:', error);
-            }
-
-            // 현재 프로젝트의 폴더 가져오기
-            try {
-              const foldersResponse = await fetch(`/api/documents/folders?projectId=${currentProjectId}`);
-              if (foldersResponse.ok) {
-                projectInfoData.projectFolders = await foldersResponse.json() as FolderInfo[];
-              }
-            } catch (error) {
-              console.error('폴더 목록 가져오기 오류:', error);
-            }
-          }
-        } catch (error) {
-          console.error('현재 프로젝트 정보 가져오기 오류:', error);
-        }
-      }
-      
-      // 데이터 수집 완료 후 AI에 전송
-      try {
-        const aiResponse = await fetch('/api/ai/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            messages: [
-              {
-                role: 'user',
-                content: `${userQuery}\n\n---\n실제 데이터베이스 정보(이 데이터만 사용해서 응답해주세요):\n${JSON.stringify(projectInfoData, null, 2)}`
-              }
-            ]
-          }),
-        });
-
-        if (aiResponse.ok) {
-          const data = await aiResponse.json();
-          // AI 응답 형식으로 추가
-          addAssistantMessage(data.content);
-        } else {
-          throw new Error('AI 응답 처리 중 오류가 발생했습니다.');
-        }
-      } catch (error) {
-        console.error('AI 응답 처리 오류:', error);
-        addAssistantMessage('죄송합니다. 프로젝트 정보를 처리하는 중 오류가 발생했습니다.');
-      }
-      
-      // 로딩 표시 종료
-      setLoading(false);
-      
-    } catch (error) {
-      console.error('프로젝트 정보 처리 오류:', error);
-      setLoading(false);
-      addAssistantMessage('죄송합니다. 프로젝트 정보를 가져오는 중 오류가 발생했습니다.');
-    }
-  }, [addAssistantMessage, getCurrentProjectId, setLoading]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -1578,6 +822,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
           <div className="text-center text-gray-500 my-8">
             <p className="mb-2">숭민이와 대화를 시작해보세요</p>
             <p className="text-xs text-blue-500 mb-2">💡 Tip: 문서를 요약하려면 "요약해줘"라고 입력하세요</p>
+            <p className="text-xs text-blue-500 mb-2">💡 Tip: 숭민이와 대화를 통해 일정 추가가 가능해요</p>
           
           </div>
         ) : (
