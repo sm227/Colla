@@ -16,6 +16,8 @@ model User {
   updatedAt   DateTime        @updatedAt
   projects    Project[]
   memberships ProjectMember[]
+  comments    Comment[]
+  calendars   Calendar[]
 }
 
 model Task {
