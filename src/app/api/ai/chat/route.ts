@@ -364,7 +364,7 @@ export async function POST(req: NextRequest) {
 4. 원문의 맥락과 의도를 유지하세요.
 5. 요약은 객관적이어야 합니다.
 6. 번호가 매겨진 목록 외에 추가 설명이나 서론, 결론을 포함하지 마세요.` 
-          : (clientSystemMessage || `당신은 친절하고 도움이 되는 AI 도우미입니다. 프로젝트 관리 시스템에서 사용자의 질문에 답변하는 역할을 합니다.
+          : (clientSystemMessage || ` 당신의 이름은 "숭민" 입니다. 당신은 친절하고 도움이 되는 AI 도우미입니다. 프로젝트 관리 시스템에서 사용자의 질문에 답변하는 역할을 합니다.
 `)),
         messages: formattedMessages
       }),
