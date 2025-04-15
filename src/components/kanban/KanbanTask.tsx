@@ -2,7 +2,7 @@
 
 import { Task } from "./KanbanBoard";
 import { useDrag } from "./useDragDrop";
-import { CalendarIcon, UserIcon, Clock, CheckCircle2, AlertCircle } from "lucide-react";
+import { CalendarIcon, UserIcon, ArrowUp, ArrowDown, Minus, User } from "lucide-react";
 import { useState, useEffect } from "react";
 import { TaskDetailDialog } from "./TaskDetailDialog";
 import { useUsers } from "@/app/contexts/UserContext";
@@ -48,29 +48,21 @@ export function KanbanTask({ task, onUpdate, onDelete }: KanbanTaskProps) {
   }, [task.assignee, getUserName]);
 
   // 우선순위에 따른 색상 및 아이콘 설정
-  const priorityConfig = {
-    low: {
-      classes: "bg-green-50 text-green-700 border-green-200",
-      icon: <CheckCircle2 className="h-3 w-3 text-green-600 mr-1" />,
-      label: "낮은 우선순위"
-    },
-    medium: {
-      classes: "bg-yellow-50 text-yellow-700 border-yellow-200",
-      icon: <Clock className="h-3 w-3 text-yellow-600 mr-1" />,
-      label: "중간 우선순위"
-    },
-    high: {
-      classes: "bg-red-50 text-red-700 border-red-200",
-      icon: <AlertCircle className="h-3 w-3 text-red-600 mr-1" />,
-      label: "높은 우선순위"
+  const getPriorityIcon = () => {
+    switch (task.priority) {
+      case 'high':
+        return <ArrowUp size={20} className="text-red-500" />;
+      case 'medium':
+        return <Minus size={20} className="text-yellow-500" />;
+      case 'low':
+        return <ArrowDown size={20} className="text-green-500" />;
+      default:
+        return <Minus size={20} className="text-yellow-500" />;
     }
   };
 
   // 설명에서 HTML 태그 제거
   const cleanDescription = task.description ? stripHtmlTags(task.description) : '';
-
-  // 해당 작업의 우선순위 설정 가져오기
-  const prioritySettings = priorityConfig[task.priority];
 
   const handleClick = () => {
     setIsDetailOpen(true);
@@ -92,45 +84,44 @@ export function KanbanTask({ task, onUpdate, onDelete }: KanbanTaskProps) {
       <div
         ref={setNodeRef}
         onClick={handleClick}
-        className={`bg-white p-3 rounded-md border border-gray-200 cursor-pointer hover:shadow-md transition-all ${
+        className={`bg-white p-3 rounded-md border border-gray-200 cursor-pointer hover:shadow-md transition-all mb-2 h-auto min-h-[80px] ${
           isDragging ? "opacity-50 scale-95" : ""
         } ${task.status === 'done' ? 'border-l-4 border-l-green-500' : ''}`}
       >
-        <div className="mb-2">
-          <h4 className="font-medium text-gray-800 mb-1">{task.title}</h4>
-          {task.description && (
-            <p className="text-xs text-gray-600 line-clamp-2 mb-2">{cleanDescription}</p>
-          )}
-        </div>
+        <h4 className="font-medium text-gray-800 mb-2 line-clamp-2 text-base">{task.title}</h4>
         
-        <div className="flex items-center justify-between">
-          <span
-            className={`text-xs px-2 py-0.5 rounded-full border flex items-center ${
-              prioritySettings.classes
-            }`}
-          >
-            {prioritySettings.icon}
-            {prioritySettings.label}
-          </span>
-          
-          <div className="flex items-center gap-2 text-xs text-gray-500">
+        <div className="flex items-center justify-between mt-2">
+          <div className="flex items-center gap-3">
+            {getPriorityIcon()}
+            
+            {task.assignee ? (
+              <div className="flex items-center">
+                <div className="h-6 w-6 rounded-full bg-gray-300 flex items-center justify-center mr-1.5">
+                  <User size={14} className="text-gray-600" />
+                </div>
+                <span className="text-sm text-gray-600">{assigneeName}</span>
+              </div>
+            ) : (
+              <div className="h-6 w-6 rounded-full border border-dashed border-gray-300 flex items-center justify-center">
+                <User size={14} className="text-gray-400" />
+              </div>
+            )}
+            
             {task.dueDate && (
               <div className="flex items-center">
-                <CalendarIcon className="h-3 w-3 mr-1 text-gray-400" />
-                <span>{new Date(task.dueDate).toLocaleDateString()}</span>
+                <CalendarIcon className="h-5 w-5 text-gray-400" />
               </div>
             )}
           </div>
-        </div>
-        
-        {task.assignee && (
-          <div className="mt-2 pt-2 border-t border-gray-100 flex items-center gap-1 text-xs text-gray-500">
-            <div className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-[10px]">
-              {assigneeName ? assigneeName.charAt(0).toUpperCase() : "?"}
+          
+          {task.status === 'done' && (
+            <div className="rounded-full bg-green-100 p-1">
+              <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
             </div>
-            <span>{assigneeName || task.assignee}</span>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <TaskDetailDialog

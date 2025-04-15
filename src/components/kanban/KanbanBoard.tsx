@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react";
 import { KanbanColumn } from "./KanbanColumn";
 import { AddTaskDialog } from "./AddTaskDialog";
-import { Button } from "@/components/ui/button";
-import { Plus, ClipboardListIcon } from "lucide-react";
+import { ClipboardListIcon } from "lucide-react";
 import { useTasks } from "@/hooks/useTasks";
 import { Alert } from "@/components/ui/alert";
 import { KanbanTask } from "./KanbanTask";
@@ -34,7 +33,6 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
   console.log("KanbanBoard 렌더링 - projectId:", projectId);
   
   const { tasks, loading, error, addTask, updateTaskStatus, updateTask, deleteTask, fetchTasks } = useTasks(projectId);
-  const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
   const [tasksState, setTasksState] = useState<Task[]>(tasks);
   
   // 작업 상세 다이얼로그 관련 상태 추가
@@ -147,39 +145,17 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
         </Alert>
       )}
 
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center">
-          <ClipboardListIcon className="h-5 w-5 text-gray-700 mr-2" />
-          <h2 className="text-xl font-semibold text-gray-900">
-            {projectId ? "프로젝트 작업" : "모든 작업"}
-          </h2>
-        </div>
-        <Button 
-          onClick={() => setIsAddTaskDialogOpen(true)}
-          className="flex items-center gap-1 bg-purple-600 hover:bg-purple-700"
-        >
-          <Plus className="h-4 w-4" />
-          새 작업
-        </Button>
+      <div className="flex items-center mb-6">
+        <ClipboardListIcon className="h-5 w-5 text-gray-700 mr-2" />
+        <h2 className="text-xl font-semibold text-gray-900">
+          {projectId ? "프로젝트 작업" : "모든 작업"}
+        </h2>
       </div>
 
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
           <p className="ml-3 text-gray-600">작업 로딩 중...</p>
-        </div>
-      ) : tasksState.length === 0 ? (
-        <div className="flex flex-col items-center justify-center bg-gray-50 rounded-lg p-8 border border-gray-200">
-          <ClipboardListIcon className="h-12 w-12 text-gray-400 mb-3" />
-          <h3 className="text-lg font-medium text-gray-900 mb-1">작업이 없습니다</h3>
-          <p className="text-gray-500 mb-4 text-center">이 프로젝트에 아직 작업이 추가되지 않았습니다.</p>
-          <Button 
-            onClick={() => setIsAddTaskDialogOpen(true)}
-            className="flex items-center gap-1 bg-purple-600 hover:bg-purple-700"
-          >
-            <Plus className="h-4 w-4" />
-            첫 작업 추가하기
-          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -191,6 +167,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             onTaskClick={handleOpenDialog}
             color="gray"
             onTaskDelete={handleDeleteTask}
+            onAddTask={handleAddTask}
           />
           <KanbanColumn 
             title="진행 중" 
@@ -200,6 +177,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             onTaskClick={handleOpenDialog}
             color="blue"
             onTaskDelete={handleDeleteTask}
+            onAddTask={handleAddTask}
           />
           <KanbanColumn 
             title="검토" 
@@ -209,6 +187,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             onTaskClick={handleOpenDialog}
             color="yellow"
             onTaskDelete={handleDeleteTask}
+            onAddTask={handleAddTask}
           />
           <KanbanColumn 
             title="완료" 
@@ -218,16 +197,10 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             onTaskClick={handleOpenDialog}
             color="green"
             onTaskDelete={handleDeleteTask}
+            onAddTask={handleAddTask}
           />
         </div>
       )}
-
-      <AddTaskDialog 
-        isOpen={isAddTaskDialogOpen} 
-        onClose={() => setIsAddTaskDialogOpen(false)} 
-        onAddTask={handleAddTask}
-        projectId={projectId}
-      />
 
       {selectedTask && (
         <TaskDetailDialog

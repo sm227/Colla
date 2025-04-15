@@ -6,8 +6,9 @@ import {
   X, 
   Calendar, 
   User, 
-  CheckCircle2, 
-  Clock, 
+  ArrowUp,
+  ArrowDown,
+  Minus,
   AlertCircle, 
   AlignLeft,
   Tag,
@@ -104,25 +105,25 @@ export function AddTaskDialog({ isOpen, onClose, onAddTask, projectId }: AddTask
     switch (priorityValue) {
       case 'high':
         return {
-          icon: <AlertCircle className="h-4 w-4 text-red-600" />,
+          icon: <ArrowUp className="h-4 w-4 text-red-600" />,
           label: "높음",
           classes: "text-red-600 bg-red-50 border-red-200"
         };
       case 'medium':
         return {
-          icon: <Clock className="h-4 w-4 text-yellow-600" />,
+          icon: <Minus className="h-4 w-4 text-yellow-600" />,
           label: "중간",
           classes: "text-yellow-600 bg-yellow-50 border-yellow-200"
         };
       case 'low':
         return {
-          icon: <CheckCircle2 className="h-4 w-4 text-green-600" />,
+          icon: <ArrowDown className="h-4 w-4 text-green-600" />,
           label: "낮음",
           classes: "text-green-600 bg-green-50 border-green-200"
         };
       default:
         return {
-          icon: <Clock className="h-4 w-4 text-yellow-600" />,
+          icon: <Minus className="h-4 w-4 text-yellow-600" />,
           label: "중간",
           classes: "text-yellow-600 bg-yellow-50 border-yellow-200"
         };
