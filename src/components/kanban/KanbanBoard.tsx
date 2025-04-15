@@ -20,8 +20,10 @@ export interface Task {
   status: TaskStatus;
   priority: "low" | "medium" | "high";
   assignee?: string;
+  startDate?: Date;
   dueDate?: Date;
   projectId?: string;
+  createdAt?: string;
 }
 
 interface KanbanBoardProps {

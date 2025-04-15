@@ -1,69 +1,48 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { getTokenFromCookie, verifyToken } from '@/app/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
 
-// 현재 사용자의 정보 가져오기
-async function getCurrentUser() {
-  try {
-    const token = getTokenFromCookie();
-    if (!token) return null;
-    const decoded = verifyToken(token);
-    if (!decoded || typeof decoded === 'string') return null;
-    return await prisma.user.findUnique({ where: { id: decoded.id } });
-  } catch (error) {
-    console.error('사용자 정보 조회 오류:', error);
-    return null;
-  }
+const prisma = new PrismaClient();
+
+// 현재 사용자 ID 가져오기 (실제 인증 로직으로 대체 필요)
+async function getCurrentUserId() {
+  // 실제 환경에서는 세션이나 토큰을 통해 인증된 사용자의 ID를 가져와야 함
+  // 테스트용으로 임시로 사용자 ID 반환
+  const user = await prisma.user.findFirst();
+  return user?.id;
 }
 
-// 캘린더 일정 가져오기
-export async function GET(request: Request) {
+// GET - 캘린더 이벤트 목록 조회
+export async function GET(request: NextRequest) {
   try {
-    // 현재 로그인한 사용자 정보 가져오기
-    const currentUser = await getCurrentUser();
-    
-    if (!currentUser) {
-      return NextResponse.json(
-        { error: '인증되지 않은 사용자입니다.' }, 
-        { status: 401 }
-      );
+    const userId = await getCurrentUserId();
+
+    if (!userId) {
+      return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
     }
+
+    // 쿼리 파라미터 가져오기
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get('projectId');
+
+    let events = [];
     
-    // URL에서 projectId 파라미터 확인
-    const url = new URL(request.url);
-    const projectId = url.searchParams.get('projectId');
-    
-    // 모든 프로젝트를 볼 수 있는지 여부
-    const showAll = url.searchParams.get('showAll') === 'true';
-    
-    // 쿼리 조건 설정
-    const whereCondition: any = {
-      OR: [
-        { userId: currentUser.id }, // 현재 사용자의 일정
-      ]
-    };
-    
-    // 특정 프로젝트의 일정을 볼 때 (프로젝트에 속한 모든 멤버의 일정 포함)
-    if (projectId && !showAll) {
-      // 1. 내가 소속된 프로젝트인지 확인
-      const membership = await prisma.projectMember.findUnique({
+    if (projectId) {
+      // 프로젝트 ID가 있을 경우:
+      // 1. 현재 사용자가 해당 프로젝트의 멤버인지 확인
+      const isMember = await prisma.projectMember.findFirst({
         where: {
-          userId_projectId: {
-            userId: currentUser.id,
-            projectId: projectId
-          }
+          userId: userId,
+          projectId: projectId,
+          inviteStatus: 'accepted' // 초대 수락 상태인 멤버만
         }
       });
       
-      if (!membership) {
-        return NextResponse.json(
-          { error: '해당 프로젝트에 접근 권한이 없습니다.' },
-          { status: 403 }
-        );
+      if (!isMember) {
+        return NextResponse.json({ error: '프로젝트에 접근 권한이 없습니다' }, { status: 403 });
       }
       
-      // 2. 프로젝트에 속한 모든 멤버의 ID 가져오기
-      const projectMembers = await prisma.projectMember.findMany({
+      // 2. 프로젝트 내 모든 멤버 ID 가져오기
+      const members = await prisma.projectMember.findMany({
         where: {
           projectId: projectId,
           inviteStatus: 'accepted'
@@ -73,20 +52,46 @@ export async function GET(request: Request) {
         }
       });
       
-      const memberIds = projectMembers.map(member => member.userId);
+      const memberIds = members.map(member => member.userId);
       
-      // 3. 해당 프로젝트의 일정만 표시
-      whereCondition.OR.push(
-        { 
-          projectId: projectId,
-          userId: { in: memberIds }
-        }
-      );
-    } else if (showAll) {
-      // 내가 속한 모든 프로젝트 찾기
-      const myProjects = await prisma.projectMember.findMany({
+      // 3. 프로젝트의 모든 캘린더 이벤트 가져오기 (프로젝트 멤버들의 것 모두 포함)
+      events = await prisma.calendar.findMany({
         where: {
-          userId: currentUser.id,
+          OR: [
+            // 해당 프로젝트에 속한 모든 캘린더 이벤트
+            { projectId: projectId },
+            // 프로젝트 멤버들의 개인 일정 (프로젝트 ID가 없는 개인 일정 제외)
+            {
+              userId: { in: memberIds },
+              projectId: null
+            }
+          ]
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          project: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        },
+        orderBy: { startDate: 'asc' }
+      });
+    } else {
+      // 프로젝트 ID가 없을 경우 현재 사용자의 개인 일정과
+      // 사용자가 속한 모든 프로젝트의 일정 가져오기
+      
+      // 1. 사용자가 속한 모든 프로젝트 ID 가져오기
+      const userProjects = await prisma.projectMember.findMany({
+        where: {
+          userId: userId,
           inviteStatus: 'accepted'
         },
         select: {
@@ -94,193 +99,115 @@ export async function GET(request: Request) {
         }
       });
       
-      const projectIds = myProjects.map(p => p.projectId);
+      const projectIds = userProjects.map(p => p.projectId);
       
-      // 내가 속한 모든 프로젝트의 일정 추가
-      whereCondition.OR.push(
-        { projectId: { in: projectIds } }
-      );
+      // 2. 사용자의 개인 일정 + 참여 중인 모든 프로젝트 일정 가져오기
+      events = await prisma.calendar.findMany({
+        where: {
+          OR: [
+            // 사용자의 개인 일정
+            { userId: userId },
+            // 사용자가 참여 중인 프로젝트의 일정
+            { projectId: { in: projectIds } }
+          ]
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          project: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        },
+        orderBy: { startDate: 'asc' }
+      });
     }
 
-    // Prisma에서 Calendar 모델을 직접 접근
-    // @ts-ignore - Calendar 모델이 Prisma 클라이언트에 있지만 타입이 제대로 인식되지 않을 때 사용
-    const calendars = await prisma.calendar.findMany({
-      where: whereCondition,
-      orderBy: {
-        startDate: 'asc',
+    return NextResponse.json(events);
+  } catch (error) {
+    console.error('캘린더 이벤트 조회 오류:', error);
+    return NextResponse.json(
+      { error: '캘린더 이벤트를 가져오는 중 오류가 발생했습니다' },
+      { status: 500 }
+    );
+  }
+}
+
+// POST - 새 캘린더 이벤트 생성
+export async function POST(request: NextRequest) {
+  try {
+    const userId = await getCurrentUserId();
+
+    if (!userId) {
+      return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
+    }
+
+    // 요청 본문 파싱
+    const data = await request.json();
+    
+    // 필수 필드 검증
+    if (!data.title || !data.startDate) {
+      return NextResponse.json(
+        { error: '제목과 시작 날짜는 필수입니다' },
+        { status: 400 }
+      );
+    }
+    
+    // 프로젝트ID가 제공된 경우 해당 프로젝트 접근 권한 확인
+    if (data.projectId) {
+      const isMember = await prisma.projectMember.findFirst({
+        where: {
+          userId: userId,
+          projectId: data.projectId,
+          inviteStatus: 'accepted'
+        }
+      });
+      
+      if (!isMember) {
+        return NextResponse.json({ error: '프로젝트에 접근 권한이 없습니다' }, { status: 403 });
+      }
+    }
+
+    // 캘린더 이벤트 생성
+    const newEvent = await prisma.calendar.create({
+      data: {
+        title: data.title,
+        description: data.description || '',
+        startDate: new Date(data.startDate),
+        endDate: data.endDate ? new Date(data.endDate) : null,
+        isAllDay: data.isAllDay || false,
+        userId: userId,
+        projectId: data.projectId || null
       },
       include: {
         user: {
           select: {
             id: true,
             name: true,
-          },
-        },
-        project: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    });
-    
-    // 태스크도 함께 가져오기 (마감일이 있는 태스크)
-    const tasks = await prisma.task.findMany({
-      where: {
-        dueDate: { not: null },
-        OR: [
-          { projectId: projectId },
-          { 
-            projectId: { in: showAll 
-              ? await prisma.projectMember.findMany({
-                  where: { 
-                    userId: currentUser.id,
-                    inviteStatus: 'accepted'
-                  },
-                  select: { projectId: true }
-                }).then(data => data.map(item => item.projectId))
-              : undefined
-            } 
+            email: true
           }
-        ]
-      },
-      include: {
-        project: {
-          select: {
-            id: true,
-            name: true,
-          },
         },
-      },
-    });
-    
-    // 태스크를 캘린더 일정 형식으로 변환
-    const taskEvents = tasks.map(task => ({
-      id: `task_${task.id}`,
-      title: `[작업] ${task.title}`,
-      description: task.description,
-      startDate: task.startDate || task.createdAt,
-      endDate: task.dueDate,
-      isAllDay: task.isAllDay || false,
-      isTask: true,
-      taskId: task.id,
-      userId: currentUser.id,
-      projectId: task.projectId,
-      projectName: task.project?.name,
-      user: {
-        id: currentUser.id,
-        name: currentUser.name,
-      },
-      createdAt: task.createdAt,
-      updatedAt: task.updatedAt,
-    }));
-    
-    // 캘린더 일정에 isTask 필드 추가
-    const calendarEvents = calendars.map((calendar: any) => ({
-      ...calendar,
-      isTask: false,
-    }));
-    
-    // 모든 일정 병합
-    const allEvents = [...calendarEvents, ...taskEvents];
-    
-    return NextResponse.json(allEvents);
-  } catch (error) {
-    console.error('캘린더 일정 조회 오류:', error);
-    return NextResponse.json(
-      { error: '캘린더 일정을 가져오는 중 오류가 발생했습니다.' },
-      { status: 500 }
-    );
-  }
-}
-
-// 새 캘린더 일정 추가
-export async function POST(request: Request) {
-  try {
-    console.log('캘린더 일정 추가 요청 시작');
-    
-    const currentUser = await getCurrentUser();
-    
-    if (!currentUser) {
-      console.log('인증되지 않은 사용자 요청');
-      return NextResponse.json(
-        { error: '인증되지 않은 사용자입니다.' }, 
-        { status: 401 }
-      );
-    }
-    
-    console.log('사용자 인증 완료:', currentUser.id);
-    
-    const body = await request.json();
-    console.log('요청 본문:', JSON.stringify(body, null, 2));
-    
-    const { title, description, startDate, endDate, isAllDay, projectId } = body;
-    
-    if (!title || !startDate) {
-      console.log('필수 필드 누락');
-      return NextResponse.json(
-        { error: '제목과 시작 날짜는 필수입니다.' },
-        { status: 400 }
-      );
-    }
-    
-    // 프로젝트 ID가 있는 경우 해당 프로젝트에 접근 권한이 있는지 확인
-    if (projectId) {
-      console.log('프로젝트 접근 권한 확인:', projectId);
-      const membership = await prisma.projectMember.findUnique({
-        where: {
-          userId_projectId: {
-            userId: currentUser.id,
-            projectId: projectId
+        project: data.projectId ? {
+          select: {
+            id: true, 
+            name: true
           }
-        }
-      });
-      
-      if (!membership) {
-        console.log('프로젝트 접근 권한 없음');
-        return NextResponse.json(
-          { error: '해당 프로젝트에 접근 권한이 없습니다.' },
-          { status: 403 }
-        );
+        } : undefined
       }
-      console.log('프로젝트 접근 권한 확인 완료');
-    }
-    
-    console.log('일정 생성 시도');
-    
-    try {
-      // 일정 생성
-      // @ts-ignore - Calendar 모델이 Prisma 클라이언트에 있지만 타입이 제대로 인식되지 않을 때 사용
-      const calendar = await prisma.calendar.create({
-        data: {
-          title,
-          description: description || "",
-          startDate: new Date(startDate),
-          endDate: endDate ? new Date(endDate) : null,
-          isAllDay: isAllDay || false,
-          userId: currentUser.id,
-          projectId: projectId || null,
-        },
-      });
-      
-      console.log('일정 생성 성공:', calendar);
-      return NextResponse.json(calendar, { status: 201 });
-    } catch (err: any) {
-      console.error('Prisma 오류:', err);
-      
-      // Prisma 오류 메시지 구체화
-      const errorMessage = err.message || '알 수 없는 오류가 발생했습니다.';
-      
-      return NextResponse.json(
-        { error: `일정 생성 중 데이터베이스 오류가 발생했습니다: ${errorMessage}` },
-        { status: 500 }
-      );
-    }
-  } catch (error: any) {
-    console.error('캘린더 일정 생성 오류:', error.stack || error);
+    });
+
+    return NextResponse.json(newEvent, { status: 201 });
+  } catch (error) {
+    console.error('캘린더 이벤트 생성 오류:', error);
     return NextResponse.json(
-      { error: '캘린더 일정을 생성하는 중 오류가 발생했습니다.' },
+      { error: '캘린더 이벤트 생성 중 오류가 발생했습니다' },
       { status: 500 }
     );
   }
