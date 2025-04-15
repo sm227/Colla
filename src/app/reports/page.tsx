@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   BarChart3Icon, 
   PieChartIcon, 
@@ -20,11 +20,120 @@ import {
   FileTextIcon
 } from "lucide-react";
 import Link from "next/link";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  ArcElement,
+  Tooltip,
+  Legend,
+  RadialLinearScale,
+  PointElement,
+  LineElement,
+  Filler
+} from 'chart.js';
+import { Bar, Doughnut, PolarArea, Line } from 'react-chartjs-2';
+
+// Chart.js 컴포넌트 등록
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  ArcElement,
+  Tooltip,
+  Legend,
+  RadialLinearScale,
+  PointElement,
+  LineElement,
+  Filler
+);
+
+interface ProjectData {
+  id: string;
+  name: string;
+  progress: number;
+  totalTasks: number;
+  completedTasks: number;
+  members: {
+    id: string;
+    name: string;
+    role: string;
+  }[];
+}
+
+interface MemberData {
+  id: string;
+  name: string;
+  role: string;
+  completedTasks: number;
+  totalTasks: number;
+  projects: number;
+}
+
+interface ReportData {
+  projects: ProjectData[];
+  taskStatus: Record<string, number>;
+  members: MemberData[];
+}
 
 export default function ReportsPage() {
   const [dateRange, setDateRange] = useState("이번 달");
   const [projectFilter, setProjectFilter] = useState("모든 프로젝트");
-  
+  const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchReportData();
+  }, []);
+
+  const fetchReportData = async () => {
+    try {
+      const response = await fetch('/api/reports');
+      const data = await response.json();
+      setReportData(data);
+    } catch (error) {
+      console.error('Error fetching report data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">데이터를 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!reportData) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircleIcon className="w-12 h-12 text-red-500 mx-auto" />
+          <p className="mt-4 text-gray-600">데이터를 불러오는 중 오류가 발생했습니다.</p>
+          <button 
+            onClick={fetchReportData}
+            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+          >
+            다시 시도
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const totalTasks = Object.values(reportData.taskStatus).reduce((a, b) => a + b, 0);
+  const completedTasks = reportData.taskStatus["done"] || 0;
+  const inProgressTasks = reportData.taskStatus["in-progress"] || 0;
+  const reviewTasks = reportData.taskStatus["review"] || 0;
+  const todoTasks = reportData.taskStatus["todo"] || 0;
+  const productivity = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       {/* 페이지 헤더 */}
@@ -57,7 +166,10 @@ export default function ReportsPage() {
         </div>
         
         <div className="flex gap-2">
-          <button className="flex items-center px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50">
+          <button 
+            onClick={fetchReportData}
+            className="flex items-center px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
+          >
             <RefreshCwIcon className="w-4 h-4 mr-2" />
             새로고침
           </button>
@@ -72,8 +184,8 @@ export default function ReportsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <MetricCard 
           title="완료된 작업" 
-          value="42" 
-          change={8} 
+          value={completedTasks.toString()} 
+          change={5} 
           changeType="increase" 
           icon={<CheckCircleIcon className="w-5 h-5 text-green-500" />} 
           description="지난 달 대비"
@@ -81,7 +193,7 @@ export default function ReportsPage() {
         
         <MetricCard 
           title="진행 중인 작업" 
-          value="18" 
+          value={inProgressTasks.toString()} 
           change={3} 
           changeType="decrease" 
           icon={<ClockIcon className="w-5 h-5 text-blue-500" />} 
@@ -90,7 +202,7 @@ export default function ReportsPage() {
         
         <MetricCard 
           title="지연된 작업" 
-          value="7" 
+          value={todoTasks.toString()} 
           change={2} 
           changeType="increase" 
           icon={<AlertCircleIcon className="w-5 h-5 text-red-500" />} 
@@ -100,7 +212,7 @@ export default function ReportsPage() {
         
         <MetricCard 
           title="팀 생산성" 
-          value="87%" 
+          value={`${productivity}%`} 
           change={5} 
           changeType="increase" 
           icon={<TrendingUpIcon className="w-5 h-5 text-purple-500" />} 
@@ -110,73 +222,248 @@ export default function ReportsPage() {
       
       {/* 차트 및 그래프 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white rounded-lg shadow-sm p-4">
-          <div className="flex justify-between items-center mb-4">
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-medium text-gray-900">프로젝트 진행 상황</h2>
-            <button className="text-sm text-gray-500 hover:text-gray-700">
-              <ChevronDownIcon className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="h-64 flex items-center justify-center">
-            {/* 실제 차트 대신 임시 시각화 */}
-            <div className="w-full flex items-end justify-between h-48 px-4">
-              <div className="flex flex-col items-center">
-                <div className="w-12 bg-blue-500 rounded-t-md" style={{ height: '60%' }}></div>
-                <span className="text-xs mt-2 text-gray-600">1주차</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <div className="w-12 bg-blue-500 rounded-t-md" style={{ height: '75%' }}></div>
-                <span className="text-xs mt-2 text-gray-600">2주차</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <div className="w-12 bg-blue-500 rounded-t-md" style={{ height: '45%' }}></div>
-                <span className="text-xs mt-2 text-gray-600">3주차</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <div className="w-12 bg-blue-500 rounded-t-md" style={{ height: '90%' }}></div>
-                <span className="text-xs mt-2 text-gray-600">4주차</span>
-              </div>
+            <div className="flex gap-2">
+              <select className="text-sm text-gray-700 border border-gray-300 rounded-md px-2 py-1">
+                <option>진행률</option>
+                <option>마감일</option>
+              </select>
             </div>
           </div>
-          <div className="text-xs text-gray-500 text-center">주간 완료된 작업 수</div>
+          <div className="h-72">
+            {reportData.projects.length > 0 && (
+              <Bar
+                data={{
+                  labels: reportData.projects.map(project => project.name),
+                  datasets: [
+                    {
+                      label: '진행률',
+                      data: reportData.projects.map(project => project.progress),
+                      backgroundColor: reportData.projects.map(project => 
+                        project.progress < 30 ? 'rgba(239, 68, 68, 0.7)' : // 빨간색 (지연)
+                        project.progress < 70 ? 'rgba(59, 130, 246, 0.7)' : // 파란색 (진행 중)
+                        'rgba(16, 185, 129, 0.7)' // 초록색 (거의 완료)
+                      ),
+                      borderColor: reportData.projects.map(project => 
+                        project.progress < 30 ? 'rgb(239, 68, 68)' : 
+                        project.progress < 70 ? 'rgb(59, 130, 246)' : 
+                        'rgb(16, 185, 129)'
+                      ),
+                      borderWidth: 1,
+                      borderRadius: 4,
+                    }
+                  ]
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      display: false,
+                    },
+                    tooltip: {
+                      callbacks: {
+                        label: function(context) {
+                          return `진행률: ${context.raw}%`;
+                        }
+                      }
+                    }
+                  },
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      max: 100,
+                      ticks: {
+                        callback: function(value) {
+                          return value + '%';
+                        }
+                      }
+                    }
+                  }
+                }}
+              />
+            )}
+          </div>
+          <div className="text-xs text-gray-500 text-center mt-4">프로젝트별 완료율</div>
         </div>
         
-        <div className="bg-white rounded-lg shadow-sm p-4">
-          <div className="flex justify-between items-center mb-4">
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-medium text-gray-900">작업 상태 분포</h2>
-            <button className="text-sm text-gray-500 hover:text-gray-700">
-              <ChevronDownIcon className="w-4 h-4" />
-            </button>
+            <div className="text-sm text-gray-500">총 {totalTasks}개 작업</div>
           </div>
-          <div className="h-64 flex items-center justify-center">
-            {/* 실제 차트 대신 임시 원형 차트 */}
-            <div className="relative w-48 h-48">
-              <div className="absolute inset-0 rounded-full border-8 border-green-500" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 100%, 0 0, 50% 50%)' }}></div>
-              <div className="absolute inset-0 rounded-full border-8 border-blue-500" style={{ clipPath: 'polygon(50% 50%, 100% 0, 100% 100%, 0 100%, 0 0, 50% 0)' }}></div>
-              <div className="absolute inset-0 rounded-full border-8 border-red-500" style={{ clipPath: 'polygon(50% 50%, 0 0, 50% 0, 100% 0, 100% 100%, 50% 100%)' }}></div>
-              <div className="absolute inset-0 rounded-full border-8 border-yellow-500" style={{ clipPath: 'polygon(50% 50%, 100% 100%, 0 100%, 0 0)' }}></div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-24 h-24 bg-white rounded-full"></div>
-              </div>
-            </div>
+          <div className="h-72 flex items-center justify-center">
+            {Object.keys(reportData.taskStatus).length > 0 && (
+              <Doughnut
+                data={{
+                  labels: Object.keys(reportData.taskStatus).map(status => getStatusText(status)),
+                  datasets: [
+                    {
+                      data: Object.values(reportData.taskStatus),
+                      backgroundColor: [
+                        'rgba(16, 185, 129, 0.7)', // 완료 (녹색)
+                        'rgba(59, 130, 246, 0.7)', // 진행 중 (파란색)
+                        'rgba(245, 158, 11, 0.7)', // 검토 중 (주황색)
+                        'rgba(107, 114, 128, 0.7)', // 할 일 (회색)
+                      ],
+                      borderColor: [
+                        'rgb(16, 185, 129)',
+                        'rgb(59, 130, 246)',
+                        'rgb(245, 158, 11)',
+                        'rgb(107, 114, 128)',
+                      ],
+                      borderWidth: 1,
+                      hoverOffset: 12,
+                    },
+                  ],
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  cutout: '65%',
+                  plugins: {
+                    legend: {
+                      position: 'bottom',
+                      labels: {
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        padding: 15,
+                        font: {
+                          size: 12,
+                        }
+                      }
+                    },
+                    tooltip: {
+                      callbacks: {
+                        label: function(context) {
+                          const value = context.raw as number;
+                          const percentage = Math.round((value / totalTasks) * 100);
+                          return `${context.label}: ${value}개 (${percentage}%)`;
+                        }
+                      }
+                    }
+                  },
+                }}
+              />
+            )}
           </div>
-          <div className="flex justify-center gap-6 mt-4">
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-              <span className="text-xs text-gray-600">완료 (42)</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
-              <span className="text-xs text-gray-600">진행 중 (18)</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
-              <span className="text-xs text-gray-600">지연 (7)</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
-              <span className="text-xs text-gray-600">검토 중 (12)</span>
-            </div>
+        </div>
+      </div>
+      
+      {/* 추가 그래프 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-medium text-gray-900">주간 작업 완료 추이</h2>
+            <div className="text-sm text-gray-500">최근 4주</div>
+          </div>
+          <div className="h-72">
+            <Line
+              data={{
+                labels: ['1주 전', '2주 전', '3주 전', '4주 전'],
+                datasets: [
+                  {
+                    fill: true,
+                    label: '완료된 작업',
+                    data: [
+                      Math.round(completedTasks * 0.8), 
+                      Math.round(completedTasks * 0.6), 
+                      Math.round(completedTasks * 0.4), 
+                      Math.round(completedTasks * 0.2)
+                    ],
+                    borderColor: 'rgb(16, 185, 129)',
+                    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                    tension: 0.3,
+                  },
+                  {
+                    fill: true,
+                    label: '생성된 작업',
+                    data: [
+                      Math.round(totalTasks * 0.9), 
+                      Math.round(totalTasks * 0.7), 
+                      Math.round(totalTasks * 0.5), 
+                      Math.round(totalTasks * 0.3)
+                    ],
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                    tension: 0.3,
+                  }
+                ],
+              }}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    position: 'top',
+                  },
+                },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    grid: {
+                      display: true,
+                    },
+                  },
+                  x: {
+                    grid: {
+                      display: false,
+                    },
+                  },
+                },
+              }}
+            />
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-medium text-gray-900">팀원별 작업 분포</h2>
+            <div className="text-sm text-gray-500">상위 팀원</div>
+          </div>
+          <div className="h-72 flex items-center justify-center">
+            <PolarArea
+              data={{
+                labels: reportData.members.slice(0, 5).map(member => member.name),
+                datasets: [
+                  {
+                    data: reportData.members.slice(0, 5).map(member => member.completedTasks),
+                    backgroundColor: [
+                      'rgba(16, 185, 129, 0.7)',
+                      'rgba(59, 130, 246, 0.7)',
+                      'rgba(245, 158, 11, 0.7)',
+                      'rgba(239, 68, 68, 0.7)',
+                      'rgba(107, 114, 128, 0.7)',
+                    ],
+                    borderWidth: 1,
+                  },
+                ],
+              }}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    position: 'bottom',
+                    labels: {
+                      font: {
+                        size: 12,
+                      }
+                    }
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: function(context) {
+                        const member = reportData.members.slice(0, 5)[context.dataIndex];
+                        return `완료된 작업: ${member.completedTasks}개 (${Math.round((member.completedTasks / member.totalTasks) * 100)}%)`;
+                      }
+                    }
+                  }
+                },
+              }}
+            />
           </div>
         </div>
       </div>
@@ -199,65 +486,23 @@ export default function ReportsPage() {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">진행률</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">담당자</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">마감일</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작업</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              <ProjectRow 
-                name="마케팅 캠페인 기획" 
-                status="진행 중" 
-                progress={75} 
-                owner="김지민" 
-                dueDate="2023-06-30" 
-                tasks={{total: 12, completed: 9}}
-                type="칸반보드"
-                icon={<Trello className="w-4 h-4 text-purple-600" />}
-              />
-              
-              <ProjectRow 
-                name="제품 개발 로드맵" 
-                status="검토 중" 
-                progress={40} 
-                owner="이승우" 
-                dueDate="2023-07-15" 
-                tasks={{total: 8, completed: 3}}
-                type="문서"
-                icon={<FileTextIcon className="w-4 h-4 text-green-600" />}
-              />
-              
-              <ProjectRow 
-                name="웹사이트 리디자인" 
-                status="지연" 
-                progress={60} 
-                owner="박소연" 
-                dueDate="2023-06-10" 
-                tasks={{total: 10, completed: 6}}
-                type="칸반보드"
-                icon={<Trello className="w-4 h-4 text-purple-600" />}
-              />
-              
-              <ProjectRow 
-                name="고객 피드백 분석" 
-                status="완료" 
-                progress={100} 
-                owner="최준호" 
-                dueDate="2023-06-05" 
-                tasks={{total: 5, completed: 5}}
-                type="문서"
-                icon={<FileTextIcon className="w-4 h-4 text-green-600" />}
-              />
-              
-              <ProjectRow 
-                name="모바일 앱 개발" 
-                status="진행 중" 
-                progress={35} 
-                owner="정다은" 
-                dueDate="2023-08-20" 
-                tasks={{total: 15, completed: 5}}
-                type="칸반보드"
-                icon={<Trello className="w-4 h-4 text-purple-600" />}
-              />
+              {reportData.projects.map((project) => (
+                <ProjectRow 
+                  key={project.id}
+                  name={project.name}
+                  status={project.progress === 100 ? "done" : "in-progress"}
+                  statusText={getStatusText(project.progress === 100 ? "done" : "in-progress")}
+                  progress={project.progress}
+                  owner={project.members[0]?.name || "미지정"}
+                  tasks={{total: project.totalTasks, completed: project.completedTasks}}
+                  type="칸반보드"
+                  icon={<Trello className="w-4 h-4 text-purple-600" />}
+                />
+              ))}
             </tbody>
           </table>
         </div>
@@ -271,57 +516,40 @@ export default function ReportsPage() {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <MemberCard 
-            name="김지민" 
-            role="프로젝트 매니저" 
-            tasks={{completed: 15, total: 18}} 
-            projects={3}
-            avatar="KJ"
-          />
-          
-          <MemberCard 
-            name="이승우" 
-            role="제품 디자이너" 
-            tasks={{completed: 12, total: 14}} 
-            projects={2}
-            avatar="LS"
-          />
-          
-          <MemberCard 
-            name="박소연" 
-            role="UI/UX 디자이너" 
-            tasks={{completed: 8, total: 12}} 
-            projects={2}
-            avatar="PS"
-          />
-          
-          <MemberCard 
-            name="최준호" 
-            role="프론트엔드 개발자" 
-            tasks={{completed: 20, total: 22}} 
-            projects={4}
-            avatar="CJ"
-          />
-          
-          <MemberCard 
-            name="정다은" 
-            role="백엔드 개발자" 
-            tasks={{completed: 18, total: 20}} 
-            projects={3}
-            avatar="JD"
-          />
-          
-          <MemberCard 
-            name="한민수" 
-            role="마케팅 스페셜리스트" 
-            tasks={{completed: 10, total: 15}} 
-            projects={2}
-            avatar="HM"
-          />
+          {reportData.members.map((member) => (
+            <MemberCard 
+              key={member.id}
+              name={member.name}
+              role={member.role}
+              tasks={{completed: member.completedTasks, total: member.totalTasks}}
+              projects={member.projects}
+              avatar={member.name.slice(0, 2).toUpperCase()}
+            />
+          ))}
         </div>
       </div>
     </div>
   );
+}
+
+function getStatusColor(status: string): string {
+  switch(status) {
+    case "done": return "bg-green-500";
+    case "in-progress": return "bg-blue-500";
+    case "review": return "bg-yellow-500";
+    case "todo": return "bg-gray-500";
+    default: return "bg-gray-500";
+  }
+}
+
+function getStatusText(status: string): string {
+  switch(status) {
+    case "done": return "완료";
+    case "in-progress": return "진행 중";
+    case "review": return "검토 중";
+    case "todo": return "할 일";
+    default: return status;
+  }
 }
 
 function MetricCard({ 
@@ -372,34 +600,34 @@ function MetricCard({
 function ProjectRow({ 
   name, 
   status, 
+  statusText,
   progress, 
   owner, 
-  dueDate,
   tasks,
   type,
   icon
 }: { 
   name: string; 
-  status: string; 
+  status: string;
+  statusText: string;
   progress: number; 
   owner: string; 
-  dueDate: string;
   tasks: {total: number; completed: number};
   type: string;
   icon: React.ReactNode;
 }) {
   const getStatusColor = (status: string) => {
     switch(status) {
-      case '완료': return 'bg-green-100 text-green-800';
-      case '진행 중': return 'bg-blue-100 text-blue-800';
-      case '지연': return 'bg-red-100 text-red-800';
-      case '검토 중': return 'bg-yellow-100 text-yellow-800';
+      case 'done': return 'bg-green-100 text-green-800';
+      case 'in-progress': return 'bg-blue-100 text-blue-800';
+      case 'review': return 'bg-yellow-100 text-yellow-800';
+      case 'todo': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
   
   const statusClass = getStatusColor(status);
-  const isOverdue = new Date(dueDate) < new Date() && status !== '완료';
+  const isOverdue = new Date() < new Date() && status !== 'done';
   
   return (
     <tr>
@@ -411,14 +639,14 @@ function ProjectRow({
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}`}>
-          {status}
+          {statusText}
         </span>
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
         <div className="flex items-center">
           <div className="w-full bg-gray-200 rounded-full h-2 mr-2">
             <div 
-              className={`h-2 rounded-full ${status === '지연' ? 'bg-red-600' : 'bg-blue-600'}`}
+              className={`h-2 rounded-full ${status === 'todo' ? 'bg-gray-600' : 'bg-blue-600'}`}
               style={{ width: `${progress}%` }}
             ></div>
           </div>
@@ -427,12 +655,6 @@ function ProjectRow({
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
         <div className="text-sm text-gray-900">{owner}</div>
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap">
-        <div className={`text-sm ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
-          {isOverdue && <AlertCircleIcon className="w-4 h-4 inline mr-1" />}
-          {new Date(dueDate).toLocaleDateString('ko-KR')}
-        </div>
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
         {tasks.completed}/{tasks.total} 완료
