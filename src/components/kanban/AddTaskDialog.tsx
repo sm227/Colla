@@ -81,6 +81,9 @@ export function AddTaskDialog({ isOpen, onClose, onAddTask, projectId }: AddTask
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // 제목이 비어있으면 제출하지 않음
+    if (!title.trim()) return;
+    
     onAddTask({
       title,
       description,
@@ -90,6 +93,23 @@ export function AddTaskDialog({ isOpen, onClose, onAddTask, projectId }: AddTask
       dueDate: dueDate ? new Date(dueDate) : undefined,
     });
     
+    // 폼 초기화 (제목만 초기화하고 다른 필드는 유지)
+    setTitle("");
+    
+    // 대화상자는 닫지 않고 유지
+    // onClose();
+  };
+
+  // 엔터키 핸들러 추가
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSubmit(e as unknown as React.FormEvent);
+    }
+  };
+
+  // 취소 버튼 핸들러
+  const handleCancel = () => {
     // 폼 초기화
     setTitle("");
     setDescription("");
@@ -192,7 +212,7 @@ export function AddTaskDialog({ isOpen, onClose, onAddTask, projectId }: AddTask
             새 작업 추가
           </h2>
           <button
-            onClick={onClose}
+            onClick={handleCancel}
             className="text-gray-500 hover:text-gray-700 rounded-full p-1 hover:bg-gray-100 transition-colors"
             aria-label="닫기"
           >
@@ -211,9 +231,11 @@ export function AddTaskDialog({ isOpen, onClose, onAddTask, projectId }: AddTask
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                onKeyDown={handleKeyDown}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                placeholder="작업 제목 입력"
+                placeholder="작업 제목 입력 (엔터키로 연속 추가 가능)"
                 required
+                autoFocus
               />
             </div>
 
@@ -397,20 +419,20 @@ export function AddTaskDialog({ isOpen, onClose, onAddTask, projectId }: AddTask
           </div>
 
           {/* 버튼 영역 */}
-          <div className="mt-8 flex justify-end space-x-3 border-t pt-5">
+          <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2 bg-gray-50">
             <Button
               type="button"
-              onClick={onClose}
               variant="outline"
-              className="text-gray-700"
+              onClick={handleCancel}
+              className="bg-white hover:bg-gray-50"
             >
               취소
             </Button>
-            <Button 
+            <Button
               type="submit"
-              className="bg-purple-600 hover:bg-purple-700 flex items-center gap-1"
+              className="bg-blue-600 text-white hover:bg-blue-700"
             >
-              <span>작업 추가</span>
+              작업 추가
             </Button>
           </div>
         </form>
