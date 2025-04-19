@@ -33,6 +33,42 @@ export function KanbanColumn({
   const [isHovering, setIsHovering] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
+  const [lastScrollPosition, setLastScrollPosition] = useState(0);
+  const [tasksLength, setTasksLength] = useState(tasks.length);
+  const isFirstMount = useRef(true);
+  const isAddingTaskFromButton = useRef(false);
+  
+  // 고유한 컬럼 ID 생성
+  const columnElementId = `kanban-column-${status}`;
+  
+  // 작업 개수가 변경되면 스크롤 위치 복원 및 작업 추가 버튼 클릭
+  useEffect(() => {
+    // 첫 마운트 시에는 실행하지 않음
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      setTasksLength(tasks.length);
+      return;
+    }
+    
+    if (tasks.length !== tasksLength) {
+      const wasTaskAdded = tasks.length > tasksLength;
+      setTasksLength(tasks.length);
+      
+      // 스크롤 위치 복원 - UI 업데이트 후 실행되도록 지연
+      setTimeout(() => {
+        const columnElement = document.getElementById(columnElementId);
+        if (columnElement) {
+          columnElement.scrollTop = lastScrollPosition;
+        }
+        
+        // 작업이 추가된 직후에 작업 추가 버튼 자동 클릭 복원
+        // 단, 첫 마운트가 아닌 경우에만
+        if (wasTaskAdded && !isFirstMount.current) {
+          setIsAddingTask(true);
+        }
+      }, 100);
+    }
+  }, [tasks.length, tasksLength, lastScrollPosition, columnElementId]);
 
   // 드롭 영역 설정
   const { isOver, setNodeRef } = useDrop({
@@ -41,24 +77,36 @@ export function KanbanColumn({
     },
   });
   
-  const handleQuickAddTask = () => {
+  const handleQuickAddTask = async () => {
     if (!newTaskTitle.trim()) {
-      setIsAddingTask(false);
       return;
     }
     
-    if (onAddTask) {
-      onAddTask({
-        title: newTaskTitle,
-        description: "",
-        status: status,
-        priority: "medium",
-      });
+    try {
+      // 현재 스크롤 위치 저장
+      const columnElement = document.getElementById(columnElementId);
+      if (columnElement) {
+        setLastScrollPosition(columnElement.scrollTop);
+      }
+      
+      if (onAddTask) {
+        // onAddTask 함수 호출 (비동기)
+        await onAddTask({
+          title: newTaskTitle,
+          description: "",
+          status: status,
+          priority: "medium", 
+        });
+      }
+    } catch (error) {
+      console.error("작업 추가 중 오류 발생:", error);
+    } finally {
+      // 입력 필드 초기화
+      setNewTaskTitle("");
+      
+      // 입력창 닫기 (작업 추가 버튼은 useEffect에서 자동 클릭됨)
+      setIsAddingTask(false);
     }
-    
-    // 입력 필드 초기화 및 폼 닫기
-    setNewTaskTitle("");
-    setIsAddingTask(false);
   };
   
   // 키보드 이벤트 처리 함수
@@ -98,6 +146,11 @@ export function KanbanColumn({
       inputRef.current.focus();
     }
   }, [isAddingTask]);
+
+  // 컴포넌트 마운트 시 isAddingTask를 false로 명시적 설정
+  useEffect(() => {
+    setIsAddingTask(false);
+  }, []);
 
   // 컬럼 헤더 색상 설정
   const getColorClasses = () => {
@@ -147,6 +200,7 @@ export function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
+      id={columnElementId}
       className={`bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex flex-col ${
         isOver ? "ring-2 ring-blue-500" : ""
       }`}
@@ -165,7 +219,7 @@ export function KanbanColumn({
         </div>
       </div>
       
-      <div className="flex flex-col gap-2 p-3 flex-grow overflow-y-auto" style={{ maxHeight: '500px' }}>
+      <div className="flex flex-col gap-2 p-3 flex-grow">
         {/* 작업 목록 */}
         {tasks.map((task) => (
           <div key={task.id} onClick={() => onTaskClick(task)}>
@@ -191,16 +245,22 @@ export function KanbanColumn({
               value={newTaskTitle}
               onChange={(e) => setNewTaskTitle(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="무엇을 완료해야 합니까?"
+              placeholder="무엇을 완료해야 합니까? (엔터키로 추가)"
               className="w-full p-2 text-sm border-none rounded focus:outline-none placeholder-gray-500 font-medium"
               autoFocus
             />
-            <div className="px-2 py-1 text-xs text-gray-400 flex items-center justify-end">
+            <div className="px-2 py-1 text-xs text-gray-400 flex items-center justify-between">
+              <span className="text-blue-600 cursor-pointer" onClick={() => {
+                setIsAddingTask(false);
+                setNewTaskTitle("");
+              }}>
+                취소
+              </span>
               <span className="inline-flex items-center">
                 <svg className="w-3 h-3 mr-1 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M3 12h18M15 6l6 6-6 6" />
                 </svg>
-                입력
+                엔터키로 추가
               </span>
             </div>
           </div>
@@ -223,4 +283,4 @@ export function KanbanColumn({
       </div>
     </div>
   );
-} 
+}
