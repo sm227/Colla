@@ -245,7 +245,7 @@ export function KanbanColumn({
               value={newTaskTitle}
               onChange={(e) => setNewTaskTitle(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="무엇을 완료해야 합니까? (엔터키로 추가)"
+              placeholder="무엇을 완료해야 합니까?"
               className="w-full p-2 text-sm border-none rounded focus:outline-none placeholder-gray-500 font-medium"
               autoFocus
             />
@@ -260,7 +260,7 @@ export function KanbanColumn({
                 <svg className="w-3 h-3 mr-1 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M3 12h18M15 6l6 6-6 6" />
                 </svg>
-                엔터키로 추가
+                ENTER
               </span>
             </div>
           </div>
