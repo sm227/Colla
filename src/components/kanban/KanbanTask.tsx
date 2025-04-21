@@ -124,13 +124,7 @@ export function KanbanTask({ task, onUpdate, onDelete }: KanbanTaskProps) {
         </div>
       </div>
 
-      <TaskDetailDialog
-        task={task}
-        isOpen={isDetailOpen}
-        onClose={handleCloseDetail}
-        onUpdate={onUpdate}
-        onDelete={handleDeleteTask}
-      />
+      
     </>
   );
 } 
