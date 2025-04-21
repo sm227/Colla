@@ -23,7 +23,11 @@ import {
   SparklesIcon,
   // 추가 아이콘
   FileTextIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  SettingsIcon,
+  ShieldIcon,
+  KeyIcon,
+  UserPlusIcon
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -50,6 +54,7 @@ import Collaboration from '@tiptap/extension-collaboration';
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
 import * as Y from 'yjs';
 import { HocuspocusProvider } from '@hocuspocus/provider';
+import PasswordVerification from "@/components/document/PasswordVerification";
 
 // 문서 인터페이스 정의
 interface Document {
@@ -246,6 +251,212 @@ function TemplateModal({ isOpen, onClose, templates, onSelect, isLoading, select
     </div>
   );
 }
+
+// 암호 설정 모달 인터페이스
+interface PasswordModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  currentPassword: string | null;
+  isPasswordProtected: boolean;
+  onSave: (password: string | null, isProtected: boolean) => void;
+  isLoading: boolean;
+}
+
+// 암호 설정 모달 컴포넌트
+function PasswordModal({ isOpen, onClose, currentPassword, isPasswordProtected, onSave, isLoading }: PasswordModalProps) {
+  const [password, setPassword] = useState(currentPassword || '');
+  const [confirmPassword, setConfirmPassword] = useState(currentPassword || '');
+  const [enablePassword, setEnablePassword] = useState(isPasswordProtected);
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+
+  // 모달이 닫힐 때 상태 초기화
+  useEffect(() => {
+    if (isOpen) {
+      setPassword(currentPassword || '');
+      setConfirmPassword(currentPassword || '');
+      setEnablePassword(isPasswordProtected);
+      setError('');
+    }
+  }, [isOpen, currentPassword, isPasswordProtected]);
+
+  const handleSave = () => {
+    // 기본 검증
+    if (enablePassword) {
+      if (!password) {
+        setError('암호를 입력해주세요.');
+        return;
+      }
+      
+      if (password.length < 4) {
+        setError('암호는 최소 4자 이상이어야 합니다.');
+        return;
+      }
+      
+      if (password !== confirmPassword) {
+        setError('암호가 일치하지 않습니다.');
+        return;
+      }
+    }
+    
+    // 암호 비활성화 시 암호를 null로 설정
+    onSave(enablePassword ? password : null, enablePassword);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+        <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+          <h3 className="text-lg font-medium">문서 암호 설정</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        <div className="p-4">
+          <div className="mb-4">
+            <div className="flex items-center mb-4">
+              <input
+                type="checkbox"
+                id="enablePassword"
+                checked={enablePassword}
+                onChange={(e) => setEnablePassword(e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="enablePassword" className="ml-2 block text-sm text-gray-900">
+                문서 암호 보호 사용
+              </label>
+            </div>
+            
+            <p className="text-sm text-gray-500 mb-4">
+              암호 보호를 활성화하면 문서 접근 시 암호를 입력해야 합니다.
+            </p>
+            
+            {enablePassword && (
+              <>
+                <div className="mb-4">
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                    암호
+                  </label>
+                  <div className="relative rounded-md shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <KeyIcon className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      id="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="block w-full pl-10 pr-10 py-2 sm:text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="문서 접근 암호 입력"
+                    />
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="text-gray-400 hover:text-gray-500 focus:outline-none"
+                      >
+                        {showPassword ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                          </svg>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mb-4">
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                    암호 확인
+                  </label>
+                  <div className="relative rounded-md shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <KeyIcon className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      id="confirmPassword"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="block w-full pl-10 pr-3 py-2 sm:text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="암호 확인"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+            
+            {error && (
+              <div className="text-sm text-red-600 mt-2">
+                {error}
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="px-4 py-3 bg-gray-50 text-right sm:px-6 flex justify-end space-x-2">
+          <button
+            onClick={onClose}
+            className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            취소
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isLoading}
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+          >
+            {isLoading ? '저장 중...' : '저장'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 편의를 위한 간단한 토스트 함수
+const showToast = (title: string, description: string, status: 'success' | 'error' | 'info' | 'warning') => {
+  // 토스트 메시지를 표시하는 HTML 요소 생성
+  const toast = document.createElement('div');
+  toast.className = `fixed top-4 right-4 bg-${status === 'success' ? 'green' : status === 'error' ? 'red' : 'blue'}-50 border-l-4 border-${status === 'success' ? 'green' : status === 'error' ? 'red' : 'blue'}-500 p-4 rounded shadow-lg z-50 transition-opacity duration-500`;
+  
+  toast.innerHTML = `
+    <div class="flex">
+      <div class="flex-shrink-0">
+        ${status === 'success' 
+          ? '<svg class="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>'
+          : status === 'error'
+            ? '<svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>'
+            : '<svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clip-rule="evenodd"></path></svg>'
+        }
+      </div>
+      <div class="ml-3">
+        <p class="text-sm font-medium text-${status === 'success' ? 'green' : status === 'error' ? 'red' : 'blue'}-800">${title}</p>
+        <p class="text-sm text-${status === 'success' ? 'green' : status === 'error' ? 'red' : 'blue'}-700 mt-1">${description}</p>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(toast);
+  
+  // 3초 후에 토스트 제거
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => {
+      document.body.removeChild(toast);
+    }, 500);
+  }, 3000);
+};
 
 export default function DocumentPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -640,22 +851,35 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
             throw new Error('문서를 불러오는데 실패했습니다.');
           }
           
-          const documentData = await response.json();
+          const data = await response.json();
           
-          // 받아온 데이터로 상태 업데이트
-          setTitle(documentData.title);
-          setEmoji(documentData.emoji || "📄");
-          setIsStarred(documentData.isStarred || false);
-          setFolder(documentData.folder || "기본 폴더");
-          setFolderId(documentData.folderId || null); // DB 컬럼명에 맞게 수정
+          // 문서 데이터 설정
+          setDocumentData({
+            id: data.id,
+            title: data.title || '제목 없음',
+            content: data.content || '',
+            emoji: data.emoji || '',
+            isStarred: data.isStarred || false,
+            folder: data.folder || '기본 폴더',
+            folderId: data.folderId || null,
+            tags: data.tags ? JSON.parse(data.tags) : [],
+            projectId: data.projectId || '',
+          });
+
+          // 상태 업데이트
+          setTitle(data.title);
+          setEmoji(data.emoji || "📄");
+          setIsStarred(data.isStarred || false);
+          setFolder(data.folder || "기본 폴더");
+          setFolderId(data.folderId || null);
           
-          // 읽기 전용 모드 설정 (DB에서 가져온 값 사용)
-          setIsReadOnlyMode(documentData.isReadOnly || false);
+          // 읽기 전용 모드 설정
+          setIsReadOnlyMode(data.isReadOnly || false);
           
-          // Tags 처리 - JSON 문자열을 배열로 변환
-          if (documentData.tags) {
+          // Tags 처리
+          if (data.tags) {
             try {
-              const parsedTags = JSON.parse(documentData.tags);
+              const parsedTags = JSON.parse(data.tags);
               setTags(Array.isArray(parsedTags) ? parsedTags : ["문서"]);
             } catch {
               setTags(["문서"]);
@@ -663,35 +887,45 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
           } else {
             setTags(["문서"]);
           }
+
+          // 암호 보호 상태 설정
+          const isProtected = data.isPasswordProtected || false;
+          setIsPasswordProtected(isProtected);
+          setDocumentPassword(data.password ? '********' : null);
           
-          // 선택된 프로젝트 ID 설정 (우선순위: URL > API)
+          // 비밀번호 보호된 문서이고 아직 인증되지 않았으면 인증 요구
+          if (isProtected && !isPasswordVerified) {
+            setNeedsPasswordVerification(true);
+            // 로딩 상태 해제하여 인증 화면 표시
+            setIsLoading(false);
+            return;
+          }
+          
+          // 프로젝트 ID 설정
           let projectIdToUse = null;
-          
           if (projectId) {
             projectIdToUse = projectId;
-          } else if (documentData.projectId) {
-            projectIdToUse = documentData.projectId;
+          } else if (data.projectId) {
+            projectIdToUse = data.projectId;
           }
           
           // 디버깅용 참조 업데이트
-          debugRef.current.projectIdFromAPI = documentData.projectId;
+          debugRef.current.projectIdFromAPI = data.projectId;
           
           // 프로젝트 ID 설정
           forceSetProjectId(projectIdToUse);
           
-          // 일정 시간 후에도 Y.js에서 컨텐츠가 로드되지 않았다면
-          // DB에서 가져온 HTML 내용을 사용 (fallback)
+          // 에디터 내용 설정 (Y.js 콘텐츠가 없을 경우)
           const timeoutId = setTimeout(() => {
-            if (!contentLoadedFromYjs && editor && documentData.content) {
+            if (!contentLoadedFromYjs && editor && data.content) {
               console.log('Y.js 데이터가 없어 DB 내용을 로드합니다.');
               
-              // 기존 내용이 비어있는지 확인
               if (editor.isEmpty) {
-                editor.commands.setContent(documentData.content || '<p></p>');
+                editor.commands.setContent(data.content || '<p></p>');
               }
             }
             setIsLoading(false);
-          }, 2000); // 2초 기다림 (더 긴 시간으로 조정)
+          }, 2000);
           
           return () => clearTimeout(timeoutId);
         } catch (error) {
@@ -702,7 +936,6 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
             editor.commands.setContent('<p>문서를 불러오는 중 오류가 발생했습니다.</p>');
           }
           
-          // 오류 상태 설정
           setLoadingError(error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다');
           setIsLoading(false);
         }
@@ -998,44 +1231,112 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
     const handleDOMEvents = () => {
       // 에디터의 DOM 요소 가져오기
       const editorElement = document.querySelector('.ProseMirror');
-      if (!editorElement) return;
+      if (!editorElement) {
+        // DOM 요소가 아직 없으면 짧은 시간 후에 다시 시도
+        setTimeout(handleDOMEvents, 100);
+        return;
+      }
       
       // 키 입력 이벤트 핸들러
       const handleKeyDown = (event: Event) => {
         const keyEvent = event as KeyboardEvent;
         if (keyEvent.key === '/' && !showSlashMenu) {
-          // 현재 커서 위치 계산
-          const { view } = editor;
-          const { state } = view;
-          const { selection } = state;
-          const { ranges } = selection;
-          const from = Math.min(...ranges.map(range => range.$from.pos));
-          
-          // 현재 커서 위치의 DOM 좌표 찾기
-          const pos = view.coordsAtPos(from);
-          
-          // 슬래시 메뉴 위치 설정
-          setSlashMenuPosition({
-            x: pos.left,
-            y: pos.bottom
-          });
-          
-          // 메뉴 표시
-          setShowSlashMenu(true);
-        }
-        
-        // 백스페이스 키를 눌렀을 때 슬래시 메뉴가 열려있으면 닫기
-        if (keyEvent.key === 'Backspace' && showSlashMenu) {
-          // 현재 커서 위치
-          const { state } = editor.view;
-          const { selection } = state;
-          const { from } = selection;
-          
-          // 커서 바로 앞의 문자가 '/'인지 확인 (백스페이스로 삭제될 문자)
-          const textBefore = state.doc.textBetween(Math.max(0, from - 1), from);
-          
-          // '/'를 지우는 경우 메뉴 닫기
-          if (textBefore === '/') {
+          try {
+            // 현재 커서 위치 계산
+            const { view } = editor;
+            
+            // 먼저 view와 state가 유효한지 확인
+            if (!view || !view.state) {
+              throw new Error("에디터 view 또는 state가 유효하지 않습니다");
+            }
+            
+            const { state } = view;
+            const { selection } = state;
+            
+            // 선택이 유효하고 ranges가 있는지 확인
+            if (!selection || !selection.ranges || selection.ranges.length === 0) {
+              throw new Error("에디터 선택 범위가 유효하지 않습니다");
+            }
+            
+            const { ranges } = selection;
+            const from = Math.min(...ranges.map(range => range.$from.pos));
+            
+            // 에디터 DOM 요소 직접 찾기
+            const editorElement = document.querySelector('.ProseMirror');
+            if (!editorElement) {
+              throw new Error("에디터 DOM 요소를 찾을 수 없습니다");
+            }
+            
+            const editorRect = editorElement.getBoundingClientRect();
+            
+            // 기본 메뉴 위치
+            let menuX = editorRect.left + 50;
+            let menuY = editorRect.top + 100;
+            
+            // 커서 좌표 계산 시도
+            try {
+              if (view.domAtPos && typeof view.domAtPos === 'function' && 
+                  from >= 0 && from <= state.doc.content.size) {
+                
+                // domAtPos를 통해 노드 가져오기
+                const domPos = view.domAtPos(from);
+                if (domPos && domPos.node) {
+                  // 커서 좌표 가져오기
+                  const pos = view.coordsAtPos(from);
+                  
+                  // 항상 커서 좌표를 직접 사용하여 메뉴를 표시
+                  menuX = pos.left;
+                  menuY = pos.bottom + 5;
+                }
+              }
+            } catch (coordError) {
+              console.warn("커서 좌표 계산 실패:", coordError);
+              // 기본 위치 사용 유지 (이미 위에서 설정됨)
+            }
+            
+            // 화면 경계 확인
+            if (menuX + 280 > window.innerWidth) {
+              menuX = Math.max(window.innerWidth - 280, 0);
+            }
+            
+            if (menuY + 420 > window.innerHeight) {
+              menuY = Math.max(window.innerHeight - 420, 10);
+            }
+            
+            // 슬래시가 입력될 시간을 주기 위해 약간의 지연 후 메뉴 표시
+            setTimeout(() => {
+              setSlashMenuPosition({
+                x: menuX,
+                y: menuY
+              });
+              setShowSlashMenu(true);
+            }, 10); // 10ms 지연으로 슬래시가 입력되도록
+          } catch (error) {
+            console.error("슬래시 메뉴 표시 중 오류 발생:", error);
+            // 오류 발생 시 화면 중앙에 메뉴 표시
+            setTimeout(() => {
+              setSlashMenuPosition({
+                x: Math.max(window.innerWidth / 2 - 140, 10),
+                y: window.innerHeight / 3
+              });
+              setShowSlashMenu(true);
+            }, 10);
+          }
+        } else if (keyEvent.key === 'Backspace' && showSlashMenu) {
+          // 백스페이스 키를 눌렀을 때 슬래시 메뉴가 열려있으면 닫기
+          try {
+            const { state } = editor.view;
+            const { selection } = state;
+            const { from } = selection;
+            
+            // 커서 바로 앞의 문자가 '/'인지 확인
+            const textBefore = state.doc.textBetween(Math.max(0, from - 1), from);
+            
+            if (textBefore === '/') {
+              setShowSlashMenu(false);
+            }
+          } catch (error) {
+            // 오류 발생 시 안전하게 메뉴 숨기기
             setShowSlashMenu(false);
           }
         }
@@ -1060,6 +1361,10 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
         }
       };
       
+      // 새 이벤트 리스너 추가 전에 기존 리스너 제거 (중복 방지)
+      editorElement.removeEventListener('keydown', handleKeyDown);
+      editorElement.removeEventListener('input', handleInput);
+      
       // 이벤트 리스너 추가
       editorElement.addEventListener('keydown', handleKeyDown);
       editorElement.addEventListener('input', handleInput);
@@ -1071,11 +1376,31 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       };
     };
     
+    // 에디터 내용 변경 감지하는 핸들러 추가 (붙여넣기 등 작업 후 호출됨)
+    const onEditorUpdate = () => {
+      // 에디터 업데이트 시 이벤트 리스너 재등록
+      handleDOMEvents();
+    };
+    
+    // 에디터 업데이트 이벤트 구독
+    editor.on('update', onEditorUpdate);
+    
     // 에디터가 마운트된 후 DOM 이벤트 리스너 설정
-    const setupTimeout = setTimeout(handleDOMEvents, 100);
+    handleDOMEvents();
     
     return () => {
-      clearTimeout(setupTimeout);
+      // 이벤트 구독 해제
+      editor.off('update', onEditorUpdate);
+      
+      // 에디터의 DOM 요소 가져오기
+      const editorElement = document.querySelector('.ProseMirror');
+      if (editorElement) {
+        // 모든 이벤트 리스너 제거 시도
+        const newEvent = new Event('keydown');
+        const newInputEvent = new Event('input');
+        editorElement.removeEventListener('keydown', () => {});
+        editorElement.removeEventListener('input', () => {});
+      }
     };
   }, [editor, showSlashMenu]);
   
@@ -1969,6 +2294,113 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
     projectId: '',
   });
 
+  const [showSecurityMenu, setShowSecurityMenu] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [isPasswordProtected, setIsPasswordProtected] = useState(false);
+  const [documentPassword, setDocumentPassword] = useState<string | null>(null);
+  const [isPasswordSaving, setIsPasswordSaving] = useState(false);
+  const [isPasswordVerified, setIsPasswordVerified] = useState(false);
+  const [needsPasswordVerification, setNeedsPasswordVerification] = useState(false);
+  
+  // 드롭다운 메뉴 토글 함수
+  const toggleSecurityMenu = (e: React.MouseEvent) => {
+    e.stopPropagation(); // 이벤트 버블링 방지
+    setShowSecurityMenu(!showSecurityMenu);
+  };
+  
+  // 문서 외부 클릭 감지 이벤트 추가
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showSecurityMenu && !target.closest('.security-menu-container')) {
+        setShowSecurityMenu(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSecurityMenu]);
+
+  // 문서 비밀번호 업데이트 함수
+  const updateDocumentPassword = async (password: string | null, isProtected: boolean) => {
+    try {
+      setIsPasswordSaving(true);
+      
+      const response = await fetch(`/api/documents/${params.id}/password`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          password,
+          isPasswordProtected: isProtected,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || '암호 설정 중 오류가 발생했습니다.');
+      }
+
+      // 성공적으로 저장되면 상태 업데이트
+      setDocumentPassword(password);
+      setIsPasswordProtected(isProtected);
+      setShowPasswordModal(false);
+      
+      // 성공 메시지 표시
+      showToast(
+        "암호 설정 완료", 
+        isProtected ? "문서에 암호가 설정되었습니다." : "문서 암호가 해제되었습니다.", 
+        "success"
+      );
+      
+    } catch (error: any) {
+      showToast(
+        "암호 설정 실패", 
+        error.message, 
+        "error"
+      );
+    } finally {
+      setIsPasswordSaving(false);
+    }
+  };
+
+  // 드롭다운 메뉴에서 암호 설정 버튼 클릭 핸들러
+  const handleOpenPasswordModal = () => {
+    setShowPasswordModal(true);
+    setShowSecurityMenu(false);
+  };
+  
+  // 암호 검증 성공 처리
+  const handlePasswordVerificationSuccess = () => {
+    setIsPasswordVerified(true);
+    setNeedsPasswordVerification(false);
+  };
+  
+  // 로딩 중이거나 암호 검증이 필요한 경우 적절한 UI 표시
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 bg-white bg-opacity-70 flex items-center justify-center z-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">문서 가져오는 중...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (needsPasswordVerification) {
+    return (
+      <PasswordVerification 
+        documentId={params.id} 
+        onSuccess={handlePasswordVerificationSuccess} 
+        onCancel={() => router.push('/documents')}
+      />
+    );
+  }
+  
   return (
     <div className="bg-gray-50 min-h-screen">
       {/* 상단 네비게이션 바 */}
@@ -2098,20 +2530,68 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               <ShareIcon className="w-5 h-5 text-gray-600" />
             </button>
             
-            <button className="p-2 rounded-md hover:bg-gray-100" disabled={isLoading}>
-              <UsersIcon className="w-5 h-5 text-gray-600" />
-            </button>
+            <div className="relative security-menu-container">
+              <button 
+                className="p-2 rounded-md hover:bg-gray-100 flex items-center" 
+                disabled={isLoading}
+                onClick={toggleSecurityMenu}
+              >
+                <SettingsIcon className="w-5 h-5 text-gray-600 mr-1" />
+                <ChevronDown className="w-3 h-3 text-gray-500" />
+              </button>
+              
+              {showSecurityMenu && (
+                <div className="absolute right-0 mt-1 w-56 bg-white rounded-md shadow-lg z-10 border border-gray-100 py-1 overflow-hidden">
+                  <div className="py-1">
+                    <button 
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center" 
+                      onClick={() => {
+                        // 문서 접근 권한 설정
+                        setShowSecurityMenu(false);
+                      }}
+                    >
+                      <UsersIcon className="w-4 h-4 mr-2" />
+                      <span>접근 권한 설정</span>
+                    </button>
+                    
+                    <button 
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center" 
+                      onClick={() => {
+                        // 문서 권한 이력
+                        setShowSecurityMenu(false);
+                      }}
+                    >
+                      <ShieldIcon className="w-4 h-4 mr-2" />
+                      <span>권한 이력 보기</span>
+                    </button>
+                    
+                    <button 
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center" 
+                      onClick={() => {
+                        // 문서 암호 설정
+                        handleOpenPasswordModal();
+                      }}
+                    >
+                      <KeyIcon className="w-4 h-4 mr-2" />
+                      <span>{isPasswordProtected ? "암호 변경" : "암호 설정"}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             
             {/* 읽기 전용 모드 버튼 또는 상태 표시 (관리자/소유자는 버튼, 일반 멤버는 상태 표시) */}
             {((userProjectRole && userProjectRole !== 'member') || isProjectOwner) ? (
-              <div className="flex items-center bg-blue-50 border border-blue-100 rounded-md px-2 py-1 cursor-pointer"
+              <button 
+                className="p-2 rounded-md hover:bg-gray-100" 
                 onClick={!isLoading && !isButtonDebouncing ? toggleReadOnlyMode : undefined}
-                // title="읽기 전용 모드 전환"
+                disabled={isLoading}
+                title={isReadOnlyMode ? "편집 모드로 전환" : "읽기 전용 모드로 전환"}
               >
                 {isReadOnlyMode ? (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="w-4 h-4 mr-1 text-blue-500"
+                    className="w-5 h-5 text-gray-600"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -2126,7 +2606,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
                 ) : (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="w-4 h-4 mr-1 text-blue-500"
+                    className="w-5 h-5 text-gray-600"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -2139,16 +2619,13 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
                     />
                   </svg>
                 )}
-                <div className="flex items-center justify-center">
-                  <span className="text-sm text-blue-700 font-medium"></span>
-                </div>
-              </div>
+              </button>
             ) : (
               isReadOnlyMode && (
-                <div className="flex items-center bg-blue-50 border border-blue-100 rounded-md px-2 py-1">
+                <div className="p-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="w-4 h-4 mr-1 text-blue-500"
+                    className="w-5 h-5 text-gray-400"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -2160,28 +2637,18 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
                       d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
                     />
                   </svg>
-                  <span className="text-sm text-blue-700 font-medium">읽기 전용</span>
                 </div>
               )
             )}
             
-            <Button 
+            <button
               onClick={saveDocument}
-              className="flex items-center bg-green-600 hover:bg-green-700 text-white w-[100px] h-[36px] justify-center"
+              className="p-2 rounded-md hover:bg-gray-100"
               disabled={isSaving || isLoading}
+              title={isSaving ? "저장 중..." : "저장"}
             >
-              {isSaving ? (
-                <>
-                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-1"></div>
-                  <span>저장 중...</span>
-                </>
-              ) : (
-                <>
-                  <SaveIcon className="w-4 h-4 mr-1" />
-                  <span>저장</span>
-                </>
-              )}
-            </Button>
+              <SaveIcon className="w-5 h-5 text-gray-600" />
+            </button>
           </div>
         </div>
       </div>
@@ -2571,7 +3038,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               ref={slashMenuRef}
               className="absolute bg-white dark:bg-white shadow-xl rounded-xl p-1 z-50 border-none max-h-[420px] overflow-auto w-[280px] transition-all duration-200 ease-in-out scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-200"
               style={{
-                top: slashMenuPosition.y,
+                top: slashMenuPosition.y + 15, // 커서 위치보다 더 아래로 위치하도록 15px 추가
                 left: slashMenuPosition.x
               }}
             >
@@ -2730,6 +3197,16 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
           />
         </div>
       </div>
+      
+      {/* 문서 암호 설정 모달 */}
+      <PasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        currentPassword={documentPassword}
+        isPasswordProtected={isPasswordProtected}
+        onSave={updateDocumentPassword}
+        isLoading={isPasswordSaving}
+      />
     </div>
   );
 }
