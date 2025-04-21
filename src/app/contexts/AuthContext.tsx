@@ -18,6 +18,7 @@ type AuthContextType = {
   login: (email: string, password: string, callbackUrl?: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updatePassword: (currentPassword: string, newPassword: string, userId?: string) => Promise<void>;
   error: string | null;
   clearError: () => void;
 };
@@ -29,6 +30,7 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => {},
   register: async () => {},
   logout: async () => {},
+  updatePassword: async () => {},
   error: null,
   clearError: () => {},
 });
@@ -132,6 +134,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       setUser(data.user);
       
+      // 토큰을 localStorage에 저장 (API에서 반환한 경우)
+      if (data.token && typeof window !== 'undefined') {
+        localStorage.setItem('token', data.token);
+      }
+      
       // 로그인 성공 후 리디렉션
       // 콜백 URL이 auth를 포함하는 경우 홈으로 리디렉션
       const redirectUrl = callbackUrl.includes('auth') ? '/' : callbackUrl;
@@ -192,11 +199,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(data.message || "로그아웃 중 오류가 발생했습니다.");
       }
       
+      // localStorage에서 토큰 삭제
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+      }
+      
       setUser(null);
       router.push("/auth/login");
       router.refresh();
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 비밀번호 변경 함수
+  const updatePassword = async (currentPassword: string, newPassword: string, userId?: string) => {
+    try {
+      setLoading(true);
+      clearError();
+      
+      if (!user && !userId) {
+        throw new Error("로그인이 필요합니다.");
+      }
+      
+      // 요청 데이터 생성 - 인증 문제 대비 userId 포함
+      const requestData = {
+        currentPassword,
+        newPassword,
+        userId: userId || user?.id  // 인증이 실패해도 ID로 사용자 식별 가능
+      };
+      
+      const response = await fetch("/api/auth/update-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestData),
+        credentials: 'include'  // 쿠키 포함
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || "비밀번호 변경 중 오류가 발생했습니다.");
+      }
+      
+      return data;
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -210,6 +263,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        updatePassword,
         error,
         clearError,
       }}
