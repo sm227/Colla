@@ -94,6 +94,8 @@ model Document {
   folderRef  Folder?  @relation(fields: [folderId], references: [id])
   project    Project? @relation(fields: [projectId], references: [id])
   ycontent   Bytes? // Y.js 문서 바이너리 데이터
+  password   String? // 문서 암호 보호를 위한 필드
+  isPasswordProtected Boolean @default(false) // 암호 보호 활성화 여부
 }
 
 model Folder {
