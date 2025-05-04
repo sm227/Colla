@@ -154,9 +154,11 @@ export default function Home() {
                 <MenuIcon className="w-6 h-6" />
               )}
             </button>
-            <div className="text-xl font-bold text-blue-600 flex items-center">
-              <LayoutDashboardIcon className="w-6 h-6 mr-2" />
-              워크스페이스
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center mr-2">
+                <span className="text-white font-bold text-lg">C</span>
+              </div>
+              <span className="text-2xl font-bold text-gray-900">Colla</span>
             </div>
           </div>
 
@@ -197,7 +199,7 @@ export default function Home() {
       <div className="flex pt-16">
         {/* 사이드바 - 모바일에서는 오버레이로 표시 */}
         <aside
-          className={`fixed inset-y-0 left-0 z-20 w-64 bg-white border-r border-gray-200 pt-16 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-20 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
             mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
           } md:relative md:w-64 md:flex-shrink-0`}
         >
@@ -213,7 +215,7 @@ export default function Home() {
                 <SidebarLink
                   icon={<VideoIcon className="w-5 h-5" />}
                   text="화상 회의"
-                  href="/meetings"
+                  href="/meeting"
                 />
                 <SidebarLink
                   icon={<Trello className="w-5 h-5" />}
