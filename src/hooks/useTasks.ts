@@ -14,8 +14,6 @@ export function useTasks(projectId?: string | null) {
     try {
       setLoading(true);
       
-      // 프로젝트 ID가 있으면 해당 프로젝트의 태스크만 가져오기
-      // 프로젝트 ID가 null이면 모든 태스크 가져오기
       const url = projectId 
         ? `/api/projects/${projectId}/tasks` 
         : "/api/tasks";
@@ -50,15 +48,12 @@ export function useTasks(projectId?: string | null) {
     }
   }, [projectId]);
 
-  // projectId가 변경될 때마다 현재 프로젝트 ID 업데이트 및 작업 다시 불러오기
+  // projectId가 변경될 때만 실행
   useEffect(() => {
-    if (projectId !== currentProjectId) {
-      setCurrentProjectId(projectId);
-      // 프로젝트 변경 시 이전 작업 데이터 초기화
-      setTasks([]);
-      fetchTasks();
-    }
-  }, [projectId, currentProjectId, fetchTasks]);
+    setCurrentProjectId(projectId);
+    setTasks([]);
+    fetchTasks();
+  }, [projectId]);
 
   // 새 태스크 추가
   const addTask = async (newTask: Omit<Task, "id">) => {
@@ -177,11 +172,6 @@ export function useTasks(projectId?: string | null) {
       setLoading(false);
     }
   };
-
-  // 컴포넌트 마운트 시 태스크 가져오기
-  useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
 
   return {
     tasks,

@@ -30,7 +30,7 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ projectId }: KanbanBoardProps) {
-  console.log("KanbanBoard 렌더링 - projectId:", projectId);
+  // console.log("KanbanBoard 렌더링 - projectId:", projectId);
   
   const { tasks, loading, error, addTask, updateTaskStatus, updateTask, deleteTask, fetchTasks } = useTasks(projectId);
   const [tasksState, setTasksState] = useState<Task[]>(tasks);
@@ -48,9 +48,10 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
       console.log("KanbanBoard - 특정 프로젝트 작업 표시:", projectId);
     }
     fetchTasks();
-  }, [projectId, fetchTasks]);
+  }, [projectId]);
   
-  // useEffect로 tasks가 변경될 때 tasksState도 업데이트
+  // tasks가 변경될 때만 tasksState 업데이트
+  
   useEffect(() => {
     setTasksState(tasks);
   }, [tasks]);
@@ -168,6 +169,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             color="gray"
             onTaskDelete={handleDeleteTask}
             onAddTask={handleAddTask}
+            loading={loading}
           />
           <KanbanColumn 
             title="진행 중" 
@@ -178,6 +180,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             color="blue"
             onTaskDelete={handleDeleteTask}
             onAddTask={handleAddTask}
+            loading={loading}
           />
           <KanbanColumn 
             title="검토" 
@@ -188,6 +191,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             color="yellow"
             onTaskDelete={handleDeleteTask}
             onAddTask={handleAddTask}
+            loading={loading}
           />
           <KanbanColumn 
             title="완료" 
@@ -198,6 +202,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             color="green"
             onTaskDelete={handleDeleteTask}
             onAddTask={handleAddTask}
+            loading={loading}
           />
         </div>
       )}

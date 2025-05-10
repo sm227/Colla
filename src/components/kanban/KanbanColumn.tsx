@@ -16,6 +16,7 @@ interface KanbanColumnProps {
   color?: 'gray' | 'blue' | 'yellow' | 'green' | 'purple' | 'red';
   onTaskDelete?: (taskId: string) => void; 
   onAddTask?: (task: Omit<Task, "id">) => void;
+  loading: boolean;
 }
 
 export function KanbanColumn({ 
@@ -26,7 +27,8 @@ export function KanbanColumn({
   onTaskClick,
   color = 'gray',
   onTaskDelete,
-  onAddTask
+  onAddTask,
+  loading
 }: KanbanColumnProps) {
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -41,34 +43,38 @@ export function KanbanColumn({
   // 고유한 컬럼 ID 생성
   const columnElementId = `kanban-column-${status}`;
   
+
   // 작업 개수가 변경되면 스크롤 위치 복원 및 작업 추가 버튼 클릭
   useEffect(() => {
-    // 첫 마운트 시에는 실행하지 않음
-    if (isFirstMount.current) {
-      isFirstMount.current = false;
-      setTasksLength(tasks.length);
-      return;
-    }
-    
-    if (tasks.length !== tasksLength) {
-      const wasTaskAdded = tasks.length > tasksLength;
+    // 로딩이 완료되고 tasks가 있을 때만 실행
+    if (!loading && tasks.length > 0) {
       setTasksLength(tasks.length);
       
-      // 스크롤 위치 복원 - UI 업데이트 후 실행되도록 지연
-      setTimeout(() => {
-        const columnElement = document.getElementById(columnElementId);
-        if (columnElement) {
-          columnElement.scrollTop = lastScrollPosition;
-        }
+      // 첫 마운트 시에는 실행하지 않음
+      if (isFirstMount.current) {
+        isFirstMount.current = false;
+        return;
+      }
+      
+      if (tasks.length !== tasksLength) {
+        const wasTaskAdded = tasks.length > tasksLength;
+        setTasksLength(tasks.length);
         
-        // 작업이 추가된 직후에 작업 추가 버튼 자동 클릭 복원
-        // 단, 첫 마운트가 아닌 경우에만
-        if (wasTaskAdded && !isFirstMount.current) {
-          setIsAddingTask(true);
-        }
-      }, 100);
+        // 스크롤 위치 복원 - UI 업데이트 후 실행되도록 지연
+        setTimeout(() => {
+          const columnElement = document.getElementById(columnElementId);
+          if (columnElement) {
+            columnElement.scrollTop = lastScrollPosition;
+          }
+          
+          // 작업이 추가된 직후에 작업 추가 버튼 자동 클릭 복원
+          if (wasTaskAdded && !isFirstMount.current) {
+            setIsAddingTask(true);
+          }
+        }, 100);
+      }
     }
-  }, [tasks.length, tasksLength, lastScrollPosition, columnElementId]);
+  }, [tasks, loading, tasksLength, lastScrollPosition, columnElementId]);
 
   // 드롭 영역 설정
   const { isOver, setNodeRef } = useDrop({
