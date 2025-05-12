@@ -404,10 +404,18 @@ const CalendarPage: React.FC = () => {
 
       // 로컬 태스크 상태 업데이트
       setTasks(prevTasks => {
-        // 기존 태스크 필터링 (드래그된 태스크 제외)
-        const filteredTasks = prevTasks.filter(t => t.id !== draggedTask.id);
-        // 업데이트된 태스크 추가
-        return [...filteredTasks, updatedLocalTask];
+        // 이미 캘린더에 해당 태스크가 있는지 확인
+        const taskExists = prevTasks.some(t => t.id === draggedTask.id);
+        
+        if (taskExists) {
+          // 이미 존재하면 업데이트
+          return prevTasks.map(t => 
+            t.id === draggedTask.id ? updatedLocalTask : t
+          );
+        } else {
+          // 존재하지 않으면 추가
+          return [...prevTasks, updatedLocalTask];
+        }
       });
 
       if (draggedTask.isCalendarEvent) {
@@ -436,7 +444,7 @@ const CalendarPage: React.FC = () => {
         });
       }
       
-      // 사이드바 태스크에서 제거
+      // 사이드바 태스크에서 제거 (중복 방지)
       setSidebarTasks(prev => prev.filter(t => t.id !== draggedTask.id));
     } catch (error) {
       console.error('이벤트 업데이트 오류:', error);
@@ -484,8 +492,13 @@ const CalendarPage: React.FC = () => {
         projectId: draggedTask.projectId
       };
       
-      // 사이드바 태스크에 즉시 추가
-      setSidebarTasks(prev => [...prev, updatedLocalTask]);
+      // 사이드바 태스크에 즉시 추가 (중복 체크 후)
+      setSidebarTasks(prev => {
+        // 이미 해당 ID의 태스크가 사이드바에 있는지 확인
+        const taskExists = prev.some(t => t.id === updatedLocalTask.id);
+        // 존재하지 않는 경우에만 추가
+        return taskExists ? prev : [...prev, updatedLocalTask];
+      });
       
       // 백그라운드에서 서버 업데이트 실행
       await updateTask(updatedTask);
