@@ -8,12 +8,12 @@ datasource db {
 }
 
 model User {
-  id          String          @id @default(uuid())
+  id          String    @id @default(uuid())
   name        String
-  email       String          @unique
+  email       String    @unique
   password    String
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   projects    Project[]
   memberships ProjectMember[]
   comments    Comment[]
@@ -62,6 +62,7 @@ model Project {
   members     ProjectMember[]
   tasks       Task[]
   calendars   Calendar[]
+  meetings    Meeting[]
 }
 
 model ProjectMember {
@@ -124,4 +125,20 @@ model Calendar {
 
   project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   projectId String?
+}
+
+model Meeting {
+  id            String    @id @default(cuid())
+  title         String?
+  startTime     DateTime  @default(now())
+  endTime       DateTime?
+  projectId     String?
+  transcript    String?   @db.Text
+  mainPoints    String?   @db.Text
+  decisions     String?   @db.Text
+  actionItems   String?   @db.Text
+  participants  Json?     // 참가자 정보를 JSON 형태로 저장 [{userId, joinTime, leaveTime}]
+  project       Project?  @relation(fields: [projectId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }

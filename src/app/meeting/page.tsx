@@ -10,16 +10,22 @@ import {
   ClockIcon,
   CalendarIcon,
   SearchIcon,
+  FileText,
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 interface Meeting {
   id: string;
   title: string;
-  date: string;
-  duration: number;
-  participants: number;
-  status: "upcoming" | "completed" | "cancelled";
+  startTime: string;
+  endTime: string | null;
+  transcript: string | null;
+  mainPoints: string | null;
+  decisions: string | null;
+  actionItems: string | null;
+  participants: any;
+  createdAt: string;
 }
 
 export default function MeetingPage() {
@@ -27,39 +33,22 @@ export default function MeetingPage() {
   const { user } = useAuth();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
 
   useEffect(() => {
-    // 임시 데이터 로드
+    // 실제 회의 데이터 가져오기
     const loadMeetings = async () => {
       try {
-        // TODO: API 연동
-        const mockMeetings: Meeting[] = [
-          {
-            id: "1",
-            title: "주간 팀 미팅",
-            date: "2024-03-20T10:00:00",
-            duration: 60,
-            participants: 8,
-            status: "upcoming",
-          },
-          {
-            id: "2",
-            title: "프로젝트 기획 회의",
-            date: "2024-03-19T14:00:00",
-            duration: 90,
-            participants: 5,
-            status: "completed",
-          },
-          {
-            id: "3",
-            title: "디자인 리뷰",
-            date: "2024-03-18T11:00:00",
-            duration: 45,
-            participants: 4,
-            status: "completed",
-          },
-        ];
-        setMeetings(mockMeetings);
+        setLoading(true);
+        const response = await fetch('/api/meetings');
+        
+        if (!response.ok) {
+          throw new Error('회의 목록을 불러오는데 실패했습니다');
+        }
+        
+        const result = await response.json();
+        setMeetings(result.data);
       } catch (error) {
         console.error("회의 목록 로딩 오류:", error);
       } finally {
@@ -86,10 +75,70 @@ export default function MeetingPage() {
     }).format(date);
   };
 
-  const formatDuration = (minutes: number) => {
+  const calculateDuration = (startTime: string, endTime: string | null) => {
+    if (!endTime) return 0;
+    
+    const start = new Date(startTime).getTime();
+    const end = new Date(endTime).getTime();
+    const durationMs = end - start;
+    
+    // 밀리초를 분으로 변환
+    return Math.round(durationMs / (1000 * 60));
+  };
+
+  const formatDuration = (startTime: string, endTime: string | null) => {
+    const minutes = calculateDuration(startTime, endTime);
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return hours > 0 ? `${hours}시간 ${mins}분` : `${mins}분`;
+  };
+
+  const getParticipantCount = (participants: any) => {
+    if (!participants) return 0;
+    try {
+      // JSON string이라면 파싱
+      const parsedParticipants = typeof participants === 'string' 
+        ? JSON.parse(participants) 
+        : participants;
+      
+      return Array.isArray(parsedParticipants) ? parsedParticipants.length : 0;
+    } catch (error) {
+      console.error("참가자 정보 파싱 오류:", error);
+      return 0;
+    }
+  };
+
+  // 회의 상태 판단
+  const getMeetingStatus = (startTime: string, endTime: string | null) => {
+    const now = new Date().getTime();
+    const start = new Date(startTime).getTime();
+    
+    if (endTime) {
+      return "completed"; // 종료 시간이 있으면 완료된 회의
+    } else if (start > now) {
+      return "upcoming"; // 시작 시간이 현재보다 미래면 예정된 회의
+    } else {
+      return "inprogress"; // 그 외는 진행중
+    }
+  };
+
+  // 필터링된 회의 목록
+  const filteredMeetings = meetings.filter(meeting => {
+    // 검색어 필터링
+    const meetingTitle = meeting.title || "";
+    const searchMatches = 
+      meetingTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (meeting.mainPoints || "").toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // 상태 필터링
+    const status = getMeetingStatus(meeting.startTime, meeting.endTime);
+    const statusMatches = filterStatus === "all" || status === filterStatus;
+    
+    return searchMatches && statusMatches;
+  });
+
+  const viewMeetingDetails = (meetingId: string) => {
+    router.push(`/meeting/records/${meetingId}`);
   };
 
   if (loading) {
@@ -128,13 +177,20 @@ export default function MeetingPage() {
               <input
                 type="text"
                 placeholder="회의 검색..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
               <SearchIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
             </div>
-            <select className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <select 
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
               <option value="all">모든 회의</option>
               <option value="upcoming">예정된 회의</option>
+              <option value="inprogress">진행 중인 회의</option>
               <option value="completed">완료된 회의</option>
             </select>
           </div>
@@ -142,62 +198,94 @@ export default function MeetingPage() {
 
         {/* 회의 목록 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {meetings.map((meeting) => (
-            <div
-              key={meeting.id}
-              className="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow"
-            >
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="font-semibold text-gray-900">{meeting.title}</h3>
-                <span
-                  className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    meeting.status === "upcoming"
-                      ? "bg-blue-100 text-blue-800"
-                      : meeting.status === "completed"
-                      ? "bg-green-100 text-green-800"
-                      : "bg-red-100 text-red-800"
-                  }`}
-                >
-                  {meeting.status === "upcoming"
-                    ? "예정됨"
-                    : meeting.status === "completed"
-                    ? "완료됨"
-                    : "취소됨"}
-                </span>
+          {filteredMeetings.map((meeting) => {
+            const status = getMeetingStatus(meeting.startTime, meeting.endTime);
+            const participantCount = getParticipantCount(meeting.participants);
+            
+            return (
+              <div
+                key={meeting.id}
+                className="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <h3 className="font-semibold text-gray-900">{meeting.title || "제목 없음"}</h3>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      status === "upcoming"
+                        ? "bg-blue-100 text-blue-800"
+                        : status === "completed"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    {status === "upcoming"
+                      ? "예정됨"
+                      : status === "completed"
+                      ? "완료됨"
+                      : "진행 중"}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center text-gray-600">
+                    <CalendarIcon className="w-4 h-4 mr-2" />
+                    <span>{formatDate(meeting.startTime)}</span>
+                  </div>
+                  {meeting.endTime && (
+                    <div className="flex items-center text-gray-600">
+                      <ClockIcon className="w-4 h-4 mr-2" />
+                      <span>{formatDuration(meeting.startTime, meeting.endTime)}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center text-gray-600">
+                    <UsersIcon className="w-4 h-4 mr-2" />
+                    <span>{participantCount}명 참여</span>
+                  </div>
+                </div>
+                
+                {status === "upcoming" && (
+                  <button
+                    onClick={() => router.push(`/meeting/${meeting.id}`)}
+                    className="mt-4 w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <VideoIcon className="w-4 h-4 mr-2" />
+                    참여하기
+                  </button>
+                )}
+                
+                {status === "completed" && (
+                  <button
+                    onClick={() => viewMeetingDetails(meeting.id)}
+                    className="mt-4 w-full flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    회의록 보기
+                  </button>
+                )}
+                
+                {status === "inprogress" && (
+                  <button
+                    onClick={() => router.push(`/meeting/${meeting.id}`)}
+                    className="mt-4 w-full flex items-center justify-center px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
+                  >
+                    <VideoIcon className="w-4 h-4 mr-2" />
+                    참여하기
+                  </button>
+                )}
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center text-gray-600">
-                  <CalendarIcon className="w-4 h-4 mr-2" />
-                  <span>{formatDate(meeting.date)}</span>
-                </div>
-                <div className="flex items-center text-gray-600">
-                  <ClockIcon className="w-4 h-4 mr-2" />
-                  <span>{formatDuration(meeting.duration)}</span>
-                </div>
-                <div className="flex items-center text-gray-600">
-                  <UsersIcon className="w-4 h-4 mr-2" />
-                  <span>{meeting.participants}명 참여</span>
-                </div>
-              </div>
-              {meeting.status === "upcoming" && (
-                <button
-                  onClick={() => router.push(`/meeting/${meeting.id}`)}
-                  className="mt-4 w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <VideoIcon className="w-4 h-4 mr-2" />
-                  참여하기
-                </button>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* 회의가 없는 경우 */}
-        {meetings.length === 0 && (
+        {filteredMeetings.length === 0 && (
           <div className="text-center py-12">
             <VideoIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              예정된 회의가 없습니다
+              {searchQuery 
+                ? "검색 결과가 없습니다" 
+                : filterStatus !== "all" 
+                  ? `${filterStatus === "upcoming" ? "예정된" : filterStatus === "completed" ? "완료된" : "진행 중인"} 회의가 없습니다`
+                  : "회의 기록이 없습니다"}
             </h3>
             <p className="text-gray-600 mb-4">
               새로운 회의를 생성하여 팀원들과 소통하세요

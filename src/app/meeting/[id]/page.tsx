@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import SpeechToText from './SpeechToText';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { PrismaClient } from '@prisma/client';
 
 interface PeerStream {
   userId: string;
@@ -371,6 +372,50 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     }
   };
 
+  const saveMeetingToDatabase = async (messageText: string, summaryResult: { mainPoints: string, decisions: string, actionItems: string }) => {
+    try {
+      // 현재 참가자 정보 구성
+      const currentParticipants = [
+        {
+          userId: myPeerIdRef.current,
+          joinTime: new Date().toISOString(),
+          leaveTime: new Date().toISOString()
+        },
+        ...peerStreams.map(peer => ({
+          userId: peer.userId,
+          joinTime: new Date().toISOString(), // 실제로는 참가 시간을 추적해야 합니다
+          leaveTime: new Date().toISOString()
+        }))
+      ];
+
+      // API 요청 보내기
+      const response = await fetch('/api/meetings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: `Meeting ${new Date().toLocaleString('ko-KR')}`,
+          startTime: new Date().toISOString(),
+          endTime: new Date().toISOString(),
+          transcript: messageText,
+          mainPoints: summaryResult.mainPoints,
+          decisions: summaryResult.decisions,
+          actionItems: summaryResult.actionItems,
+          participants: currentParticipants
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('회의 저장에 실패했습니다');
+      }
+
+      console.log('회의가 성공적으로 저장되었습니다');
+    } catch (error) {
+      console.error('회의 저장 중 오류 발생:', error);
+    }
+  };
+
   const summarizeMessages = async (messages: Message[]) => {
     try {
       const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
@@ -386,14 +431,30 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
 2. 결정된 사항
 3. 후속 조치 필요 사항
 
+각 섹션은 명확하게 구분해서 응답해주세요.
+
 대화 내용:
 ${messageText}`;
 
       const result = await model.generateContent(prompt);
       const response = await result.response;
-      const summary = response.text();
+      const summaryText = response.text();
       
-      return summary;
+      // 요약 내용 파싱
+      const mainPointsMatch = summaryText.match(/주요 논의 사항[:\n]+([\s\S]+?)(?=결정된 사항|$)/i);
+      const decisionsMatch = summaryText.match(/결정된 사항[:\n]+([\s\S]+?)(?=후속 조치|$)/i);
+      const actionItemsMatch = summaryText.match(/후속 조치 필요 사항[:\n]+([\s\S]+?)(?=$)/i);
+      
+      const summaryResult = {
+        mainPoints: mainPointsMatch ? mainPointsMatch[1].trim() : summaryText,
+        decisions: decisionsMatch ? decisionsMatch[1].trim() : '',
+        actionItems: actionItemsMatch ? actionItemsMatch[1].trim() : ''
+      };
+
+      // 데이터베이스에 저장
+      await saveMeetingToDatabase(messageText, summaryResult);
+      
+      return summaryText;
     } catch (error) {
       console.error('Error summarizing messages:', error);
       throw error;
