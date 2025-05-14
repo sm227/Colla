@@ -145,7 +145,7 @@ function PreJoinModal({
               muted
               autoPlay
               playsInline
-              className={`w-full h-full object-cover ${
+              className={`w-full h-full object-cover transform scale-x-[-1] ${
                 !isVideoEnabled ? "hidden" : ""
               }`}
             />
@@ -269,7 +269,7 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     if (!myStream) return;
 
     socketRef.current = io(
-      process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000",
+      process.env.NEXT_PUBLIC_MEET_SOCKET_URL || "http://localhost:3000",
       {
         transports: ["websocket"],
         reconnection: true,
@@ -717,7 +717,7 @@ ${messageText}`;
               muted
               autoPlay
               playsInline
-              className={`w-full h-full object-cover ${
+              className={`w-full h-full object-cover transform scale-x-[-1] ${
                 !isVideoEnabled ? "hidden" : ""
               }`}
             />
@@ -743,7 +743,7 @@ ${messageText}`;
                 ref={(element) => {
                   if (element) element.srcObject = peerStream.stream;
                 }}
-                className={`w-full h-full object-cover ${
+                className={`w-full h-full object-cover transform scale-x-[-1] ${
                   !peerStream.isVideoEnabled ? "hidden" : ""
                 }`}
               />
