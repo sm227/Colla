@@ -18,11 +18,11 @@ export function useTasks(projectId?: string | null) {
         ? `/api/projects/${projectId}/tasks` 
         : "/api/tasks";
       
-      if (!projectId) {
-        console.log("🔄 모든 프로젝트의 작업을 가져오는 중... (projectId:", projectId, ")");
-      } else {
-        console.log(`🔄 프로젝트 ${projectId}의 작업을 가져오는 중...`);
-      }
+      // if (!projectId) {
+      //   console.log("🔄 모든 프로젝트의 작업을 가져오는 중... (projectId:", projectId, ")");
+      // } else {
+      //   console.log(`🔄 프로젝트 ${projectId}의 작업을 가져오는 중...`);
+      // }
       
       const response = await fetch(url, {
         method: 'GET',
@@ -38,7 +38,7 @@ export function useTasks(projectId?: string | null) {
       }
       
       const data = await response.json();
-      console.log(`✅ ${data.length}개의 작업을 가져왔습니다.`);
+      // console.log(`✅ ${data.length}개의 작업을 가져왔습니다.`);
       setTasks(data);
       setError(null);
     } catch (err) {
