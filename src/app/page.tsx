@@ -34,10 +34,86 @@ import { useProject } from "./contexts/ProjectContext";
 import { Task, TaskStatus } from "@/components/kanban/KanbanBoard";
 import { useTasks } from "@/hooks/useTasks";
 
+// 알림 타입 정의
+type Notification = {
+  id: string;
+  type: "invitation" | "document_update" | "task_assigned" | "generic";
+  title: string;
+  message: string;
+  link: string;
+  createdAt: string; // ISO 문자열 또는 Date 객체
+  isRead?: boolean;
+  icon?: React.ReactNode;
+  iconBgColor?: string;
+  iconColor?: string;
+};
+
+// Invitation 타입을 page.tsx 내에 정의 (또는  import)
+type Invitation = {
+  id: string;
+  projectId: string;
+  // userId: string; // Notification에서는 직접 사용 안 함
+  // role: string; // Notification에서는 직접 사용 안 함
+  // inviteStatus: string; // Notification에서는 직접 사용 안 함 (pending 상태의 초대만 가져올 것이므로)
+  createdAt: string;
+  // updatedAt: string; // Notification에서는 직접 사용 안 함
+  project: {
+    id: string;
+    name: string;
+    // description?: string; // Notification에서는 직접 사용 안 함
+    user?: { // 초대자 정보
+      // id: string;
+      name: string;
+      // email: string;
+    };
+  };
+};
+
+// 실제 프로젝트 초대 알림을 가져오는 함수
+const fetchProjectInvitationsAsNotifications = async (): Promise<Notification[]> => {
+  try {
+    const response = await fetch("/api/projects/invitations", {
+      headers: {
+        "Cache-Control": "no-cache", // 최신 데이터를 가져오도록 설정
+      },
+    });
+
+    if (!response.ok) {
+      // API 에러 응답을 좀 더 자세히 로깅하거나 사용자에게 알릴 수 있습니다.
+      console.error("Failed to fetch invitations:", response.status, await response.text());
+      // 빈 배열을 반환하거나, 에러를 throw하여 호출부에서 처리하게 할 수 있습니다.
+      // 여기서는 빈 배열을 반환하여 알림창에 '에러 발생' 대신 '알림 없음'으로 표시되도록 합니다.
+      return [];
+    }
+
+    const invitations: Invitation[] = await response.json();
+
+    // Invitation[]을 Notification[]으로 변환
+    // API 응답에서 inviteStatus가 'pending'인 것만 필터링해야 할 수 있습니다.
+    // 현재는 API가 pending 상태의 초대만 반환한다고 가정합니다.
+    return invitations.map((invitation) => ({
+      id: invitation.id, // 각 알림의 고유 ID로 사용
+      type: "invitation",
+      title: `'${invitation.project.name}' 프로젝트 초대`,
+      message: `초대자: ${invitation.project.user?.name || '정보 없음'}`,
+      link: "/projects/invitations", // 초대 확인 페이지로 링크
+      createdAt: invitation.createdAt,
+      icon: <UsersIcon className="w-5 h-5" />,
+      iconBgColor: "bg-blue-50",
+      iconColor: "text-blue-500",
+      isRead: false, // 기본적으로 읽지 않음 상태
+    }));
+  } catch (error) {
+    console.error("Error fetching or processing project invitations:", error);
+    return []; // 에러 발생 시 빈 배열 반환
+  }
+};
+
 export default function Home() {
   const router = useRouter();
   const [roomId, setRoomId] = useState("");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const { user, loading: authLoading, logout } = useAuth();
   const {
     projects,
@@ -49,6 +125,11 @@ export default function Home() {
   const { tasks = [], loading: tasksLoading } = useTasks(
     currentProject?.id || null
   );
+
+  // 알림 상태 관리
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationLoading, setNotificationLoading] = useState(false);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
 
   // Handle redirects with useEffect
   useEffect(() => {
@@ -67,6 +148,56 @@ export default function Home() {
       setCurrentProject(projects[0]);
     }
   }, [hasProjects, currentProject, projects, setCurrentProject]);
+
+  // 날짜 포맷팅 함수 (기존 함수 재사용 또는 개선)
+  const formatDateForNotification = (dateStr: string | Date | null) => {
+    if (!dateStr) return "날짜 없음";
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+
+    if (diffSec < 60) return "방금 전";
+    if (diffMin < 60) return `${diffMin}분 전`;
+    if (diffHour < 24) return `${diffHour}시간 전`;
+    if (diffDay === 1) return `어제`;
+    if (diffDay < 7) return `${diffDay}일 전`;
+    return date.toLocaleDateString("ko-KR");
+  };
+  
+  // 알림 데이터 가져오기
+  useEffect(() => {
+    if (showNotifications) { // 알림창이 열릴 때마다 데이터를 새로고침하도록 변경 (선택사항)
+    // 또는 notifications.length === 0 조건 유지하여 최초 한 번만 로드
+    // if (showNotifications && notifications.length === 0) {
+      const loadNotifications = async () => {
+        setNotificationLoading(true);
+        setNotificationError(null);
+        try {
+          // 실제 프로젝트 초대 알림 가져오기
+          const invitationNotifications = await fetchProjectInvitationsAsNotifications();
+          
+          // TODO: 다른 유형의 알림 (예: 문서, 작업 등)을 가져오는 로직 추가
+          // const otherNotifications = await fetchOtherNotificationTypes();
+          // setNotifications([...invitationNotifications, ...otherNotifications].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+
+          // 현재는 초대 알림만 표시
+          setNotifications(invitationNotifications.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+
+        } catch (err: any) {
+          setNotificationError(err.message || "알림 로딩 중 오류 발생");
+          setNotifications([]);
+        } finally {
+          setNotificationLoading(false);
+        }
+      };
+      loadNotifications();
+    }
+  // }, [showNotifications, notifications.length]); // 최초 한 번 로드 조건
+  }, [showNotifications]); // 알림창 열릴 때마다 새로고침 조건
 
   // 로딩 중이면 로딩 표시
   if (authLoading || projectLoading || tasksLoading) {
@@ -102,39 +233,6 @@ export default function Home() {
       await logout();
     } catch (error) {
       console.error("로그아웃 오류:", error);
-    }
-  };
-
-  // 날짜 포맷팅 함수
-  const formatDate = (dateStr: string | Date | null) => {
-    if (!dateStr) return "날짜 없음";
-    
-    // 날짜 객체로 변환
-    const date = new Date(dateStr);
-    const now = new Date();
-    
-    // 시간 차이 계산 (밀리초)
-    const diffMs = now.getTime() - date.getTime();
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHour = Math.floor(diffMin / 60);
-    const diffDay = Math.floor(diffHour / 24);
-    const diffMonth = Math.floor(diffDay / 30);
-    const diffYear = Math.floor(diffMonth / 12);
-    
-    // 상대적 시간 문자열 반환
-    if (diffSec < 60) {
-      return "방금 전";
-    } else if (diffMin < 60) {
-      return `${diffMin}분 전`;
-    } else if (diffHour < 24) {
-      return `${diffHour}시간 전`;
-    } else if (diffDay < 30) {
-      return `${diffDay}일 전`;
-    } else if (diffMonth < 12) {
-      return `${diffMonth}개월 전`;
-    } else {
-      return `${diffYear}년 전`;
     }
   };
 
@@ -174,16 +272,93 @@ export default function Home() {
           </div>
 
           <div className="flex items-center space-x-4">
-            <Link
-              href="/projects/invitations"
-              className="relative p-2 rounded-full hover:bg-gray-100 transition-colors duration-200"
-            >
-              <BellIcon className="w-5 h-5 text-gray-600" />
-              {/* 알림 배지 개선 */}
-              <span className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full shadow-sm animate-pulse">
-                3
-              </span>
-            </Link>
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative p-2 rounded-full hover:bg-gray-100 transition-colors duration-200"
+              >
+                <BellIcon className="w-5 h-5 text-gray-600" />
+                {/* 알림 배지 개선 - 알림이 있을 때만 표시 */}
+                {notifications.length > 0 && (
+                  <span className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full shadow-sm animate-pulse">
+                    {/* 실제 읽지 않은 알림 수 또는 전체 알림 수 표시 */}
+                    {notifications.filter(n => !n.isRead).length > 0 ? notifications.filter(n => !n.isRead).length : notifications.length}
+                  </span>
+                )}
+              </button>
+              {/* 알림창 UI 시작 */}
+              {showNotifications && (
+                <div className="absolute right-0 mt-2 w-80 md:w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+                  <div className="p-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="text-lg font-medium text-gray-900">알림</h3>
+                      <button onClick={() => setShowNotifications(false)} className="text-gray-400 hover:text-gray-600">
+                        <XIcon className="w-5 h-5" />
+                      </button>
+                    </div>
+                    
+                    {notificationLoading && (
+                      <div className="flex justify-center items-center py-10">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      </div>
+                    )}
+
+                    {notificationError && (
+                      <div className="text-center py-10 text-red-500">
+                        <p>{notificationError}</p>
+                      </div>
+                    )}
+
+                    {!notificationLoading && !notificationError && notifications.length === 0 && (
+                      <div className="text-center py-10 text-gray-500">
+                        <BellIcon className="w-10 h-10 mx-auto mb-2 text-gray-400" />
+                        <p>새로운 알림이 없습니다.</p>
+                      </div>
+                    )}
+
+                    {!notificationLoading && !notificationError && notifications.length > 0 && (
+                      <div className="space-y-3 max-h-96 overflow-y-auto">
+                        {notifications.map((notification) => (
+                          <div 
+                            key={notification.id} 
+                            className={`p-3 rounded-md flex items-start ${notification.iconBgColor || 'bg-gray-50'}`}
+                            onClick={() => {
+                              // TODO: 알림 읽음 처리 API 호출 등
+                              router.push(notification.link);
+                              setShowNotifications(false);
+                            }}
+                          >
+                            <div className={`flex-shrink-0 p-1.5 rounded-full ${notification.iconBgColor ? notification.iconBgColor.replace('bg-', 'bg-opacity-20 ') : 'bg-gray-100'} mr-3`}>
+                              {notification.icon || <BellIcon className="w-5 h-5" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-medium ${notification.iconColor || 'text-gray-900'}`}>{notification.title}</p>
+                              <p className="text-xs text-gray-600 mt-0.5 truncate">
+                                {notification.message}
+                              </p>
+                              <p className="text-xs text-gray-400 mt-1">
+                                {formatDateForNotification(notification.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <div className="mt-4 text-center border-t pt-3">
+                      <Link 
+                        href="/notifications" // TODO: 모든 알림 보기 페이지 경로로 수정
+                        onClick={() => setShowNotifications(false)}
+                        className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                      >
+                        모든 알림 보기
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* 알림창 UI 끝 */}
+            </div>
             <div className="relative">
               <Link href="/mypage" className="flex items-center">
                 <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
