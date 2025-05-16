@@ -27,9 +27,10 @@ export interface Task {
 
 interface KanbanBoardProps {
   projectId: string | null;
+  theme?: "light" | "dark";
 }
 
-export function KanbanBoard({ projectId }: KanbanBoardProps) {
+export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
   // console.log("KanbanBoard 렌더링 - projectId:", projectId);
   
   const { tasks, loading, error, addTask, updateTaskStatus, updateTask, deleteTask, fetchTasks } = useTasks(projectId);
@@ -147,16 +148,16 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
       )}
 
       <div className="flex items-center mb-6">
-        <ClipboardListIcon className="h-5 w-5 text-gray-700 mr-2" />
-        <h2 className="text-xl font-semibold text-gray-900">
+        <ClipboardListIcon className={`h-5 w-5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-700'} mr-2`} />
+        <h2 className={`text-xl font-semibold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>
           {projectId ? "프로젝트 작업" : "모든 작업"}
         </h2>
       </div>
 
       {loading ? (
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
-          <p className="ml-3 text-gray-600">작업 로딩 중...</p>
+          <div className={`animate-spin rounded-full h-10 w-10 border-b-2 ${theme === 'dark' ? 'border-blue-500' : 'border-blue-600'}`}></div>
+          <p className={`ml-3 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>작업 로딩 중...</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -170,6 +171,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             onTaskDelete={handleDeleteTask}
             onAddTask={handleAddTask}
             loading={loading}
+            theme={theme}
           />
           <KanbanColumn 
             title="진행 중" 
@@ -181,6 +183,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             onTaskDelete={handleDeleteTask}
             onAddTask={handleAddTask}
             loading={loading}
+            theme={theme}
           />
           <KanbanColumn 
             title="검토" 
@@ -192,6 +195,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             onTaskDelete={handleDeleteTask}
             onAddTask={handleAddTask}
             loading={loading}
+            theme={theme}
           />
           <KanbanColumn 
             title="완료" 
@@ -203,6 +207,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             onTaskDelete={handleDeleteTask}
             onAddTask={handleAddTask}
             loading={loading}
+            theme={theme}
           />
         </div>
       )}
@@ -214,6 +219,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
           onClose={handleCloseDialog}
           onUpdate={handleUpdateTask}
           onDelete={handleDeleteTask}
+          theme={theme}
         />
       )}
     </div>

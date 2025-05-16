@@ -13,8 +13,25 @@ export default function KanbanPage() {
   const searchParams = useSearchParams();
   const projectIdParam = searchParams.get('projectId');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const { currentProject, projects, loading: projectLoading } = useProject();
+  const { projects } = useProject();
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  
+  // 로컬 스토리지에서 테마 설정 불러와서 초기값으로 사용
+  const savedTheme = typeof window !== 'undefined' ? 
+    (localStorage.getItem('theme') as 'light' | 'dark') : null;
+  const [theme, setTheme] = useState<"light" | "dark">(savedTheme || "dark");
+  
+  // 테마 설정을 위한 효과
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // document.body의 클래스를 변경하여 전체 스타일 적용 가능
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark-mode');
+      } else {
+        document.documentElement.classList.remove('dark-mode');
+      }
+    }
+  }, [theme]);
 
   // 드롭다운 메뉴 외부 클릭 시 닫히도록 이벤트 핸들러 등록
   useEffect(() => {
@@ -84,103 +101,130 @@ export default function KanbanPage() {
     : "모든 프로젝트";
 
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className={`bg-${theme === 'dark' ? '[#1F1F21]' : 'gray-50'} min-h-screen`}>
       {/* 상단 네비게이션 바 */}
-      <div className="bg-white border-b border-gray-200 py-4 px-6">
+      <div className={`${theme === 'dark' ? 'bg-[#2A2A2C] border-gray-800' : 'bg-white border-gray-200'} border-b py-4 px-6`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Link href="/" className="text-gray-500 hover:text-blue-600 transition-colors">
+            <Link href="/" className={`${theme === 'dark' ? 'text-gray-400 hover:text-blue-400' : 'text-gray-500 hover:text-blue-600'} transition-colors`}>
               <HomeIcon className="w-5 h-5" />
             </Link>
-            <span className="text-gray-500">/</span>
-            <Link href="/" className="text-gray-500 hover:text-blue-600 transition-colors">
+            <span className={`${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>/</span>
+            <Link href="/" className={`${theme === 'dark' ? 'text-gray-400 hover:text-blue-400' : 'text-gray-500 hover:text-blue-600'} transition-colors`}>
               워크스페이스
             </Link>
-            <span className="text-gray-500">/</span>
-            <span className="text-gray-900 font-medium">{currentProjectName} 칸반보드</span>
+            <span className={`${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>/</span>
+            <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'} font-medium`}>{currentProjectName} 칸반보드</span>
           </div>
           
           <div className="flex items-center space-x-2">
             {/* 프로젝트 선택 드롭다운 */}
             <div className="relative mr-3 project-dropdown">
               <div 
-                className="flex items-center px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50"
+                className={`flex items-center px-3 py-1.5 text-sm ${theme === 'dark' ? 'bg-[#353538] border-gray-700 text-gray-300' : 'bg-white border-gray-300 text-gray-700'} border rounded-md cursor-pointer hover:${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}
                 onClick={() => setShowProjectDropdown(!showProjectDropdown)}
               >
-                <FolderIcon className="h-4 w-4 text-gray-600 mr-2" />
+                <FolderIcon className={`h-4 w-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} mr-2`} />
                 <span className="mr-1">{currentProjectName}</span>
-                <ChevronDownIcon className="h-4 w-4 text-gray-500" />
+                <ChevronDownIcon className={`h-4 w-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
               </div>
               
               {/* 드롭다운 메뉴 */}
               {showProjectDropdown && (
-                <div className="absolute right-0 mt-1 w-64 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-72 overflow-y-auto">
+                <div className={`absolute right-0 mt-1 w-64 ${theme === 'dark' ? 'bg-[#2A2A2C] border-gray-700' : 'bg-white border-gray-200'} border rounded-md shadow-lg z-50 max-h-72 overflow-y-auto`}>
                   <div 
-                    className={`px-3 py-2 hover:bg-gray-100 cursor-pointer flex items-center ${
-                      selectedProjectId === null ? 'bg-blue-50 text-blue-700' : ''
+                    className={`px-3 py-2 hover:${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} cursor-pointer flex items-center ${
+                      selectedProjectId === null ? (theme === 'dark' ? 'bg-blue-900 text-blue-300' : 'bg-blue-50 text-blue-700') : ''
                     }`}
                     onClick={() => handleSelectProject(null)}
                   >
-                    <div className="p-1 rounded-full bg-gray-100 mr-2">
-                      <FolderIcon className="h-4 w-4 text-gray-600" />
+                    <div className={`p-1 rounded-full ${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-100'} mr-2`}>
+                      <FolderIcon className={`h-4 w-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`} />
                     </div>
-                    <span className="font-medium">모든 작업</span>
+                    <span className={`font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>모든 작업</span>
                   </div>
                   
                   {/* 프로젝트 목록 */}
                   {projects.map((project) => (
                     <div
                       key={project.id}
-                      className={`px-3 py-2 hover:bg-gray-100 cursor-pointer flex items-center ${
-                        selectedProjectId === project.id ? 'bg-blue-50 text-blue-700' : ''
+                      className={`px-3 py-2 hover:${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} cursor-pointer flex items-center ${
+                        selectedProjectId === project.id ? (theme === 'dark' ? 'bg-blue-900 text-blue-300' : 'bg-blue-50 text-blue-700') : ''
                       }`}
                       onClick={() => handleSelectProject(project.id)}
                     >
-                      <div className="p-1 rounded-full bg-gray-100 mr-2">
-                        <FolderIcon className="h-4 w-4 text-gray-600" />
+                      <div className={`p-1 rounded-full ${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-100'} mr-2`}>
+                        <FolderIcon className={`h-4 w-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`} />
                       </div>
-                      <span className="font-medium truncate">{project.name}</span>
+                      <span className={`font-medium truncate ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>{project.name}</span>
                     </div>
                   ))}
                 </div>
               )}
             </div>
             
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push('/')}
-              className="flex items-center space-x-1"
-            >
-              <ArrowLeftIcon className="w-4 h-4" />
-              <span>대시보드로 돌아가기</span>
-            </Button>
+            {/* 대시보드로 돌아가기 버튼 */}
+            {theme === 'dark' ? (
+              <button 
+                onClick={() => router.push('/')}
+                className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-[#2A2A2C] border border-gray-700 text-gray-300 hover:bg-gray-700 rounded-md transition-colors duration-200"
+              >
+                <ArrowLeftIcon className="w-4 h-4 mr-1" />
+                <span>대시보드로 돌아가기</span>
+              </button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push('/')}
+                className="flex items-center space-x-1"
+              >
+                <ArrowLeftIcon className="w-4 h-4" />
+                <span>대시보드로 돌아가기</span>
+              </Button>
+            )}
             
-            <Button 
-              size="sm" 
-              className="flex items-center space-x-1"
-              onClick={() => {
-                const url = selectedProjectId 
-                  ? `/kanban/new?projectId=${selectedProjectId}` 
-                  : '/kanban/new';
-                router.push(url);
-              }}
-            >
-              <PlusIcon className="w-4 h-4" />
-              <span>새 보드</span>
-            </Button>
+            {/* 새 보드 버튼 */}
+            {theme === 'dark' ? (
+              <button
+                onClick={() => {
+                  const url = selectedProjectId 
+                    ? `/kanban/new?projectId=${selectedProjectId}` 
+                    : '/kanban/new';
+                  router.push(url);
+                }}
+                className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-blue-700 hover:bg-blue-600 text-white rounded-md transition-colors duration-200"
+              >
+                <PlusIcon className="w-4 h-4 mr-1" />
+                <span>새 보드</span>
+              </button>
+            ) : (
+              <Button 
+                size="sm" 
+                className="flex items-center space-x-1"
+                onClick={() => {
+                  const url = selectedProjectId 
+                    ? `/kanban/new?projectId=${selectedProjectId}` 
+                    : '/kanban/new';
+                  router.push(url);
+                }}
+              >
+                <PlusIcon className="w-4 h-4" />
+                <span>새 보드</span>
+              </Button>
+            )}
           </div>
         </div>
       </div>
 
       <div className="container mx-auto py-8 px-4">
         <div className="mb-6 flex items-center space-x-2">
-          <Trello className="w-6 h-6 text-purple-600" />
-          <h1 className="text-2xl font-bold">칸반보드</h1>
+          <Trello className={`w-6 h-6 ${theme === 'dark' ? 'text-purple-400' : 'text-purple-600'}`} />
+          <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>칸반보드</h1>
         </div>
         
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <KanbanBoard projectId={selectedProjectId} />
+        <div className={`${theme === 'dark' ? 'bg-[#2A2A2C]' : 'bg-white'} rounded-lg shadow-sm p-6`}>
+          <KanbanBoard projectId={selectedProjectId} theme={theme} />
         </div>
       </div>
     </div>

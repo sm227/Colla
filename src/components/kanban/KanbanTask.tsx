@@ -11,6 +11,7 @@ interface KanbanTaskProps {
   task: Task;
   onUpdate: (task: Task) => void;
   onDelete?: (taskId: string) => void;
+  theme?: "light" | "dark";
 }
 
 // HTML 태그를 제거하는 함수
@@ -28,7 +29,7 @@ const stripHtmlTags = (html: string): string => {
   return html.replace(/<[^>]*>|&[^;]+;/g, '');
 };
 
-export function KanbanTask({ task, onUpdate, onDelete }: KanbanTaskProps) {
+export function KanbanTask({ task, onUpdate, onDelete, theme = "light" }: KanbanTaskProps) {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const { isDragging, setNodeRef } = useDrag({
     id: task.id,
@@ -84,11 +85,11 @@ export function KanbanTask({ task, onUpdate, onDelete }: KanbanTaskProps) {
       <div
         ref={setNodeRef}
         onClick={handleClick}
-        className={`bg-white p-3 rounded-md border border-gray-200 cursor-pointer hover:shadow-md transition-all mb-2 h-auto min-h-[80px] ${
+        className={`${theme === 'dark' ? 'bg-[#2A2A2C] border-gray-700 hover:bg-gray-800' : 'bg-white border-gray-200 hover:shadow-md'} p-3 rounded-md border cursor-pointer transition-all mb-2 h-auto min-h-[80px] ${
           isDragging ? "opacity-50 scale-95" : ""
-        } ${task.status === 'done' ? 'border-l-4 border-l-green-500' : ''}`}
+        } ${task.status === 'done' ? `border-l-4 ${theme === 'dark' ? 'border-l-green-600' : 'border-l-green-500'}` : ''}`}
       >
-        <h4 className="font-medium text-gray-800 mb-2 line-clamp-2 text-base">{task.title}</h4>
+        <h4 className={`font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'} mb-2 line-clamp-2 text-base`}>{task.title}</h4>
         
         <div className="flex items-center justify-between mt-2">
           <div className="flex items-center gap-3">
@@ -96,35 +97,44 @@ export function KanbanTask({ task, onUpdate, onDelete }: KanbanTaskProps) {
             
             {task.assignee ? (
               <div className="flex items-center">
-                <div className="h-6 w-6 rounded-full bg-gray-300 flex items-center justify-center mr-1.5">
-                  <User size={14} className="text-gray-600" />
+                <div className={`h-6 w-6 rounded-full ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-300'} flex items-center justify-center mr-1.5`}>
+                  <User size={14} className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`} />
                 </div>
-                <span className="text-sm text-gray-600">{assigneeName}</span>
+                <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>{assigneeName}</span>
               </div>
             ) : (
-              <div className="h-6 w-6 rounded-full border border-dashed border-gray-300 flex items-center justify-center">
-                <User size={14} className="text-gray-400" />
+              <div className={`h-6 w-6 rounded-full border border-dashed ${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'} flex items-center justify-center`}>
+                <User size={14} className={`${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
               </div>
             )}
             
             {task.dueDate && (
               <div className="flex items-center">
-                <CalendarIcon className="h-5 w-5 text-gray-400" />
+                <CalendarIcon className={`h-5 w-5 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
               </div>
             )}
           </div>
           
           {task.status === 'done' && (
-            <div className="rounded-full bg-green-100 p-1">
-              <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+            <div className={`rounded-full ${theme === 'dark' ? 'bg-green-900 bg-opacity-30' : 'bg-green-100'} p-1`}>
+              <svg className={`w-4 h-4 ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`} fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
             </div>
           )}
         </div>
       </div>
-
       
+      {/* {isDetailOpen && (
+        <TaskDetailDialog
+          task={task}
+          isOpen={isDetailOpen}
+          onClose={handleCloseDetail}
+          onUpdate={onUpdate}
+          onDelete={handleDeleteTask}
+          theme={theme}
+        />
+      )} */}
     </>
   );
 } 
