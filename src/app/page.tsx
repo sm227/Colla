@@ -824,41 +824,13 @@ export default function Home() {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-gray-900">최근 회의</h2>
                 <Link
-                  href="/meetings"
+                  href="/meeting"
                   className="text-sm text-blue-600 hover:text-blue-800"
                 >
                   모두 보기
                 </Link>
               </div>
-              <div className="space-y-3">
-                <MeetingItem
-                  title="주간 팀 미팅"
-                  date="2023-06-05"
-                  participants={8}
-                  icon={<VideoIcon className="w-4 h-4 text-blue-600" />}
-                />
-
-                <MeetingItem
-                  title="제품 기획 회의"
-                  date="2023-06-02"
-                  participants={5}
-                  icon={<VideoIcon className="w-4 h-4 text-blue-600" />}
-                />
-
-                <MeetingItem
-                  title="디자인 리뷰"
-                  date="2023-05-30"
-                  participants={4}
-                  icon={<VideoIcon className="w-4 h-4 text-blue-600" />}
-                />
-
-                <MeetingItem
-                  title="클라이언트 미팅"
-                  date="2023-05-28"
-                  participants={6}
-                  icon={<VideoIcon className="w-4 h-4 text-blue-600" />}
-                />
-              </div>
+              <RecentMeetings />
             </div>
           </div>
         </main>
@@ -1048,36 +1020,121 @@ function KanbanItem({
   );
 }
 
-function MeetingItem({
-  title,
-  date,
-  participants,
-  icon,
-}: {
-  title: string;
-  date: string;
-  participants: number;
-  icon: React.ReactNode;
-}) {
+// 최근 회의 컴포넌트
+function RecentMeetings() {
+  const [meetings, setMeetings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const fetchMeetings = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/meetings');
+        
+        if (!response.ok) {
+          throw new Error('회의 목록을 불러오는데 실패했습니다');
+        }
+        
+        const result = await response.json();
+        // 최근 4개의 회의만 표시
+        setMeetings(result.data.slice(0, 4));
+        setError(null);
+      } catch (err) {
+        console.error("최근 회의 로딩 오류:", err);
+        setError('회의 목록을 불러오는데 실패했습니다');
+        setMeetings([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMeetings();
+  }, []);
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat("ko-KR", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }).format(date);
+  };
+
+  const getParticipantCount = (participants: any) => {
+    if (!participants) return 0;
+    try {
+      // JSON string이라면 파싱
+      const parsedParticipants = typeof participants === 'string' 
+        ? JSON.parse(participants) 
+        : participants;
+      
+      return Array.isArray(parsedParticipants) ? parsedParticipants.length : 0;
+    } catch (error) {
+      console.error("참가자 정보 파싱 오류:", error);
+      return 0;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-6">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-6 text-gray-500">
+        <p>{error}</p>
+      </div>
+    );
+  }
+
+  if (meetings.length === 0) {
+    return (
+      <div className="text-center py-6 text-gray-500">
+        <p className="mb-4">아직 회의 기록이 없습니다</p>
+        <button
+          onClick={() => {
+            const newRoomId = uuidv4().substring(0, 8);
+            router.push(`/meeting/${newRoomId}`);
+          }}
+          className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+        >
+          <VideoIcon className="w-4 h-4 mr-2" />
+          새 회의 시작하기
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <Link
-      href={`/meetings/${title.toLowerCase().replace(/\s+/g, "-")}`}
-      className="block"
-    >
-      <div className="flex items-center p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
-        <div className="mr-3 p-2 bg-gray-100 rounded-full">{icon}</div>
-        <div>
-          <h4 className="font-medium text-gray-900">{title}</h4>
-          <div className="flex items-center text-sm text-gray-500">
-            <span className="mr-3">{date}</span>
-            <div className="flex items-center">
-              <UsersIcon className="w-3 h-3 mr-1" />
-              <span>{participants}명</span>
+    <div className="space-y-3">
+      {meetings.map((meeting) => (
+        <div
+          key={meeting.id}
+          onClick={() => router.push(`/meeting/records/${meeting.id}`)}
+          className="flex items-center p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer"
+        >
+          <div className="mr-3 p-2 bg-gray-100 rounded-full">
+            <VideoIcon className="w-4 h-4 text-blue-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-medium text-gray-900 truncate">{meeting.title || "제목 없는 회의"}</h4>
+            <div className="flex items-center text-sm text-gray-500">
+              <span className="mr-3">{formatDate(meeting.startTime)}</span>
+              <div className="flex items-center">
+                <UsersIcon className="w-3 h-3 mr-1" />
+                <span>{getParticipantCount(meeting.participants)}명</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </Link>
+      ))}
+    </div>
   );
 }
 
