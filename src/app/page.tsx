@@ -235,9 +235,19 @@ export default function Home() {
   if (authLoading || projectLoading || tasksLoading) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${theme === 'dark' ? 'bg-[#1F1F21]' : 'bg-gray-50'}`}>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className={`mt-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>로딩 중...</p>
+        <div className="text-center flex flex-col items-center">
+          <div className={`relative w-24 h-24 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className={`w-16 h-16 border-4 border-current border-solid rounded-full opacity-20 ${theme === 'dark' ? 'border-blue-400' : 'border-blue-600'}`}></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className={`w-16 h-16 border-4 border-current border-solid rounded-full border-t-transparent animate-spin`}></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className={`text-3xl font-bold ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>C</span>
+            </div>
+          </div>
+          <p className={`mt-6 text-lg font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Colla 로딩 중...</p>
         </div>
       </div>
     );
