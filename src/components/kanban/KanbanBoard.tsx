@@ -2,11 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { KanbanColumn } from "./KanbanColumn";
-import { AddTaskDialog } from "./AddTaskDialog";
 import { ClipboardListIcon } from "lucide-react";
 import { useTasks } from "@/hooks/useTasks";
 import { Alert } from "@/components/ui/alert";
-import { KanbanTask } from "./KanbanTask";
 import { TaskDetailDialog } from "./TaskDetailDialog";
 
 // 칸반 보드 상태 타입 정의
@@ -155,9 +153,21 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className={`animate-spin rounded-full h-10 w-10 border-b-2 ${theme === 'dark' ? 'border-blue-500' : 'border-blue-600'}`}></div>
-          <p className={`ml-3 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>작업 로딩 중...</p>
+        <div className={`flex items-center justify-center h-64 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
+          <div className="text-center flex flex-col items-center">
+            <div className="relative w-20 h-20">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className={`w-14 h-14 border-4 border-current border-solid rounded-full opacity-20`}></div>
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className={`w-14 h-14 border-4 border-current border-solid rounded-full border-t-transparent animate-spin`}></div>
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className={`text-2xl font-bold`}>C</span>
+              </div>
+            </div>
+            <p className={`mt-4 text-base font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>작업 로딩 중...</p>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
