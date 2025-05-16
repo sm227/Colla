@@ -26,6 +26,8 @@ import {
   XIcon,
   BarChart3Icon,
   UserPlusIcon,
+  SunIcon,
+  MoonIcon,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -114,6 +116,7 @@ export default function Home() {
   const [roomId, setRoomId] = useState("");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("dark"); // 기본값은 다크모드
   const { user, loading: authLoading, logout } = useAuth();
   const {
     projects,
@@ -130,6 +133,35 @@ export default function Home() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationLoading, setNotificationLoading] = useState(false);
   const [notificationError, setNotificationError] = useState<string | null>(null);
+
+  // 테마 변경 시 localStorage에 저장하고 body 클래스 변경
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // localStorage에서 테마 설정 불러오기
+      const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+      if (savedTheme) {
+        setTheme(savedTheme);
+      }
+    }
+  }, []);
+
+  // 테마 변경 시 localStorage에 저장
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('theme', theme);
+      // document.body의 클래스를 변경하여 전체 스타일 적용 가능
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark-mode');
+      } else {
+        document.documentElement.classList.remove('dark-mode');
+      }
+    }
+  }, [theme]);
+
+  // 테마 토글 함수
+  const toggleTheme = () => {
+    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
+  };
 
   // Handle redirects with useEffect
   useEffect(() => {
@@ -202,10 +234,10 @@ export default function Home() {
   // 로딩 중이면 로딩 표시
   if (authLoading || projectLoading || tasksLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className={`min-h-screen flex items-center justify-center ${theme === 'dark' ? 'bg-[#1F1F21]' : 'bg-gray-50'}`}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">로딩 중...</p>
+          <p className={`mt-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>로딩 중...</p>
         </div>
       </div>
     );
@@ -237,9 +269,9 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen ${theme === 'dark' ? 'bg-[#1F1F21]' : 'bg-gray-50'}`}>
       {/* 상단 네비게이션 바 */}
-      <nav className="bg-white border-b border-gray-200 fixed w-full z-30">
+      <nav className={`${theme === 'dark' ? 'bg-[#2A2A2C] border-gray-800' : 'bg-white border-gray-200'} border-b fixed w-full z-30`}>
         <div className="px-4 py-3 flex justify-between items-center">
           <div className="flex items-center">
             <button
@@ -247,16 +279,16 @@ export default function Home() {
               onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
             >
               {mobileSidebarOpen ? (
-                <XIcon className="w-6 h-6" />
+                <XIcon className={`w-6 h-6 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`} />
               ) : (
-                <MenuIcon className="w-6 h-6" />
+                <MenuIcon className={`w-6 h-6 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`} />
               )}
             </button>
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center mr-2">
+              <div className={`w-8 h-8 ${theme === 'dark' ? 'bg-blue-600' : 'bg-black'} rounded-lg flex items-center justify-center mr-2`}>
                 <span className="text-white font-bold text-lg">C</span>
               </div>
-              <span className="text-2xl font-bold text-gray-900">Colla</span>
+              <span className={`text-2xl font-bold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>Colla</span>
             </div>
           </div>
 
@@ -265,19 +297,43 @@ export default function Home() {
               <input
                 type="text"
                 placeholder="검색..."
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full pl-10 pr-4 py-2 rounded-lg border ${
+                  theme === 'dark' 
+                    ? 'border-gray-700 bg-[#353538] text-gray-200' 
+                    : 'border-gray-300 bg-white text-gray-700'
+                } focus:outline-none focus:ring-2 focus:ring-blue-500`}
               />
               <SearchIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
             </div>
           </div>
 
           <div className="flex items-center space-x-4">
+            {/* 테마 전환 버튼 */}
+            <button
+              onClick={toggleTheme}
+              className={`p-2 rounded-full ${
+                theme === 'dark' 
+                  ? 'hover:bg-gray-700 text-gray-300' 
+                  : 'hover:bg-gray-100 text-gray-600'
+              } transition-colors duration-200`}
+            >
+              {theme === 'dark' ? (
+                <SunIcon className="w-5 h-5" />
+              ) : (
+                <MoonIcon className="w-5 h-5" />
+              )}
+            </button>
+            
             <div className="relative">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-2 rounded-full hover:bg-gray-100 transition-colors duration-200"
+                className={`relative p-2 rounded-full ${
+                  theme === 'dark'
+                    ? 'hover:bg-gray-700 text-gray-300'
+                    : 'hover:bg-gray-100 text-gray-600'
+                } transition-colors duration-200`}
               >
-                <BellIcon className="w-5 h-5 text-gray-600" />
+                <BellIcon className="w-5 h-5" />
                 {/* 알림 배지 개선 - 알림이 있을 때만 표시 */}
                 {notifications.length > 0 && (
                   <span className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full shadow-sm animate-pulse">
@@ -288,11 +344,19 @@ export default function Home() {
               </button>
               {/* 알림창 UI 시작 */}
               {showNotifications && (
-                <div className="absolute right-0 mt-2 w-80 md:w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+                <div className={`absolute right-0 mt-2 w-80 md:w-96 ${
+                  theme === 'dark'
+                    ? 'bg-[#2A2A2C] border-gray-700'
+                    : 'bg-white border-gray-200'
+                } rounded-lg shadow-xl border z-50`}>
                   <div className="p-4">
                     <div className="flex justify-between items-center mb-3">
-                      <h3 className="text-lg font-medium text-gray-900">알림</h3>
-                      <button onClick={() => setShowNotifications(false)} className="text-gray-400 hover:text-gray-600">
+                      <h3 className={`text-lg font-medium ${
+                        theme === 'dark' ? 'text-gray-100' : 'text-gray-900'
+                      }`}>알림</h3>
+                      <button onClick={() => setShowNotifications(false)} className={`text-gray-400 hover:${
+                        theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                      }`}>
                         <XIcon className="w-5 h-5" />
                       </button>
                     </div>
@@ -310,8 +374,8 @@ export default function Home() {
                     )}
 
                     {!notificationLoading && !notificationError && notifications.length === 0 && (
-                      <div className="text-center py-10 text-gray-500">
-                        <BellIcon className="w-10 h-10 mx-auto mb-2 text-gray-400" />
+                      <div className="text-center py-10 text-gray-400">
+                        <BellIcon className="w-10 h-10 mx-auto mb-2 text-gray-500" />
                         <p>새로운 알림이 없습니다.</p>
                       </div>
                     )}
@@ -361,8 +425,12 @@ export default function Home() {
             </div>
             <div className="relative">
               <Link href="/mypage" className="flex items-center">
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                  <UserIcon className="w-5 h-5 text-gray-600" />
+                <div className={`w-8 h-8 rounded-full ${
+                  theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
+                } flex items-center justify-center`}>
+                  <UserIcon className={`w-5 h-5 ${
+                    theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                  }`} />
                 </div>
               </Link>
             </div>
@@ -374,7 +442,11 @@ export default function Home() {
       <div className="flex pt-16">
         {/* 사이드바 - 모바일에서는 오버레이로 표시 */}
         <aside
-          className={`fixed inset-y-0 left-0 z-20 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-20 w-64 ${
+            theme === 'dark'
+              ? 'bg-[#2A2A2C] border-gray-800'
+              : 'bg-white border-gray-200'
+          } border-r transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
             mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
           } md:relative md:w-64 md:flex-shrink-0`}
         >
@@ -386,11 +458,13 @@ export default function Home() {
                   text="홈"
                   href="/"
                   active={true}
+                  theme={theme}
                 />
                 <SidebarLink
                   icon={<VideoIcon className="w-5 h-5" />}
                   text="화상 회의"
                   href="/meeting"
+                  theme={theme}
                 />
                 <SidebarLink
                   icon={<Trello className="w-5 h-5" />}
@@ -400,6 +474,7 @@ export default function Home() {
                       ? `/kanban?projectId=${currentProject.id}`
                       : "/kanban"
                   }
+                  theme={theme}
                 />
                 <SidebarLink
                   icon={<FileTextIcon className="w-5 h-5" />}
@@ -441,21 +516,25 @@ export default function Home() {
                         });
                     }
                   }}
+                  theme={theme}
                 />
                 <SidebarLink
                   icon={<CalendarIcon className="w-5 h-5" />}
                   text="일정"
                   href="/calendar"
+                  theme={theme}
                 />
                 <SidebarLink
                   icon={<MessageSquareIcon className="w-5 h-5" />}
                   text="메시지"
                   href="/messages"
+                  theme={theme}
                 />
                 <SidebarLink
                   icon={<BarChart3Icon className="w-5 h-5" />}
                   text="보고서"
                   href="/reports"
+                  theme={theme}
                 />
                 <SidebarLink
                   icon={<UsersIcon className="w-5 h-5" />}
@@ -465,16 +544,20 @@ export default function Home() {
                       ? `/projects/${currentProject.id}/members`
                       : "/projects"
                   }
+                  theme={theme}
                 />
                 <SidebarLink
                   icon={<BellIcon className="w-5 h-5" />}
                   text="초대 확인"
                   href="/projects/invitations"
+                  theme={theme}
                 />
               </nav>
 
               <div className="mt-8">
-                <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <h3 className={`px-3 text-xs font-semibold uppercase tracking-wider ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                }`}>
                   프로젝트
                 </h3>
                 <nav className="mt-2 space-y-1">
@@ -490,6 +573,7 @@ export default function Home() {
                         setCurrentProject(project);
                         router.push("/");
                       }}
+                      theme={theme}
                     />
                   ))}
                 </nav>
@@ -498,20 +582,54 @@ export default function Home() {
               <div className="mt-8">
                 <button
                   onClick={() => router.push("/projects/new")}
-                  className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-100 w-full"
+                  className={`flex items-center px-3 py-2 text-sm font-medium rounded-md w-full ${
+                    theme === 'dark' 
+                      ? 'text-gray-300 hover:bg-gray-700' 
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
                 >
                   <PlusIcon className="w-5 h-5 mr-2" />새 프로젝트
                 </button>
               </div>
 
-              <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
-                <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-100 w-full">
+              <div className={`absolute bottom-0 left-0 right-0 p-4 border-t ${theme === 'dark' ? 'border-gray-800' : 'border-gray-200'}`}>
+                <div className="mb-3 flex justify-between items-center">
+                  <button 
+                    onClick={toggleTheme} 
+                    className={`flex items-center px-3 py-2 text-sm font-medium ${
+                      theme === 'dark' 
+                        ? 'text-gray-300 hover:bg-gray-700'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    } rounded-md w-full`}
+                  >
+                    {theme === 'dark' ? (
+                      <>
+                        <SunIcon className="w-5 h-5 mr-2" />
+                        라이트 모드
+                      </>
+                    ) : (
+                      <>
+                        <MoonIcon className="w-5 h-5 mr-2" />
+                        다크 모드
+                      </>
+                    )}
+                  </button>
+                </div>
+                <button className={`flex items-center px-3 py-2 text-sm font-medium ${
+                  theme === 'dark' 
+                    ? 'text-gray-300 hover:bg-gray-700'
+                    : 'text-gray-600 hover:bg-gray-100'
+                } rounded-md w-full`}>
                   <SettingsIcon className="w-5 h-5 mr-2" />
                   설정
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-100 w-full mt-2"
+                  className={`flex items-center px-3 py-2 text-sm font-medium ${
+                    theme === 'dark' 
+                      ? 'text-gray-300 hover:bg-gray-700'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  } rounded-md w-full mt-2`}
                 >
                   <LogOutIcon className="w-5 h-5 mr-2" />
                   로그아웃
@@ -526,8 +644,8 @@ export default function Home() {
           {/* 대시보드 헤더 */}
           <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">대시보드</h1>
-              <p className="text-sm text-gray-600">
+              <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>대시보드</h1>
+              <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                 안녕하세요, {user.name}님! {currentProject?.name || "프로젝트"}
                 의 업무를 확인하세요
               </p>
@@ -535,13 +653,21 @@ export default function Home() {
             <div className="mt-4 md:mt-0 flex space-x-3">
               <button
                 onClick={createNewMeeting}
-                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                className={`flex items-center justify-center gap-2 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  theme === 'dark'
+                    ? 'bg-blue-800 hover:bg-blue-700'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
               >
                 <VideoIcon className="w-4 h-4" />새 회의
               </button>
               <Link
                 href="/kanban/new"
-                className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                className={`flex items-center justify-center gap-2 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  theme === 'dark'
+                    ? 'bg-purple-800 hover:bg-purple-700'
+                    : 'bg-purple-600 hover:bg-purple-700'
+                }`}
               >
                 <Trello className="w-4 h-4" />새 보드
               </Link>
@@ -551,7 +677,11 @@ export default function Home() {
                     ? `/documents/new?projectId=${currentProject.id}`
                     : "/documents/new"
                 }
-                className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                className={`flex items-center justify-center gap-2 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  theme === 'dark'
+                    ? 'bg-green-800 hover:bg-green-700'
+                    : 'bg-green-600 hover:bg-green-700'
+                }`}
                 onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
                   if (currentProject?.id) {
                     e.preventDefault();
@@ -595,7 +725,11 @@ export default function Home() {
                     ? `/projects/${currentProject.id}/members`
                     : "/projects"
                 }
-                className="flex items-center justify-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                className={`flex items-center justify-center gap-2 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  theme === 'dark'
+                    ? 'bg-yellow-800 hover:bg-yellow-700'
+                    : 'bg-yellow-600 hover:bg-yellow-700'
+                }`}
               >
                 <UsersIcon className="w-4 h-4" />
                 팀원 관리
@@ -605,14 +739,14 @@ export default function Home() {
 
           {/* 새로운 섹션: 프로젝트 팀 */}
           {currentProject && (
-            <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+            <div className={`${theme === 'dark' ? 'bg-[#2A2A2C]' : 'bg-white'} rounded-lg shadow-sm p-4 mb-6`}>
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium text-gray-900">
+                <h2 className={`text-lg font-medium ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>
                   프로젝트 팀
                 </h2>
                 <Link
                   href={`/projects/${currentProject.id}/members`}
-                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                  className={`text-sm flex items-center ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
                 >
                   <UsersIcon className="w-4 h-4 mr-1" />
                   팀원 관리
@@ -623,7 +757,11 @@ export default function Home() {
                 <div className="flex -space-x-2">
                   {/* 프로젝트 소유자 아바타 */}
                   {currentProject.user && (
-                    <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white border-2 border-white z-10">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white border-2 z-10 ${
+                      theme === 'dark' 
+                        ? 'bg-blue-700 border-gray-800' 
+                        : 'bg-blue-600 border-white'
+                    }`}>
                       {currentProject.user.name.charAt(0)}
                     </div>
                   )}
@@ -636,7 +774,11 @@ export default function Home() {
                       .map((member, index) => (
                         <div
                           key={member.id}
-                          className="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center text-white border-2 border-white"
+                          className={`w-10 h-10 rounded-full flex items-center justify-center text-white border-2 ${
+                            theme === 'dark' 
+                              ? 'bg-gray-600 border-gray-800' 
+                              : 'bg-gray-400 border-white'
+                          }`}
                           style={{ zIndex: 10 - index }}
                         >
                           {member.user?.name.charAt(0)}
@@ -648,7 +790,11 @@ export default function Home() {
                     currentProject.members.filter(
                       (m) => m.inviteStatus === "accepted"
                     ).length > 3 && (
-                      <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 border-2 border-white">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
+                        theme === 'dark' 
+                          ? 'bg-gray-700 text-gray-300 border-gray-800' 
+                          : 'bg-gray-300 text-gray-600 border-white'
+                      }`}>
                         +
                         {currentProject.members.filter(
                           (m) => m.inviteStatus === "accepted"
@@ -659,7 +805,11 @@ export default function Home() {
 
                 <Link
                   href={`/projects/${currentProject.id}/members`}
-                  className="flex items-center text-blue-600 hover:text-blue-800"
+                  className={`flex items-center ${
+                    theme === 'dark' 
+                      ? 'text-blue-400 hover:text-blue-300' 
+                      : 'text-blue-600 hover:text-blue-800'
+                  }`}
                 >
                   <UserPlusIcon className="w-5 h-5 mr-1" />
                   팀원 초대
@@ -669,8 +819,8 @@ export default function Home() {
           )}
 
           {/* 빠른 액세스 - 회의 참여 */}
-          <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-3">
+          <div className={`${theme === 'dark' ? 'bg-[#2A2A2C]' : 'bg-white'} rounded-lg shadow-sm p-4 mb-6`}>
+            <h2 className={`text-lg font-medium mb-3 ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>
               빠른 회의 참여
             </h2>
             <form onSubmit={joinMeeting} className="flex gap-2">
@@ -679,11 +829,17 @@ export default function Home() {
                 value={roomId}
                 onChange={(e) => setRoomId(e.target.value)}
                 placeholder="회의 코드 입력"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                className={`flex-1 px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none ${
+                  theme === 'dark' 
+                    ? 'border border-gray-700 bg-[#353538] text-gray-200' 
+                    : 'border border-gray-300 bg-white text-gray-700'
+                }`}
               />
               <button
                 type="submit"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                className={`${
+                  theme === 'dark' ? 'bg-blue-800 hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'
+                } text-white px-4 py-2 rounded-lg transition-colors`}
               >
                 참여하기
               </button>
@@ -693,75 +849,47 @@ export default function Home() {
           {/* 대시보드 그리드 */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* 간략한 칸반 보드 */}
-            <div className="bg-white rounded-lg shadow-sm p-4 lg:col-span-2">
+            <div className={`${theme === 'dark' ? 'bg-[#2A2A2C]' : 'bg-white'} rounded-lg shadow-sm p-4 lg:col-span-2`}>
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium text-gray-900">칸반 보드</h2>
+                <h2 className={`text-lg font-medium ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>칸반 보드</h2>
                 <Link
                   href="/kanban"
-                  className="text-sm text-blue-600 hover:text-blue-800"
+                  className={`text-sm ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
                 >
                   전체 보기
                 </Link>
               </div>
-              <SimplifiedKanbanBoard />
+              <SimplifiedKanbanBoard theme={theme} />
             </div>
 
             {/* 예정된 일정 */}
-            <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className={`${theme === 'dark' ? 'bg-[#2A2A2C]' : 'bg-white'} rounded-lg shadow-sm p-4`}>
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium text-gray-900">
+                <h2 className={`text-lg font-medium ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>
                   예정된 일정
                 </h2>
                 <Link
                   href="/calendar"
-                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                  className={`text-sm flex items-center ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
                 >
                   <CalendarIcon className="w-4 h-4 mr-1" />
                   캘린더
                 </Link>
               </div>
-              {/* <div className="space-y-3">
-                <ScheduleItem
-                  title="디자인 팀 회의"
-                  time="오늘, 14:00"
-                  type="회의"
-                  icon={<VideoIcon className="w-4 h-4 text-blue-600" />}
-                />
-
-                <ScheduleItem
-                  title="프로젝트 마감일"
-                  time="내일, 18:00"
-                  type="마감일"
-                  icon={<ClipboardListIcon className="w-4 h-4 text-red-600" />}
-                />
-
-                <ScheduleItem
-                  title="클라이언트 미팅"
-                  time="수요일, 11:00"
-                  type="회의"
-                  icon={<VideoIcon className="w-4 h-4 text-blue-600" />}
-                />
-
-                <ScheduleItem
-                  title="주간 팀 회의"
-                  time="금요일, 10:00"
-                  type="회의"
-                  icon={<VideoIcon className="w-4 h-4 text-blue-600" />}
-                />
-              </div> */}
+              
             </div>
 
             {/* 최근 문서 */}
-            <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className={`${theme === 'dark' ? 'bg-[#2A2A2C]' : 'bg-white'} rounded-lg shadow-sm p-4`}>
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium text-gray-900">최근 문서</h2>
+                <h2 className={`text-lg font-medium ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>최근 문서</h2>
                 <Link
                   href={
                     currentProject
                       ? `/documents?projectId=${currentProject.id}`
                       : "/documents"
                   }
-                  className="text-sm text-blue-600 hover:text-blue-800"
+                  className={`text-sm ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
                   onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
                     if (currentProject) {
                       e.preventDefault();
@@ -776,18 +904,18 @@ export default function Home() {
                   모두 보기
                 </Link>
               </div>
-              <RecentDocuments projectId={currentProject?.id} />
+              <RecentDocuments projectId={currentProject?.id} theme={theme} />
             </div>
 
             {/* 활성 칸반보드 */}
-            <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className={`${theme === 'dark' ? 'bg-[#2A2A2C]' : 'bg-white'} rounded-lg shadow-sm p-4`}>
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium text-gray-900">
+                <h2 className={`text-lg font-medium ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>
                   활성 칸반보드
                 </h2>
                 <Link
                   href="/kanban"
-                  className="text-sm text-blue-600 hover:text-blue-800"
+                  className={`text-sm ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
                 >
                   모두 보기
                 </Link>
@@ -796,41 +924,45 @@ export default function Home() {
                 <KanbanItem
                   title="마케팅 캠페인"
                   tasks={{ total: 12, completed: 9 }}
-                  icon={<Trello className="w-4 h-4 text-purple-600" />}
+                  icon={<Trello className={`w-4 h-4 ${theme === 'dark' ? 'text-purple-400' : 'text-purple-600'}`} />}
+                  theme={theme}
                 />
 
                 <KanbanItem
                   title="웹사이트 리디자인"
                   tasks={{ total: 8, completed: 3 }}
-                  icon={<Trello className="w-4 h-4 text-purple-600" />}
+                  icon={<Trello className={`w-4 h-4 ${theme === 'dark' ? 'text-purple-400' : 'text-purple-600'}`} />}
+                  theme={theme}
                 />
 
                 <KanbanItem
                   title="모바일 앱 개발"
                   tasks={{ total: 15, completed: 7 }}
-                  icon={<Trello className="w-4 h-4 text-purple-600" />}
+                  icon={<Trello className={`w-4 h-4 ${theme === 'dark' ? 'text-purple-400' : 'text-purple-600'}`} />}
+                  theme={theme}
                 />
 
                 <KanbanItem
                   title="고객 피드백 처리"
                   tasks={{ total: 5, completed: 2 }}
-                  icon={<Trello className="w-4 h-4 text-purple-600" />}
+                  icon={<Trello className={`w-4 h-4 ${theme === 'dark' ? 'text-purple-400' : 'text-purple-600'}`} />}
+                  theme={theme}
                 />
               </div>
             </div>
 
             {/* 최근 회의 */}
-            <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className={`${theme === 'dark' ? 'bg-[#2A2A2C]' : 'bg-white'} rounded-lg shadow-sm p-4`}>
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium text-gray-900">최근 회의</h2>
+                <h2 className={`text-lg font-medium ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>최근 회의</h2>
                 <Link
                   href="/meeting"
-                  className="text-sm text-blue-600 hover:text-blue-800"
+                  className={`text-sm ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
                 >
                   모두 보기
                 </Link>
               </div>
-              <RecentMeetings />
+              <RecentMeetings theme={theme} />
             </div>
           </div>
         </main>
@@ -846,6 +978,7 @@ function SidebarLink({
   active = false,
   small = false,
   onClick,
+  theme = "dark"
 }: {
   icon: React.ReactNode;
   text: string;
@@ -853,6 +986,7 @@ function SidebarLink({
   active?: boolean;
   small?: boolean;
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+  theme?: "light" | "dark";
 }) {
   return (
     <Link
@@ -861,7 +995,9 @@ function SidebarLink({
       className={`flex items-center px-3 py-2 ${
         small ? "text-sm" : "text-base"
       } font-medium rounded-md ${
-        active ? "bg-blue-50 text-blue-600" : "text-gray-600 hover:bg-gray-100"
+        theme === 'dark'
+          ? (active ? "bg-blue-900 text-blue-300" : "text-gray-300 hover:bg-gray-700")
+          : (active ? "bg-blue-50 text-blue-600" : "text-gray-600 hover:bg-gray-100")
       }`}
     >
       <div className={`${small ? "mr-2" : "mr-3"}`}>{icon}</div>
@@ -984,10 +1120,12 @@ function KanbanItem({
   title,
   tasks,
   icon,
+  theme = "dark"
 }: {
   title: string;
   tasks: { total: number; completed: number };
   icon: React.ReactNode;
+  theme?: "light" | "dark";
 }) {
   const percentage = Math.round((tasks.completed / tasks.total) * 100);
 
@@ -996,21 +1134,35 @@ function KanbanItem({
       href={`/kanban/${title.toLowerCase().replace(/\s+/g, "-")}`}
       className="block"
     >
-      <div className="flex items-center p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
-        <div className="mr-3 p-2 bg-gray-100 rounded-full">{icon}</div>
+      <div className={`flex items-center p-3 rounded-lg ${
+        theme === 'dark'
+          ? 'border border-gray-700 hover:bg-gray-800'
+          : 'border border-gray-100 hover:bg-gray-50'
+      }`}>
+        <div className={`mr-3 p-2 rounded-full ${
+          theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
+        }`}>{icon}</div>
         <div className="flex-1">
-          <h4 className="font-medium text-gray-900">{title}</h4>
+          <h4 className={`font-medium ${
+            theme === 'dark' ? 'text-gray-200' : 'text-gray-900'
+          }`}>{title}</h4>
           <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-500">
+            <p className={`text-sm ${
+              theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+            }`}>
               {tasks.completed}/{tasks.total} 작업 완료
             </p>
-            <span className="text-xs font-medium text-gray-700">
+            <span className={`text-xs font-medium ${
+              theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+            }`}>
               {percentage}%
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+          <div className={`w-full rounded-full h-1.5 mt-1 ${
+            theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
+          }`}>
             <div
-              className="bg-purple-600 h-1.5 rounded-full"
+              className={`${theme === 'dark' ? 'bg-purple-500' : 'bg-purple-600'} h-1.5 rounded-full`}
               style={{ width: `${percentage}%` }}
             ></div>
           </div>
@@ -1021,7 +1173,7 @@ function KanbanItem({
 }
 
 // 최근 회의 컴포넌트
-function RecentMeetings() {
+function RecentMeetings({ theme = "dark" }: { theme?: "light" | "dark" }) {
   const [meetings, setMeetings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1080,14 +1232,18 @@ function RecentMeetings() {
   if (loading) {
     return (
       <div className="flex justify-center items-center py-6">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+        <div className={`animate-spin rounded-full h-6 w-6 border-b-2 ${
+          theme === 'dark' ? 'border-blue-500' : 'border-blue-600'
+        }`}></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-center py-6 text-gray-500">
+      <div className={`text-center py-6 ${
+        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+      }`}>
         <p>{error}</p>
       </div>
     );
@@ -1095,14 +1251,18 @@ function RecentMeetings() {
 
   if (meetings.length === 0) {
     return (
-      <div className="text-center py-6 text-gray-500">
+      <div className={`text-center py-6 ${
+        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+      }`}>
         <p className="mb-4">아직 회의 기록이 없습니다</p>
         <button
           onClick={() => {
             const newRoomId = uuidv4().substring(0, 8);
             router.push(`/meeting/${newRoomId}`);
           }}
-          className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+          className={`inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white rounded-md ${
+            theme === 'dark' ? 'bg-blue-800 hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'
+          }`}
         >
           <VideoIcon className="w-4 h-4 mr-2" />
           새 회의 시작하기
@@ -1117,14 +1277,26 @@ function RecentMeetings() {
         <div
           key={meeting.id}
           onClick={() => router.push(`/meeting/records/${meeting.id}`)}
-          className="flex items-center p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer"
+          className={`flex items-center p-3 rounded-lg cursor-pointer ${
+            theme === 'dark'
+              ? 'border border-gray-700 hover:bg-gray-800'
+              : 'border border-gray-100 hover:bg-gray-50'
+          }`}
         >
-          <div className="mr-3 p-2 bg-gray-100 rounded-full">
-            <VideoIcon className="w-4 h-4 text-blue-600" />
+          <div className={`mr-3 p-2 rounded-full ${
+            theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
+          }`}>
+            <VideoIcon className={`w-4 h-4 ${
+              theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+            }`} />
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className="font-medium text-gray-900 truncate">{meeting.title || "제목 없는 회의"}</h4>
-            <div className="flex items-center text-sm text-gray-500">
+            <h4 className={`font-medium truncate ${
+              theme === 'dark' ? 'text-gray-200' : 'text-gray-900'
+            }`}>{meeting.title || "제목 없는 회의"}</h4>
+            <div className={`flex items-center text-sm ${
+              theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+            }`}>
               <span className="mr-3">{formatDate(meeting.startTime)}</span>
               <div className="flex items-center">
                 <UsersIcon className="w-3 h-3 mr-1" />
@@ -1138,7 +1310,7 @@ function RecentMeetings() {
   );
 }
 
-function SimplifiedKanbanBoard() {
+function SimplifiedKanbanBoard({ theme = "dark" }: { theme?: "light" | "dark" }) {
   // 현재 선택된 프로젝트의 태스크 가져오기
   const { currentProject } = useProject();
   const { tasks = [], loading } = useTasks(currentProject?.id || null);
@@ -1154,7 +1326,9 @@ function SimplifiedKanbanBoard() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-40">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${
+          theme === 'dark' ? 'border-blue-500' : 'border-blue-600'
+        }`}></div>
       </div>
     );
   }
@@ -1162,11 +1336,15 @@ function SimplifiedKanbanBoard() {
   // 태스크가 없으면 빈 상태 표시
   if (tasks.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-40 text-gray-500">
+      <div className={`flex flex-col items-center justify-center h-40 ${
+        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+      }`}>
         <p className="text-center mb-4">현재 프로젝트에 작업이 없습니다</p>
         <Link
           href="/kanban/new"
-          className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          className={`flex items-center justify-center gap-2 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            theme === 'dark' ? 'bg-purple-800 hover:bg-purple-700' : 'bg-purple-600 hover:bg-purple-700'
+          }`}
         >
           <PlusIcon className="w-4 h-4" />새 작업 추가
         </Link>
@@ -1174,20 +1352,26 @@ function SimplifiedKanbanBoard() {
     );
   }
 
-  // 간략화된 칸반 컬럼 컴포넌트
+        // 간략화된 칸반 컬럼 컴포넌트
   const SimplifiedColumn = ({
     title,
     status,
     statusColor,
     tasks,
+    theme = "dark"
   }: {
     title: string;
     status: string;
     statusColor: string;
     tasks: Task[];
+    theme?: "light" | "dark";
   }) => (
-    <div className="bg-gray-50 rounded-lg p-3">
-      <h3 className="font-medium text-gray-700 mb-2 flex items-center">
+    <div className={`${
+      theme === 'dark' ? 'bg-[#353538]' : 'bg-gray-50'
+    } rounded-lg p-3`}>
+      <h3 className={`font-medium mb-2 flex items-center ${
+        theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+      }`}>
         <span
           className={`inline-block w-3 h-3 ${statusColor} rounded-full mr-2`}
         ></span>
@@ -1198,11 +1382,19 @@ function SimplifiedKanbanBoard() {
           tasks.map((task) => (
             <div
               key={task.id}
-              className="bg-white p-2 rounded shadow-sm border border-gray-200"
+              className={`p-2 rounded shadow-sm ${
+                theme === 'dark' 
+                  ? 'bg-[#2A2A2C] border border-gray-700' 
+                  : 'bg-white border border-gray-200'
+              }`}
             >
-              <p className="text-sm font-medium">{task.title}</p>
+              <p className={`text-sm font-medium ${
+                theme === 'dark' ? 'text-gray-200' : 'text-gray-800'
+              }`}>{task.title}</p>
               <div className="flex justify-between items-center mt-2">
-                <span className="text-xs text-gray-500">
+                <span className={`text-xs ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                }`}>
                   {task.priority === "high"
                     ? "우선순위 높음"
                     : task.priority === "medium"
@@ -1213,8 +1405,12 @@ function SimplifiedKanbanBoard() {
             </div>
           ))
         ) : (
-          <div className="bg-white p-2 rounded shadow-sm border border-gray-200 text-center">
-            <p className="text-xs text-gray-400">작업 없음</p>
+          <div className={`p-2 rounded shadow-sm text-center ${
+            theme === 'dark' 
+              ? 'bg-[#2A2A2C] border border-gray-700 text-gray-500' 
+              : 'bg-white border border-gray-200 text-gray-400'
+          }`}>
+            <p className="text-xs">작업 없음</p>
           </div>
         )}
       </div>
@@ -1228,25 +1424,28 @@ function SimplifiedKanbanBoard() {
         status="todo"
         statusColor="bg-gray-400"
         tasks={todoTasks}
+        theme={theme}
       />
       <SimplifiedColumn
         title="진행 중"
         status="in-progress"
         statusColor="bg-blue-400"
         tasks={inProgressTasks}
+        theme={theme}
       />
       <SimplifiedColumn
         title="완료"
         status="done"
         statusColor="bg-green-400"
         tasks={doneTasks}
+        theme={theme}
       />
     </div>
   );
 }
 
 // 최근 문서 컴포넌트
-function RecentDocuments({ projectId }: { projectId?: string }) {
+function RecentDocuments({ projectId, theme = "dark" }: { projectId?: string; theme?: "light" | "dark" }) {
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1317,14 +1516,18 @@ function RecentDocuments({ projectId }: { projectId?: string }) {
   if (loading) {
     return (
       <div className="flex justify-center items-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${
+          theme === 'dark' ? 'border-blue-500' : 'border-blue-600'
+        }`}></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div className={`text-center py-8 ${
+        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+      }`}>
         <p>{error}</p>
       </div>
     );
@@ -1332,11 +1535,15 @@ function RecentDocuments({ projectId }: { projectId?: string }) {
 
   if (documents.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div className={`text-center py-8 ${
+        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+      }`}>
         <p className="mb-4">아직 문서가 없습니다</p>
         <Link
           href={projectId ? `/documents/new?projectId=${projectId}` : "/documents/new"}
-          className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+          className={`inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white rounded-md ${
+            theme === 'dark' ? 'bg-blue-800 hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'
+          }`}
         >
           <PlusIcon className="w-4 h-4 mr-2" />
           새 문서 만들기
@@ -1351,18 +1558,30 @@ function RecentDocuments({ projectId }: { projectId?: string }) {
         <div
           key={doc.id}
           onClick={() => router.push(`/documents/${doc.id}${projectId ? `?projectId=${projectId}` : ''}`)}
-          className="flex items-center p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer"
+          className={`flex items-center p-3 rounded-lg cursor-pointer ${
+            theme === 'dark'
+              ? 'border border-gray-700 hover:bg-gray-800'
+              : 'border border-gray-100 hover:bg-gray-50'
+          }`}
         >
-          <div className="mr-3 p-2 bg-gray-100 rounded-full">
+          <div className={`mr-3 p-2 rounded-full ${
+            theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
+          }`}>
             {doc.emoji ? (
               <span className="text-xl">{doc.emoji}</span>
             ) : (
-              <FileTextIcon className="w-4 h-4 text-green-600" />
+              <FileTextIcon className={`w-4 h-4 ${
+                theme === 'dark' ? 'text-green-400' : 'text-green-600'
+              }`} />
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className="font-medium text-gray-900 truncate">{doc.title || "무제 문서"}</h4>
-            <p className="text-sm text-gray-500">
+            <h4 className={`font-medium truncate ${
+              theme === 'dark' ? 'text-gray-200' : 'text-gray-900'
+            }`}>{doc.title || "무제 문서"}</h4>
+            <p className={`text-sm ${
+              theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+            }`}>
               수정됨: {formatDate(doc.updatedAt || doc.createdAt)}
             </p>
           </div>
