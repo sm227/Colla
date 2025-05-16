@@ -116,7 +116,12 @@ export default function Home() {
   const [roomId, setRoomId] = useState("");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">("dark"); // 기본값은 다크모드
+  
+  // 로컬 스토리지에서 테마 설정 불러와서 초기값으로 사용
+  const savedTheme = typeof window !== 'undefined' ? 
+    (localStorage.getItem('theme') as 'light' | 'dark') : null;
+  const [theme, setTheme] = useState<"light" | "dark">(savedTheme || "dark");
+  
   const { user, loading: authLoading, logout } = useAuth();
   const {
     projects,
@@ -135,17 +140,6 @@ export default function Home() {
   const [notificationError, setNotificationError] = useState<string | null>(null);
 
   // 테마 변경 시 localStorage에 저장하고 body 클래스 변경
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // localStorage에서 테마 설정 불러오기
-      const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
-      if (savedTheme) {
-        setTheme(savedTheme);
-      }
-    }
-  }, []);
-
-  // 테마 변경 시 localStorage에 저장
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('theme', theme);
