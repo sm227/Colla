@@ -46,7 +46,7 @@ interface TimelineProps {
   theme: "light" | "dark";
 }
 
-export function Timeline({ projectId, theme }: TimelineProps) {
+export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
   const [epics, setEpics] = useState<Epic[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,9 +62,17 @@ export function Timeline({ projectId, theme }: TimelineProps) {
   
   const router = useRouter();
 
-  // 처음 렌더링 시 document에 테마 클래스 적용 - 다크모드 이슈 해결
+  // 로컬 스토리지에서 테마 설정 불러오기
+  const savedTheme = typeof window !== 'undefined' ? 
+    (localStorage.getItem('theme') as 'light' | 'dark') : null;
+  const [theme, setTheme] = useState<"light" | "dark">(savedTheme || initialTheme || "dark");
+
+  // 테마 변경 시 로컬 스토리지에 저장하고 클래스 변경
   useEffect(() => {
-    if (typeof document !== 'undefined') {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('theme', theme);
+      
+      // document.documentElement의 클래스를 변경하여 전체 스타일 적용
       if (theme === 'dark') {
         document.documentElement.classList.add('dark-mode');
       } else {
@@ -394,18 +402,19 @@ export function Timeline({ projectId, theme }: TimelineProps) {
 
       {/* 에픽이 없을 때 메시지 */}
       {!isLoading && epics.length === 0 && !error && (
-        <div className={`p-6 rounded-md border border-dashed text-center ${
-          theme === 'dark' 
-            ? 'border-gray-700 text-gray-400' 
-            : 'border-gray-300 text-gray-500'
+      <div className={`p-6 rounded-md border border-dashed text-center ${
+        theme === 'dark' 
+          ? 'border-gray-700 text-gray-400' 
+          : 'border-gray-300 text-gray-500'
+      }`}>
+        <CalendarIcon className="w-12 h-12 mx-auto mb-3 opacity-20" />
+        <h3 className={`text-lg font-medium mb-1 ${
+          theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
         }`}>
-          <CalendarIcon className="w-12 h-12 mx-auto mb-3 opacity-20" />
-          <h3 className={`text-lg font-medium mb-1 ${
-            theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
-          }`}>
-            아직 에픽이 없습니다
-          </h3>
-          <p className="mb-4">새 에픽을 추가하여 작업을 구성해보세요.</p>
+          아직 에픽이 없습니다
+        </h3>
+        <p className="mb-4">새 에픽을 추가하여 작업을 구성해보세요.</p>
+        {!isAddingEpic ? (
           <Button
             onClick={handleStartAddEpic}
             className={`${
@@ -418,7 +427,46 @@ export function Timeline({ projectId, theme }: TimelineProps) {
             <PlusIcon className="w-4 h-4 mr-1" />
             <span>새 에픽 추가</span>
           </Button>
-        </div>
+        ) : (
+          <div className={`mt-3 ${theme === 'dark' ? 'bg-[#353538]' : 'bg-gray-100'} p-3 rounded-md`}>
+            <input
+              ref={newEpicInputRef}
+              type="text"
+              placeholder="에픽 제목 입력 후 엔터 (Esc로 취소)"
+              className={`w-full p-2 rounded border ${
+                theme === 'dark' 
+                  ? 'bg-[#2A2A2C] border-gray-700 text-gray-200' 
+                  : 'bg-white border-gray-300 text-gray-800'
+              }`}
+              value={newEpicTitle}
+              onChange={(e) => setNewEpicTitle(e.target.value)}
+              onKeyDown={handleEpicKeyDown}
+            />
+            
+            <div className="flex mt-2 space-x-2 justify-end">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleCancelAddEpic}
+                className={`${theme === 'dark' ? 'text-gray-300 hover:text-white' : ''}`}
+              >
+                취소
+              </Button>
+              <Button 
+                size="sm" 
+                onClick={handleSubmitNewEpic}
+                className={`${
+                  theme === 'dark' 
+                    ? 'bg-blue-700 hover:bg-blue-600 text-white' 
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                추가
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
       )}
 
       {/* 에픽 목록 */}
@@ -704,7 +752,7 @@ export function Timeline({ projectId, theme }: TimelineProps) {
                 variant="outline"
                 size="sm"
                 onClick={handleStartAddEpic}
-                className={`w-full flex items-center justify-center space-x-2 opacity-0 hover:opacity-100 transition-opacity ${
+                className={`w-full flex items-center justify-center space-x-2 ${
                   theme === 'dark' 
                     ? 'bg-[#2A2A2C] text-gray-300 border-gray-700 hover:bg-blue-900 hover:text-blue-300 hover:border-blue-800 border border-dashed' 
                     : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 border border-dashed'
