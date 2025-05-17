@@ -1,6 +1,7 @@
 "use client";
 
 import { Task } from "./KanbanBoard";
+import { TaskStatus } from "./KanbanBoard";
 import { X, CalendarIcon, UserIcon, Smile, Bold, Italic, List, ListOrdered, Link2, Image, Code, CheckSquare, Clock, Tag, MoreHorizontal, MessageSquare, ChevronDown, ChevronUp, Copy, Trash2, Share2, AlertCircle, Users, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
@@ -37,6 +38,14 @@ interface Comment {
     name: string;
     email: string;
   };
+}
+
+interface Epic {
+  id: string;
+  title: string;
+  description?: string;
+  color?: string;
+  projectId?: string | null;
 }
 
 interface TaskDetailDialogProps {
@@ -260,6 +269,8 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
   const [showDetails, setShowDetails] = useState(true);
   const [showActivity, setShowActivity] = useState(false);
   const [showMembersList, setShowMembersList] = useState(false);
+  const [showEpicDropdown, setShowEpicDropdown] = useState(false);
+  const [epics, setEpics] = useState<Epic[]>([]);
   const dialogRef = useRef<HTMLDivElement>(null);
   const [isLoadingComments, setIsLoadingComments] = useState<boolean>(false);
   const [isAddingComment, setIsAddingComment] = useState<boolean>(false);
@@ -319,10 +330,36 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
     }
   }, [task.projectId, projects, currentProject, currentUser]);
 
-  // 변경사항이 있을 때 로컬 상태만 업데이트
+  // 작업 상세 내용 변경 처리 함수
   const handleChange = (updatedTask: Task) => {
     setEditedTask(updatedTask);
-    setHasChanges(true);
+    
+    // 실시간으로 에픽 변경 사항도 서버에 저장하기
+    if (updatedTask.epicId !== task.epicId) {
+      saveTask(updatedTask);
+    }
+  };
+
+  // 작업 저장 함수 (서버에 업데이트)
+  const saveTask = async (taskToSave: Task) => {
+    try {
+      const response = await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(taskToSave),
+      });
+
+      if (!response.ok) {
+        throw new Error('작업 업데이트에 실패했습니다.');
+      }
+
+      const updatedTask = await response.json();
+      onUpdate(updatedTask);
+    } catch (error) {
+      console.error('작업 업데이트 중 오류 발생:', error);
+    }
   };
   
   // 설명 변경 처리를 위한 특별 핸들러
@@ -344,19 +381,13 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
   };
   
   // 모달을 닫을 때 변경사항이 있으면 저장 (useCallback으로 감싸기)
-  const handleCloseAndSave = useCallback(() => {
-    if (hasChanges) {
-      // 저장할 때 설명에서 HTML 태그를 제거
-      // (이미 서버 측에서도 처리하지만 이중 안전장치임)
-      let taskToSave = {...editedTask};
-      
-      // 저장 전에 로그에 기록
-      console.log('저장 전 설명:', taskToSave.description);
-      
-      onUpdate(taskToSave);
+  const handleClose = async () => {
+    // 변경 사항이 있으면 저장
+    if (JSON.stringify(task) !== JSON.stringify(editedTask)) {
+      await saveTask(editedTask);
     }
     onClose();
-  }, [hasChanges, editedTask, onUpdate, onClose]);
+  };
 
   // 댓글 불러오기
   const fetchComments = useCallback(async () => {
@@ -483,45 +514,18 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
     return editedTask.assignee;
   };
 
-  // 모달 외부 클릭 처리 함수 수정
+  // 백드롭 클릭 처리 
   const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('모달 배경 클릭 - 닫기 실행');
-      handleCloseAndSave();
+    const target = e.target as HTMLElement;
+    if (target.dataset.modalBackdrop === "true") {
+      handleClose();
     }
   };
 
-  // 닫기 버튼 클릭 핸들러를 수정합니다
+  // x 버튼 클릭 처리
   const handleXButtonClick = (e: React.MouseEvent) => {
-    e.preventDefault();
     e.stopPropagation();
-    console.log('X 버튼 클릭 - 직접 상태 변경');
-    
-    // 저장 후 모달 숨기기
-    if (hasChanges) {
-      console.log('변경사항 저장 후 닫기');
-      onUpdate(editedTask);
-    }
-    
-    // 직접 모달을 숨기고 상태 초기화
-    if (typeof document !== 'undefined') {
-      const modalEl = document.querySelector('[data-modal-backdrop="true"]');
-      if (modalEl) {
-        modalEl.classList.add('opacity-0');
-        modalEl.classList.add('pointer-events-none');
-        
-        // 완전히 사라진 후에 onClose 호출
-        setTimeout(() => {
-          onClose();
-        }, 10);
-      } else {
-        onClose();
-      }
-    } else {
-      onClose();
-    }
+    handleClose();
   };
 
   // Handle date change with proper type conversion
@@ -530,21 +534,22 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
     handleChange({...editedTask, dueDate: newDate});
   };
 
-  // 모달의 JSX 부분에서 반환 직전에 추가합니다
+  // ESC 키 누를 때 모달 닫기
   useEffect(() => {
-    // ESC 키로 모달 닫기
     const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        handleCloseAndSave();
+      if (event.key === 'Escape' && isOpen) {
+        handleClose();
       }
     };
 
-    // Clean up event listeners
-    window.addEventListener('keydown', handleEscKey);
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscKey);
+    }
+
     return () => {
-      window.removeEventListener('keydown', handleEscKey);
+      document.removeEventListener('keydown', handleEscKey);
     };
-  }, [handleCloseAndSave]);
+  }, [isOpen, editedTask, task, handleClose]);
 
   // 댓글 수정 시작 함수
   const handleEditComment = (comment: Comment) => {
@@ -627,6 +632,50 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
     return currentUser && comment.userId === currentUser.id;
   };
 
+  // 프로젝트의 에픽 목록 불러오기
+  useEffect(() => {
+    const fetchEpics = async () => {
+      if (!editedTask.projectId) return;
+      
+      try {
+        const url = `/api/epics?projectId=${editedTask.projectId}`;
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          setEpics(data);
+        } else {
+          console.error('에픽 로딩 실패:', await response.text());
+        }
+      } catch (error) {
+        console.error('에픽 로딩 중 오류 발생:', error);
+      }
+    };
+
+    if (isOpen && editedTask.projectId) {
+      fetchEpics();
+    }
+  }, [isOpen, editedTask.projectId]);
+
+  // 에픽 변경 처리 함수
+  const handleEpicChange = (epicId: string | null) => {
+    handleChange({...editedTask, epicId});
+    setShowEpicDropdown(false);
+  };
+
+  // 현재 선택된 에픽 이름 가져오기
+  const getSelectedEpicName = () => {
+    if (!editedTask.epicId) return "에픽 없음";
+    const selectedEpic = epics.find(epic => epic.id === editedTask.epicId);
+    return selectedEpic ? selectedEpic.title : "에픽 없음";
+  };
+
+  // 에픽 색상 가져오기
+  const getEpicColor = (epicId: string | null) => {
+    if (!epicId) return "#CCCCCC"; // 기본 회색
+    const epic = epics.find(e => e.id === epicId);
+    return epic?.color || "#CCCCCC";
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -639,24 +688,24 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
       {/* 모달 컨테이너 */}
       <div 
         ref={dialogRef}
-        className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+        className={`${theme === 'dark' ? 'bg-[#2A2A2C] text-gray-200' : 'bg-white'} rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* 헤더 영역 */}
-        <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+        <div className={`p-4 border-b flex justify-between items-center ${theme === 'dark' ? 'bg-[#353538] border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
           <div className="flex items-center gap-2">
-            <span className="text-gray-500 text-sm">JEXO-{task.id}</span>
+            <span className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-sm`}>JEXO-{task.id}</span>
             <div className="flex gap-2">
               <button 
                 type="button" 
-                className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200"
+                className={`${theme === 'dark' ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'} p-1 rounded`}
                 onClick={(e) => e.stopPropagation()}
               >
                 <Copy size={16} />
               </button>
               <button 
                 type="button" 
-                className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200"
+                className={`${theme === 'dark' ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'} p-1 rounded`}
                 onClick={(e) => e.stopPropagation()}
               >
                 <Share2 size={16} />
@@ -666,7 +715,7 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
           <div className="flex items-center gap-2">
             <button 
               type="button" 
-              className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200"
+              className={`${theme === 'dark' ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'} p-1 rounded`}
               onClick={(e) => e.stopPropagation()}
             >
               <MoreHorizontal size={18} />
@@ -675,7 +724,7 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
             <button
               type="button"
               onClick={handleXButtonClick}
-              className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200"
+              className={`${theme === 'dark' ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'} p-1 rounded`}
               data-close-button="true"
             >
               <X size={18} />
@@ -686,81 +735,83 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
         <div className="flex flex-1 overflow-hidden">
           {/* 메인 콘텐츠 영역 */}
           <div className="flex-1 overflow-y-auto">
-            <div className="p-6">
+            <div className={`p-6 ${theme === 'dark' ? 'text-gray-200' : ''}`}>
               <Input
                 value={editedTask.title}
                 onChange={(e) => handleChange({...editedTask, title: e.target.value})}
-                className="text-xl font-semibold border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0 w-full mb-4"
+                className={`text-xl font-semibold border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0 w-full mb-4 ${
+                  theme === 'dark' ? 'bg-[#2A2A2C] text-gray-200' : ''
+                }`}
                 placeholder="제목을 입력하세요"
               />
-              
+            
               <div className="mb-6">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm font-medium text-gray-700">설명</span>
+                  <span className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>설명</span>
                 </div>
                 <RichTextEditor 
-                  content={editedTask.description || ""} 
-                  onChange={handleDescriptionChange}
+                  content={editedTask.description || ''} 
+                  onChange={handleDescriptionChange} 
                 />
               </div>
-              
+
               {/* 활동 섹션 */}
               <div className="mt-8">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex gap-4">
                     <button 
-                      className={`text-sm font-medium pb-1 ${!showActivity ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}`}
+                      className={`text-sm font-medium pb-1 ${!showActivity ? (theme === 'dark' ? 'border-b-2 border-blue-500 text-blue-400' : 'border-b-2 border-blue-500 text-blue-600') : (theme === 'dark' ? 'text-gray-400' : 'text-gray-600')}`}
                       onClick={() => setShowActivity(false)}
                     >
                       댓글
                     </button>
                     <button 
-                      className={`text-sm font-medium pb-1 ${showActivity ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}`}
+                      className={`text-sm font-medium pb-1 ${showActivity ? (theme === 'dark' ? 'border-b-2 border-blue-500 text-blue-400' : 'border-b-2 border-blue-500 text-blue-600') : (theme === 'dark' ? 'text-gray-400' : 'text-gray-600')}`}
                       onClick={() => setShowActivity(true)}
                     >
                       활동 내역
                     </button>
                   </div>
                 </div>
-                
+
                 {!showActivity ? (
                   <>
                     <div className="space-y-4 mb-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <MessageSquare className="h-4 w-4 text-gray-500" />
-                          <span className="text-sm font-medium">댓글</span>
-                          <span className="text-xs bg-gray-200 text-gray-700 rounded-full px-2">{comments.length}</span>
+                          <MessageSquare className={`h-4 w-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
+                          <span className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>댓글</span>
+                          <span className={`text-xs ${theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'} rounded-full px-2`}>{comments.length}</span>
                         </div>
                       </div>
                       
                       {isLoadingComments ? (
                         <div className="flex justify-center py-4">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                          <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${theme === 'dark' ? 'border-blue-400' : 'border-blue-500'}`}></div>
                         </div>
                       ) : comments.length > 0 ? (
                         comments.map((comment) => (
-                          <div key={comment.id} className="bg-gray-50 p-3 rounded-md border">
+                          <div key={comment.id} className={`${theme === 'dark' ? 'bg-[#353538] border-gray-700' : 'bg-gray-50 border-gray-200'} p-3 rounded-md border`}>
                             <div className="flex justify-between text-sm mb-1">
                               <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium">
+                                <div className={`w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium`}>
                                   {comment.user?.name?.charAt(0) || 'U'}
                                 </div>
                                 <span className="font-medium">{comment.user?.name || '사용자'}</span>
-                                <span className="text-gray-500 text-xs">{format(comment.createdAt, 'PPP p', { locale: ko })}</span>
+                                <span className={`${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'} text-xs`}>{format(comment.createdAt, 'PPP p', { locale: ko })}</span>
                               </div>
                               {isCommentOwner(comment) && (
                                 <div className="relative">
                                   <button 
-                                    className="text-gray-400 hover:text-gray-600 p-1"
+                                    className={`${theme === 'dark' ? 'text-gray-400 hover:text-gray-200' : 'text-gray-400 hover:text-gray-600'} p-1`}
                                     onClick={() => setShowCommentMenu(showCommentMenu === comment.id ? null : comment.id)}
                                   >
                                     <MoreHorizontal size={16} />
                                   </button>
                                   {showCommentMenu === comment.id && (
-                                    <div className="absolute right-0 mt-1 bg-white border rounded-md shadow-lg z-10 w-32">
+                                    <div className={`absolute right-0 mt-1 ${theme === 'dark' ? 'bg-[#2A2A2C] border-gray-700' : 'bg-white border-gray-200'} border rounded-md shadow-lg z-10 w-32`}>
                                       <button 
-                                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                                        className={`w-full text-left px-3 py-2 text-sm ${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'} flex items-center`}
                                         onClick={() => handleEditComment(comment)}
                                       >
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -769,7 +820,7 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
                                         수정
                                       </button>
                                       <button 
-                                        className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center"
+                                        className={`w-full text-left px-3 py-2 text-sm ${theme === 'dark' ? 'text-red-400 hover:bg-gray-700' : 'text-red-600 hover:bg-gray-100'} flex items-center`}
                                         onClick={() => handleDeleteComment(comment.id)}
                                       >
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -787,13 +838,16 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
                                 <Textarea
                                   value={editedCommentContent}
                                   onChange={(e) => setEditedCommentContent(e.target.value)}
-                                  className="w-full border bg-white focus-visible:ring-1 focus-visible:ring-blue-500 resize-none min-h-[80px] p-2 rounded-md mb-2"
+                                  className={`w-full border focus-visible:ring-1 focus-visible:ring-blue-500 resize-none min-h-[80px] p-2 rounded-md mb-2 ${
+                                    theme === 'dark' ? 'bg-[#2A2A2C] border-gray-700 text-gray-200' : 'bg-white text-gray-800'
+                                  }`}
                                 />
                                 <div className="flex justify-end gap-2">
                                   <Button 
                                     variant="outline" 
                                     size="sm" 
                                     onClick={handleCancelEdit}
+                                    className={theme === 'dark' ? 'bg-[#353538] text-gray-300 border-gray-700 hover:bg-gray-700' : ''}
                                   >
                                     취소
                                   </Button>
@@ -801,22 +855,23 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
                                     size="sm" 
                                     onClick={() => handleSaveCommentEdit(comment.id)}
                                     disabled={isEditingComment}
+                                    className={theme === 'dark' ? 'bg-blue-700 hover:bg-blue-600 text-white' : ''}
                                   >
                                     {isEditingComment ? '저장 중...' : '저장'}
                                   </Button>
                                 </div>
                               </div>
                             ) : (
-                              <p className="text-gray-800 ml-10">{comment.content}</p>
+                              <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-800'} ml-10`}>{comment.content}</p>
                             )}
                           </div>
                         ))
                       ) : (
-                        <p className="text-gray-500 text-sm">아직 댓글이 없습니다.</p>
+                        <p className={`${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'} text-sm`}>아직 댓글이 없습니다.</p>
                       )}
                     </div>
-
-                    <div className="relative bg-gray-50 rounded-md border p-3">
+                    
+                    <div className={`relative ${theme === 'dark' ? 'bg-[#353538] border-gray-700' : 'bg-gray-50 border-gray-200'} rounded-md border p-3`}>
                       <div className="flex items-start gap-2">
                         <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium shrink-0">
                           U
@@ -826,31 +881,33 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
                             value={newComment}
                             onChange={(e) => setNewComment(e.target.value)}
                             placeholder="댓글을 입력하세요..."
-                            className="w-full border bg-white focus-visible:ring-1 focus-visible:ring-blue-500 resize-none min-h-[80px] p-3 rounded-md"
+                            className={`w-full border focus-visible:ring-1 focus-visible:ring-blue-500 resize-none min-h-[80px] p-3 rounded-md ${
+                              theme === 'dark' ? 'bg-[#2A2A2C] border-gray-700 text-gray-200' : 'bg-white'
+                            }`}
                           />
                           <div className="flex justify-between items-center mt-2">
                             <div className="flex gap-1">
                               <button
                                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                                className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200"
+                                className={`${theme === 'dark' ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'} p-1 rounded`}
                                 type="button"
                               >
                                 <Smile className="h-5 w-5" />
                               </button>
-                              <button className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200">
+                              <button className={`${theme === 'dark' ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'} p-1 rounded`}>
                                 <Bold className="h-5 w-5" />
                               </button>
-                              <button className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200">
+                              <button className={`${theme === 'dark' ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'} p-1 rounded`}>
                                 <Italic className="h-5 w-5" />
                               </button>
-                              <button className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-200">
+                              <button className={`${theme === 'dark' ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'} p-1 rounded`}>
                                 <Link2 className="h-5 w-5" />
                               </button>
                             </div>
                             <Button 
                               onClick={handleAddComment} 
                               size="sm"
-                              className="bg-blue-600 hover:bg-blue-700"
+                              className={`${theme === 'dark' ? 'bg-blue-700 hover:bg-blue-600' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
                               disabled={isAddingComment}
                             >
                               {isAddingComment ? '저장 중...' : '댓글 작성'}
@@ -872,20 +929,20 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
                     </div>
                   </>
                 ) : (
-                  <div className="bg-gray-50 p-4 rounded-md border">
+                  <div className={`${theme === 'dark' ? 'bg-[#353538] border-gray-700' : 'bg-gray-50 border-gray-200'} p-4 rounded-md border`}>
                     <div className="flex items-center gap-2 mb-3">
-                      <Clock className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm font-medium">활동 내역</span>
+                      <Clock className={`h-4 w-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
+                      <span className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>활동 내역</span>
                     </div>
                     <div className="space-y-3 ml-6">
                       <div className="flex items-start gap-2">
                         <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs">U</div>
                         <div>
-                          <div className="text-sm">
+                          <div className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                             <span className="font-medium">현재 사용자</span>
-                            <span className="text-gray-500 ml-1">이(가) 이슈를 생성했습니다.</span>
+                            <span className={`${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'} ml-1`}>이(가) 이슈를 생성했습니다.</span>
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className={`text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
                             {format(new Date(), 'PPP p', { locale: ko })}
                           </div>
                         </div>
@@ -898,31 +955,95 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
           </div>
 
           {/* 사이드바 영역 */}
-          <div className="w-80 border-l overflow-y-auto bg-gray-50">
+          <div className={`w-80 border-l overflow-y-auto ${theme === 'dark' ? 'bg-[#353538] border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
             <div className="p-4">
               <div className="mb-6">
                 <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-sm font-medium text-gray-500">상태</h3>
+                  <h3 className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>상태</h3>
                 </div>
                 <select
                   value={editedTask.status}
-                  onChange={(e) => handleChange({...editedTask, status: e.target.value as 'todo' | 'in-progress' | 'review' | 'done'})}
-                  className="w-full border rounded-md p-2 text-sm bg-white"
+                  onChange={(e) => handleChange({...editedTask, status: e.target.value as TaskStatus})}
+                  className={`w-full border rounded-md p-2 text-sm ${
+                    theme === 'dark' ? 'bg-[#2A2A2C] border-gray-700 text-gray-200' : 'bg-white'
+                  }`}
                 >
-                  <option value="todo" className="bg-gray-100 text-gray-800">할 일</option>
-                  <option value="in-progress" className="bg-blue-100 text-blue-800">진행 중</option>
-                  <option value="review" className="bg-purple-100 text-purple-800">검토</option>
-                  <option value="done" className="bg-green-100 text-green-800">완료</option>
+                  <option value="todo" className={theme === 'dark' ? 'bg-[#2A2A2C] text-gray-300' : ''}>할 일</option>
+                  <option value="in-progress" className={theme === 'dark' ? 'bg-[#2A2A2C] text-gray-300' : ''}>진행 중</option>
+                  <option value="review" className={theme === 'dark' ? 'bg-[#2A2A2C] text-gray-300' : ''}>검토</option>
+                  <option value="done" className={theme === 'dark' ? 'bg-[#2A2A2C] text-gray-300' : ''}>완료</option>
                 </select>
               </div>
 
               <div className="mb-6">
                 <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-sm font-medium text-gray-500">담당자</h3>
+                  <h3 className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>에픽</h3>
+                </div>
+                <div className="relative">
+                  <div
+                    onClick={() => setShowEpicDropdown(!showEpicDropdown)}
+                    className={`w-full p-2 border rounded-md flex items-center justify-between cursor-pointer ${
+                      theme === 'dark' ? 'bg-[#2A2A2C] border-gray-700 text-gray-200 hover:bg-gray-700' : 'bg-white border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {editedTask.epicId && (
+                        <div 
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: getEpicColor(editedTask.epicId) }}
+                        ></div>
+                      )}
+                      <span>{getSelectedEpicName()}</span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
+                  </div>
+                  
+                  {showEpicDropdown && (
+                    <div className={`absolute w-full mt-1 border rounded-md shadow-lg z-50 max-h-48 overflow-y-auto ${
+                      theme === 'dark' ? 'bg-[#2A2A2C] border-gray-700' : 'bg-white border-gray-300'
+                    }`}>
+                      <div 
+                        className={`p-2 cursor-pointer ${
+                          !editedTask.epicId 
+                            ? (theme === 'dark' ? 'bg-blue-900 text-blue-300' : 'bg-blue-50 text-blue-700') 
+                            : (theme === 'dark' ? 'text-gray-200 hover:bg-gray-700' : 'hover:bg-gray-100')
+                        }`}
+                        onClick={() => handleEpicChange(null)}
+                      >
+                        에픽 없음
+                      </div>
+                      
+                      {epics.map(epic => (
+                        <div 
+                          key={epic.id}
+                          className={`p-2 cursor-pointer flex items-center gap-2 ${
+                            editedTask.epicId === epic.id 
+                              ? (theme === 'dark' ? 'bg-blue-900 text-blue-300' : 'bg-blue-50 text-blue-700') 
+                              : (theme === 'dark' ? 'text-gray-200 hover:bg-gray-700' : 'hover:bg-gray-100')
+                          }`}
+                          onClick={() => handleEpicChange(epic.id)}
+                        >
+                          <div 
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: epic.color || '#4F46E5' }}
+                          ></div>
+                          <span>{epic.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>담당자</h3>
                 </div>
                 <div className="relative">
                   <div 
-                    className="w-full px-3 py-2 border rounded-md bg-white flex justify-between items-center cursor-pointer"
+                    className={`w-full px-3 py-2 border rounded-md flex justify-between items-center cursor-pointer ${
+                      theme === 'dark' ? 'bg-[#2A2A2C] border-gray-700 text-gray-200' : 'bg-white border-gray-300'
+                    }`}
                     onClick={() => setShowMembersList(!showMembersList)}
                   >
                     <div className="flex items-center">
@@ -935,12 +1056,12 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
                         </>
                       ) : (
                         <>
-                          <UserCheck className="h-4 w-4 text-gray-400 mr-2" />
-                          <span className="text-gray-500 text-sm">담당자 선택</span>
+                          <UserCheck className={`h-4 w-4 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'} mr-2`} />
+                          <span className={`${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'} text-sm`}>담당자 선택</span>
                         </>
                       )}
                     </div>
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                    <ChevronDown className={`w-4 h-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-400'}`} />
                   </div>
                   
                   {/* 멤버 선택 드롭다운 */}
@@ -1006,7 +1127,7 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
 
               <div className="mb-6">
                 <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-sm font-medium text-gray-500">우선순위</h3>
+                  <h3 className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>우선순위</h3>
                 </div>
                 <div className="relative">
                   <select
@@ -1029,7 +1150,7 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
 
               <div className="mb-6">
                 <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-sm font-medium text-gray-500">마감일</h3>
+                  <h3 className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>마감일</h3>
                 </div>
                 <div className="flex items-center gap-2 border rounded-md p-2 bg-white">
                   <CalendarIcon className="h-4 w-4 text-gray-400" />

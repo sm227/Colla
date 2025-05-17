@@ -34,7 +34,9 @@ model Task {
   endDate     DateTime?
   isAllDay    Boolean   @default(false)
   startDate   DateTime?
+  epicId      String?   
   project     Project?  @relation(fields: [projectId], references: [id])
+  epic        Epic?     @relation(fields: [epicId], references: [id])
   comments    Comment[]
 }
 
@@ -61,6 +63,7 @@ model Project {
   user        User?           @relation(fields: [userId], references: [id])
   members     ProjectMember[]
   tasks       Task[]
+  epics       Epic[]
   calendars   Calendar[]
   meetings    Meeting[]
 }
@@ -141,4 +144,18 @@ model Meeting {
   project       Project?  @relation(fields: [projectId], references: [id])
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+}
+
+model Epic {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  projectId   String?
+  color       String?   @default("#4F46E5")
+  project     Project?  @relation(fields: [projectId], references: [id])
+  tasks       Task[]
 }

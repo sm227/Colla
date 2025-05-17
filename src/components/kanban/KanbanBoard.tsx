@@ -13,14 +13,17 @@ export type TaskStatus = "todo" | "in-progress" | "review" | "done";
 export interface Task {
   id: string;
   title: string;
-  description: string;
+  description?: string;
   status: TaskStatus;
-  priority: "low" | "medium" | "high";
-  assignee?: string;
-  startDate?: Date;
-  dueDate?: Date;
-  projectId?: string;
-  createdAt?: string;
+  priority: string;
+  assignee?: string | null;
+  projectId?: string | null;
+  epicId?: string | null;
+  dueDate?: Date | null;
+  startDate?: Date | null;
+  endDate?: Date | null;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 interface KanbanBoardProps {
