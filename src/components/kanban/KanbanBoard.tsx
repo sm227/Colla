@@ -2,11 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { KanbanColumn } from "./KanbanColumn";
-import { AddTaskDialog } from "./AddTaskDialog";
 import { ClipboardListIcon } from "lucide-react";
 import { useTasks } from "@/hooks/useTasks";
 import { Alert } from "@/components/ui/alert";
-import { KanbanTask } from "./KanbanTask";
 import { TaskDetailDialog } from "./TaskDetailDialog";
 
 // 칸반 보드 상태 타입 정의
@@ -27,9 +25,10 @@ export interface Task {
 
 interface KanbanBoardProps {
   projectId: string | null;
+  theme?: "light" | "dark";
 }
 
-export function KanbanBoard({ projectId }: KanbanBoardProps) {
+export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
   // console.log("KanbanBoard 렌더링 - projectId:", projectId);
   
   const { tasks, loading, error, addTask, updateTaskStatus, updateTask, deleteTask, fetchTasks } = useTasks(projectId);
@@ -147,16 +146,28 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
       )}
 
       <div className="flex items-center mb-6">
-        <ClipboardListIcon className="h-5 w-5 text-gray-700 mr-2" />
-        <h2 className="text-xl font-semibold text-gray-900">
+        <ClipboardListIcon className={`h-5 w-5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-700'} mr-2`} />
+        <h2 className={`text-xl font-semibold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>
           {projectId ? "프로젝트 작업" : "모든 작업"}
         </h2>
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
-          <p className="ml-3 text-gray-600">작업 로딩 중...</p>
+        <div className={`flex items-center justify-center h-64 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
+          <div className="text-center flex flex-col items-center">
+            <div className="relative w-20 h-20">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className={`w-14 h-14 border-4 border-current border-solid rounded-full opacity-20`}></div>
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className={`w-14 h-14 border-4 border-current border-solid rounded-full border-t-transparent animate-spin`}></div>
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className={`text-2xl font-bold`}>C</span>
+              </div>
+            </div>
+            <p className={`mt-4 text-base font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>작업 로딩 중...</p>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -170,6 +181,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             onTaskDelete={handleDeleteTask}
             onAddTask={handleAddTask}
             loading={loading}
+            theme={theme}
           />
           <KanbanColumn 
             title="진행 중" 
@@ -181,6 +193,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             onTaskDelete={handleDeleteTask}
             onAddTask={handleAddTask}
             loading={loading}
+            theme={theme}
           />
           <KanbanColumn 
             title="검토" 
@@ -192,6 +205,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             onTaskDelete={handleDeleteTask}
             onAddTask={handleAddTask}
             loading={loading}
+            theme={theme}
           />
           <KanbanColumn 
             title="완료" 
@@ -203,6 +217,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
             onTaskDelete={handleDeleteTask}
             onAddTask={handleAddTask}
             loading={loading}
+            theme={theme}
           />
         </div>
       )}
@@ -214,6 +229,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
           onClose={handleCloseDialog}
           onUpdate={handleUpdateTask}
           onDelete={handleDeleteTask}
+          theme={theme}
         />
       )}
     </div>

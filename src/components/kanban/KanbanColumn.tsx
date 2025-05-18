@@ -17,6 +17,7 @@ interface KanbanColumnProps {
   onTaskDelete?: (taskId: string) => void; 
   onAddTask?: (task: Omit<Task, "id">) => void;
   loading: boolean;
+  theme?: "light" | "dark";
 }
 
 export function KanbanColumn({ 
@@ -28,7 +29,8 @@ export function KanbanColumn({
   color = 'gray',
   onTaskDelete,
   onAddTask,
-  loading
+  loading,
+  theme = "light"
 }: KanbanColumnProps) {
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -160,44 +162,88 @@ export function KanbanColumn({
 
   // 컬럼 헤더 색상 설정
   const getColorClasses = () => {
-    switch (color) {
-      case 'blue':
-        return {
-          bg: 'bg-blue-100',
-          text: 'text-blue-800',
-          indicator: 'bg-blue-500'
-        };
-      case 'green':
-        return {
-          bg: 'bg-green-100',
-          text: 'text-green-800',
-          indicator: 'bg-green-500'
-        };
-      case 'yellow':
-        return {
-          bg: 'bg-yellow-100',
-          text: 'text-yellow-800',
-          indicator: 'bg-yellow-500'
-        };
-      case 'purple':
-        return {
-          bg: 'bg-purple-100',
-          text: 'text-purple-800',
-          indicator: 'bg-purple-500'
-        };
-      case 'red':
-        return {
-          bg: 'bg-red-100',
-          text: 'text-red-800',
-          indicator: 'bg-red-500'
-        };
-      case 'gray':
-      default:
-        return {
-          bg: 'bg-gray-100',
-          text: 'text-gray-800',
-          indicator: 'bg-gray-500'
-        };
+    // 다크 모드에서는 다른 색상을 사용
+    if (theme === 'dark') {
+      switch (color) {
+        case 'blue':
+          return {
+            bg: 'bg-blue-900 bg-opacity-30',
+            text: 'text-blue-300',
+            indicator: 'bg-blue-500'
+          };
+        case 'green':
+          return {
+            bg: 'bg-green-900 bg-opacity-30',
+            text: 'text-green-300',
+            indicator: 'bg-green-500'
+          };
+        case 'yellow':
+          return {
+            bg: 'bg-yellow-900 bg-opacity-30',
+            text: 'text-yellow-300',
+            indicator: 'bg-yellow-500'
+          };
+        case 'purple':
+          return {
+            bg: 'bg-purple-900 bg-opacity-30',
+            text: 'text-purple-300',
+            indicator: 'bg-purple-500'
+          };
+        case 'red':
+          return {
+            bg: 'bg-red-900 bg-opacity-30',
+            text: 'text-red-300',
+            indicator: 'bg-red-500'
+          };
+        case 'gray':
+        default:
+          return {
+            bg: 'bg-gray-800',
+            text: 'text-gray-300',
+            indicator: 'bg-gray-500'
+          };
+      }
+    } else {
+      // 라이트 모드 색상 (기존 코드)
+      switch (color) {
+        case 'blue':
+          return {
+            bg: 'bg-blue-100',
+            text: 'text-blue-800',
+            indicator: 'bg-blue-500'
+          };
+        case 'green':
+          return {
+            bg: 'bg-green-100',
+            text: 'text-green-800',
+            indicator: 'bg-green-500'
+          };
+        case 'yellow':
+          return {
+            bg: 'bg-yellow-100',
+            text: 'text-yellow-800',
+            indicator: 'bg-yellow-500'
+          };
+        case 'purple':
+          return {
+            bg: 'bg-purple-100',
+            text: 'text-purple-800',
+            indicator: 'bg-purple-500'
+          };
+        case 'red':
+          return {
+            bg: 'bg-red-100',
+            text: 'text-red-800',
+            indicator: 'bg-red-500'
+          };
+        case 'gray':
+        default:
+          return {
+            bg: 'bg-gray-100',
+            text: 'text-gray-800',
+            indicator: 'bg-gray-500'
+          };
+      }
     }
   };
 
@@ -207,19 +253,19 @@ export function KanbanColumn({
     <div
       ref={setNodeRef}
       id={columnElementId}
-      className={`bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex flex-col ${
+      className={`${theme === 'dark' ? 'bg-[#353538] border-gray-700' : 'bg-white border-gray-200'} rounded-lg border shadow-sm overflow-hidden flex flex-col ${
         isOver ? "ring-2 ring-blue-500" : ""
       }`}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      <div className={`${colorClasses.bg} px-4 py-3 border-b border-gray-200`}>
+      <div className={`${colorClasses.bg} px-4 py-3 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <div className={`w-3 h-3 rounded-full ${colorClasses.indicator} mr-2`}></div>
             <h3 className={`font-medium ${colorClasses.text}`}>{title}</h3>
           </div>
-          <span className={`${colorClasses.bg} ${colorClasses.text} border border-gray-200 rounded-full px-2 py-0.5 text-xs font-medium`}>
+          <span className={`${colorClasses.bg} ${colorClasses.text} border ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} rounded-full px-2 py-0.5 text-xs font-medium`}>
             {tasks.length}
           </span>
         </div>
@@ -235,6 +281,7 @@ export function KanbanColumn({
                 // 업데이트 로직
               }}
               onDelete={onTaskDelete}
+              theme={theme}
             />
           </div>
         ))}
@@ -243,7 +290,7 @@ export function KanbanColumn({
         {isAddingTask ? (
           <div 
             ref={inputContainerRef}
-            className="mt-2 border border-blue-300 bg-white rounded-md shadow-sm focus-within:border-blue-500"
+            className={`mt-2 border ${theme === 'dark' ? 'border-blue-700 bg-[#2A2A2C]' : 'border-blue-300 bg-white'} rounded-md shadow-sm focus-within:border-blue-500`}
           >
             <input
               ref={inputRef}
@@ -251,40 +298,38 @@ export function KanbanColumn({
               value={newTaskTitle}
               onChange={(e) => setNewTaskTitle(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="무엇을 완료해야 합니까?"
-              className="w-full p-2 text-sm border-none rounded focus:outline-none placeholder-gray-500 font-medium"
-              autoFocus
+              placeholder="새 작업을 입력하세요"
+              className={`w-full px-3 py-2 rounded-md outline-none ${theme === 'dark' ? 'bg-[#2A2A2C] text-gray-200 placeholder:text-gray-500' : 'bg-white'}`}
             />
-            <div className="px-2 py-1 text-xs text-gray-400 flex items-center justify-between">
-              <span className="text-blue-600 cursor-pointer" onClick={() => {
-                setIsAddingTask(false);
-                setNewTaskTitle("");
-              }}>
+            <div className="flex justify-end p-2 border-t">
+              <button
+                onClick={() => {
+                  setIsAddingTask(false);
+                  setNewTaskTitle("");
+                }}
+                className={`mr-2 px-3 py-1 text-sm ${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'} rounded`}
+              >
                 취소
-              </span>
-              <span className="inline-flex items-center">
-                <svg className="w-3 h-3 mr-1 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M3 12h18M15 6l6 6-6 6" />
-                </svg>
-                ENTER
-              </span>
+              </button>
+              <button
+                onClick={handleQuickAddTask}
+                className={`px-3 py-1 text-sm text-white ${newTaskTitle.trim() ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-400 cursor-not-allowed'} rounded`}
+                disabled={!newTaskTitle.trim()}
+              >
+                추가
+              </button>
             </div>
           </div>
         ) : (
-          // 작업 추가 버튼 (호버 시에만 표시)
-          <div className="mt-2 h-10 flex items-center">
-            <Button
-              type="button"
-              variant="ghost"
-              className={`w-full justify-start text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-opacity duration-200 ${
-                isHovering ? 'opacity-100' : 'opacity-0'
-              }`}
-              onClick={() => setIsAddingTask(true)}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              <span className="text-sm">작업 추가</span>
-            </Button>
-          </div>
+          <Button
+            onClick={() => setIsAddingTask(true)}
+            variant="ghost"
+            size="sm"
+            className={`w-full mt-2 justify-start text-sm ${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-200' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            작업 추가
+          </Button>
         )}
       </div>
     </div>

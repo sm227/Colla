@@ -45,6 +45,7 @@ interface TaskDetailDialogProps {
   onClose: () => void;
   onUpdate: (task: Task) => void;
   onDelete?: (taskId: string) => void;
+  theme?: "light" | "dark";
 }
 
 // TipTap 에디터의 HTML 콘텐츠 처리를 위한 함수
@@ -251,7 +252,7 @@ const removeHtmlTags = (html: string): string => {
   return html.replace(/<[^>]*>|&[^;]+;/g, '');
 };
 
-export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete }: TaskDetailDialogProps) {
+export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, theme = "light" }: TaskDetailDialogProps) {
   const [editedTask, setEditedTask] = useState<Task>({...task});
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
