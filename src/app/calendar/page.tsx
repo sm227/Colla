@@ -648,13 +648,25 @@ const CalendarPage: React.FC = () => {
   }, [processedCalendarTasks]);
 
   // 이전 달로 이동
-  const prevMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1));
+  const handlePrev = () => {
+    if (calendarView === 'month') {
+      setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1));
+    } else if (calendarView === 'week') {
+      setCurrentDate(addDays(currentDate, -7));
+    } else {
+      setCurrentDate(addDays(currentDate, -1));
+    }
   };
 
   // 다음 달로 이동
-  const nextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
+  const handleNext = () => {
+    if (calendarView === 'month') {
+      setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
+    } else if (calendarView === 'week') {
+      setCurrentDate(addDays(currentDate, 7));
+    } else {
+      setCurrentDate(addDays(currentDate, 1));
+    }
   };
 
   // 요일 헤더
@@ -778,6 +790,8 @@ const CalendarPage: React.FC = () => {
     });
   };
 
+  const [calendarView, setCalendarView] = useState<'month'|'week'|'day'>('month');
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* 좌측 패널 */}
@@ -819,9 +833,9 @@ const CalendarPage: React.FC = () => {
         {/* 상단 네비게이션 */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={prevMonth}><ChevronLeft className="w-5 h-5" /></Button>
+            <Button variant="ghost" size="icon" onClick={handlePrev}><ChevronLeft className="w-5 h-5" /></Button>
             <div className="text-2xl font-bold">{format(currentDate, 'yyyy년 M월', {locale:ko})}</div>
-            <Button variant="ghost" size="icon" onClick={nextMonth}><ChevronRight className="w-5 h-5" /></Button>
+            <Button variant="ghost" size="icon" onClick={handleNext}><ChevronRight className="w-5 h-5" /></Button>
             <Button variant="ghost" size="sm" onClick={()=>setCurrentDate(new Date())}>오늘</Button>
           </div>
           <div className="flex items-center gap-2">
@@ -835,46 +849,120 @@ const CalendarPage: React.FC = () => {
               <CalendarIcon className="w-3 h-3 mr-1" />
               예약되지 않은 업무
             </Button>
+            {/* 뷰 전환 버튼 */}
+            <div className="flex gap-1 ml-2">
+              <Button size="sm" variant={calendarView==='month'?'default':'outline'} onClick={()=>setCalendarView('month')}>월</Button>
+              <Button size="sm" variant={calendarView==='week'?'default':'outline'} onClick={()=>setCalendarView('week')}>주</Button>
+              <Button size="sm" variant={calendarView==='day'?'default':'outline'} onClick={()=>setCalendarView('day')}>일</Button>
+            </div>
             <MoreHorizontal className="w-5 h-5 text-gray-400" />
           </div>
         </div>
-        {/* 월간 캘린더 그리드 */}
-        <div className="bg-white rounded-lg shadow border overflow-hidden">
-          <div className="grid grid-cols-7 border-b text-center text-sm font-medium bg-gray-50">
-            {weekDays.map((d,i)=>(<div key={i} className={i===0?'text-red-500':i===6?'text-blue-500':'text-gray-700'}>{d}</div>))}
+        {/* 월/주/일 달력 뷰 */}
+        {calendarView === 'month' && (
+          <div className="bg-white rounded-lg shadow border overflow-hidden">
+            <div className="grid grid-cols-7 border-b text-center text-sm font-medium bg-gray-50">
+              {weekDays.map((d,i)=>(<div key={i} className={i===0?'text-red-500':i===6?'text-blue-500':'text-gray-700'}>{d}</div>))}
             </div>
-          <div className="grid grid-cols-7 auto-rows-[100px]">
-            {calendarDays.map((day, idx) => {
-              const isCurrentMonth = isSameMonth(day, currentDate);
-              const isCurrentDay = isToday(day);
-              return (
-                <div
-                  key={day.toString()}
-                  className={`relative border p-2 h-full ${!isCurrentMonth?'bg-gray-50 text-gray-400':'bg-white'} ${isCurrentDay?'ring-2 ring-blue-400':''}`}
-                  onDoubleClick={() => {
-                    setShowAddForm(true);
-                    setAddFormDate(format(day, 'yyyy-MM-dd'));
-                    setNewEvent({ ...newEvent, startDate: format(day, 'yyyy-MM-dd') });
-                  }}
-                  onClick={()=>{
-                    setSelectedDate(day);
-                  }}
-                >
-                  <div className="absolute top-2 left-2 text-xs font-semibold">{format(day,'d')}</div>
-                  {/* 일정 표시 */}
-                  <div className="mt-6 space-y-1">
-                    {calendarTasks.filter(t=>{
-                      const dateToCheck = t.startDate || t.dueDate || undefined;
-                      return dateToCheck && isSameDay(dateToCheck, day);
-                    }).map((task,i)=>(
-                      <div key={task.id+''+i} className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}>{task.title}</div>
-                    ))}
+            <div className="grid grid-cols-7 auto-rows-[100px]">
+              {calendarDays.map((day, idx) => {
+                const isCurrentMonth = isSameMonth(day, currentDate);
+                const isCurrentDay = isToday(day);
+                return (
+                  <div
+                    key={day.toString()}
+                    className={`relative border p-2 h-full ${!isCurrentMonth?'bg-gray-50 text-gray-400':'bg-white'} ${isCurrentDay?'ring-2 ring-blue-400':''}`}
+                    onDoubleClick={() => {
+                      setShowAddForm(true);
+                      setAddFormDate(format(day, 'yyyy-MM-dd'));
+                      setNewEvent({ ...newEvent, startDate: format(day, 'yyyy-MM-dd') });
+                    }}
+                    onClick={()=>{
+                      setSelectedDate(day);
+                    }}
+                    onDragOver={handleDragOver(day)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop(day)}
+                  >
+                    <div className="absolute top-2 left-2 text-xs font-semibold">{format(day,'d')}</div>
+                    {/* 일정 표시 */}
+                    <div className="mt-6 space-y-1">
+                      {calendarTasks.filter(t=>{
+                        const dateToCheck = t.startDate || t.dueDate || undefined;
+                        return dateToCheck && isSameDay(dateToCheck, day);
+                      }).map((task,i)=>(
+                        <div key={task.id+''+i} className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}>{task.title}</div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
-        </div>
+        )}
+        {calendarView === 'week' && (
+          <div className="bg-white rounded-lg shadow border overflow-hidden">
+            <div className="grid grid-cols-7 border-b text-center text-sm font-medium bg-gray-50">
+              {weekDays.map((d,i)=>(<div key={i} className={i===0?'text-red-500':i===6?'text-blue-500':'text-gray-700'}>{d}</div>))}
+            </div>
+            <div className="grid grid-cols-7 auto-rows-[120px]">
+              {(() => {
+                // 현재 날짜가 속한 주의 일요일~토요일 구하기
+                const curr = selectedDate || currentDate;
+                const weekStart = addDays(curr, -getDay(curr));
+                return Array.from({length:7}).map((_,i)=>{
+                  const day = addDays(weekStart, i);
+                  const isCurrentDay = isToday(day);
+                  return (
+                    <div
+                      key={day.toString()}
+                      className={`relative border p-2 h-full bg-white ${isCurrentDay?'ring-2 ring-blue-400':''}`}
+                      onDoubleClick={() => {
+                        setShowAddForm(true);
+                        setAddFormDate(format(day, 'yyyy-MM-dd'));
+                        setNewEvent({ ...newEvent, startDate: format(day, 'yyyy-MM-dd') });
+                      }}
+                      onClick={()=>{
+                        setSelectedDate(day);
+                      }}
+                      onDragOver={handleDragOver(day)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop(day)}
+                    >
+                      <div className="absolute top-2 left-2 text-xs font-semibold">{format(day,'d')}</div>
+                      <div className="mt-6 space-y-1">
+                        {calendarTasks.filter(t=>{
+                          const dateToCheck = t.startDate || t.dueDate || undefined;
+                          return dateToCheck && isSameDay(dateToCheck, day);
+                        }).map((task,i)=>(
+                          <div key={task.id+''+i} className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}>{task.title}</div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })
+              })()}
+            </div>
+          </div>
+        )}
+        {calendarView === 'day' && (
+          <div className="bg-white rounded-lg shadow border overflow-hidden">
+            <div className="border-b text-center text-sm font-medium bg-gray-50 py-2">
+              {format(selectedDate || currentDate, 'yyyy년 MM월 dd일 (E)', {locale:ko})}
+            </div>
+            <div className="p-8 min-h-[300px]">
+              <div className="font-bold mb-2">{format(selectedDate || currentDate, 'd일')}</div>
+              <div className="space-y-2">
+                {calendarTasks.filter(t=>{
+                  const dateToCheck = t.startDate || t.dueDate || undefined;
+                  return dateToCheck && isSameDay(dateToCheck, selectedDate || currentDate);
+                }).map((task,i)=>(
+                  <div key={task.id+''+i} className={`truncate px-2 py-1 rounded text-sm font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}>{task.title}</div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* 우측 패널 */}
@@ -950,19 +1038,19 @@ const CalendarPage: React.FC = () => {
         <div className="mb-6">
           <div className="font-bold text-lg mb-2">캘린더 안내</div>
           <ul className="text-xs text-gray-600 list-disc pl-4">
-            <li>일정을 클릭해 상세보기/수정</li>
-            <li>드래그로 일정 이동</li>
-            <li>오른쪽에서 새 일정 추가</li>
+            <li>1</li>
+            <li>2</li>
+            <li>날짜 더블클릭으로 새 일정 추가</li>
           </ul>
         </div>
-        <div>
+        {/* <div>
           <div className="font-bold text-lg mb-2">단축키 안내</div>
           <ul className="text-xs text-gray-600 list-disc pl-4">
             <li>←/→ : 월 이동</li>
             <li>Enter : 오늘로 이동</li>
             <li>Esc : 다이얼로그 닫기</li>
           </ul>
-        </div>
+        </div> */}
       </aside>
 
       {/* 일정 수정 다이얼로그만 유지 */}
