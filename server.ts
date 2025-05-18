@@ -163,10 +163,15 @@ nextApp.prepare().then(() => {
     });
   });
 
-  app.get('*', (req, res) => {
-    const parsedUrl = parse(req.url!, true)
-    return handle(req, res, parsedUrl)
-  })
+  // API 라우트를 Next.js에 위임
+  app.all('/api/*', (req, res) => {
+    return handle(req, res);
+  });
+  
+  // 기타 라우트 처리
+  app.all('*', (req, res) => {
+    return handle(req, res);
+  });
 
   server.listen(port, () => {
     console.log(`> Ready on http://${hostname}:${port}`)

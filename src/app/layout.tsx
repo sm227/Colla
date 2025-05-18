@@ -1,16 +1,17 @@
 // app/layout.tsx
-import { ClerkProvider } from "@clerk/nextjs";
-import "./globals.css";
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import SocketProvider from "../../providers/SocketProvide";
-import { cn } from "@/lib/utils";
+import './globals.css';
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import { AuthProvider } from './contexts/AuthContext';
+import { ProjectProvider } from './contexts/ProjectContext';
+import { UserProvider } from './contexts/UserContext';
+import { ChatButton } from '@/components/ChatButton';
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: "Video Conference App",
-  description: "A video conferencing application with meeting summary feature",
+  title: '워크스페이스 - 협업 플랫폼',
+  description: '팀 협업을 위한 올인원 워크스페이스 플랫폼',
 };
 
 export default function RootLayout({
@@ -19,14 +20,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider>
-      <html lang="en">
-        <body className={cn(inter.className, 'relative')}>
-          <SocketProvider>
-          {children}
-          </SocketProvider>
-          </body>
-      </html>
-    </ClerkProvider>
+    <html lang="ko">
+      <body className={inter.className}>
+        <AuthProvider>
+          <ProjectProvider>
+            <UserProvider>
+              {children}
+              <ChatButton />
+            </UserProvider>
+          </ProjectProvider>
+        </AuthProvider>
+      </body>
+    </html>
   );
 }
