@@ -15,15 +15,15 @@ async function getCurrentUserId() {
 export async function GET(request: NextRequest) {
   try {
     const userId = await getCurrentUserId();
-
+    
     if (!userId) {
       return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
     }
-
+    
     // 쿼리 파라미터 가져오기
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('projectId');
-
+    
     let events = [];
     
     if (projectId) {
@@ -108,20 +108,20 @@ export async function GET(request: NextRequest) {
             // 사용자의 개인 일정
             { userId: userId },
             // 사용자가 참여 중인 프로젝트의 일정
-            { projectId: { in: projectIds } }
+        { projectId: { in: projectIds } }
           ]
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
               email: true
             }
-          },
-          project: {
-            select: {
-              id: true,
+        },
+        project: {
+          select: {
+            id: true,
               name: true
             }
           }
@@ -144,11 +144,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const userId = await getCurrentUserId();
-
+    
     if (!userId) {
       return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
     }
-
+    
     // 요청 본문 파싱
     const data = await request.json();
     
@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
 
     // 캘린더 이벤트 생성
     const newEvent = await prisma.calendar.create({
-      data: {
+        data: {
         title: data.title,
         description: data.description || '',
         startDate: new Date(data.startDate),
@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
         } : undefined
       }
     });
-
+      
     return NextResponse.json(newEvent, { status: 201 });
   } catch (error) {
     console.error('캘린더 이벤트 생성 오류:', error);
