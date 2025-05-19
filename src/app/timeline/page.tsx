@@ -10,8 +10,7 @@ import {
   PlusIcon, 
   FolderIcon, 
   ChevronDownIcon, 
-  TrelloIcon,
-  CalendarIcon
+  TrelloIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProject } from "@/app/contexts/ProjectContext";
@@ -215,14 +214,6 @@ export default function TimelinePage() {
             >
               <ClockIcon className={`w-5 h-5 ${theme === 'dark' ? 'text-white' : ''}`} />
               <span>타임라인</span>
-            </Link>
-
-            <Link
-              href={selectedProjectId ? `/calendar?projectId=${selectedProjectId}` : '/calendar'}
-              className="flex items-center space-x-2 py-3 px-4 border-b-2 border-transparent hover:text-blue-600 hover:border-blue-600 transition-colors"
-            >
-              <CalendarIcon className={`w-5 h-5 ${theme === 'dark' ? 'text-white' : ''}`} />
-              <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>캘린더</span>
             </Link>
           </div>
         </div>
