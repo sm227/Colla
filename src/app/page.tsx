@@ -1,7 +1,7 @@
 // app/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -28,6 +28,10 @@ import {
   UserPlusIcon,
   SunIcon,
   MoonIcon,
+  CheckIcon,
+  AlertCircleIcon,
+  CheckCircleIcon,
+  ClockIcon,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -39,7 +43,7 @@ import { useTasks } from "@/hooks/useTasks";
 // 알림 타입 정의
 type Notification = {
   id: string;
-  type: "invitation" | "document_update" | "task_assigned" | "generic";
+  type: "invitation" | "document_update" | "task_assigned" | "generic" | "task_created" | "task_updated";
   title: string;
   message: string;
   link: string;
@@ -48,6 +52,23 @@ type Notification = {
   icon?: React.ReactNode;
   iconBgColor?: string;
   iconColor?: string;
+  projectId?: string; // 프로젝트 초대의 경우 프로젝트 ID
+  taskId?: string; // 작업 관련 알림의 경우 작업 ID
+};
+
+// 작업 알림 타입 정의
+type TaskNotification = {
+  id: string;
+  projectId: string;
+  taskId: string;
+  title: string;
+  description?: string;
+  status: TaskStatus;
+  createdAt: string;
+  updatedAt: string;
+  project?: {
+    name: string;
+  };
 };
 
 // Invitation 타입을 page.tsx 내에 정의 (또는  import)
@@ -95,6 +116,7 @@ const fetchProjectInvitationsAsNotifications = async (): Promise<Notification[]>
     // 현재는 API가 pending 상태의 초대만 반환한다고 가정합니다.
     return invitations.map((invitation) => ({
       id: invitation.id, // 각 알림의 고유 ID로 사용
+      projectId: invitation.projectId, // 프로젝트 ID 추가
       type: "invitation",
       title: `'${invitation.project.name}' 프로젝트 초대`,
       message: `초대자: ${invitation.project.user?.name || '정보 없음'}`,
@@ -107,6 +129,83 @@ const fetchProjectInvitationsAsNotifications = async (): Promise<Notification[]>
     }));
   } catch (error) {
     console.error("Error fetching or processing project invitations:", error);
+    return []; // 에러 발생 시 빈 배열 반환
+  }
+};
+
+// 작업 관련 알림을 가져오는 함수
+const fetchTaskNotifications = async (): Promise<Notification[]> => {
+  try {
+    const response = await fetch("/api/notifications/tasks", {
+      headers: {
+        "Cache-Control": "no-cache", // 최신 데이터를 가져오도록 설정
+      },
+    });
+
+    if (!response.ok) {
+      console.error("Failed to fetch task notifications:", response.status, await response.text());
+      return [];
+    }
+
+    const taskNotifications: TaskNotification[] = await response.json();
+
+    // 작업 알림을 Notification 형식으로 변환
+    return taskNotifications.map((notification) => {
+      // 상태에 따라 아이콘과 배경색 설정
+      let icon = <Trello className="w-5 h-5" />;
+      let iconBgColor = "bg-purple-50";
+      let iconColor = "text-purple-500";
+      
+      if (notification.status === "todo") {
+        icon = <ClockIcon className="w-5 h-5" />;
+        iconBgColor = "bg-gray-50";
+        iconColor = "text-gray-500";
+      } else if (notification.status === "in-progress") {
+        icon = <AlertCircleIcon className="w-5 h-5" />;
+        iconBgColor = "bg-blue-50";
+        iconColor = "text-blue-500";
+      } else if (notification.status === "review") {
+        icon = <AlertCircleIcon className="w-5 h-5" />;
+        iconBgColor = "bg-yellow-50";
+        iconColor = "text-yellow-500";
+      } else if (notification.status === "done") {
+        icon = <CheckCircleIcon className="w-5 h-5" />;
+        iconBgColor = "bg-green-50";
+        iconColor = "text-green-500";
+      }
+
+      // 알림 유형 확인 (생성 또는 업데이트)
+      const isNew = new Date(notification.createdAt).getTime() === new Date(notification.updatedAt).getTime();
+      const type = isNew ? "task_created" : "task_updated";
+      
+      // 알림 메시지 생성
+      const projectName = notification.project?.name || '프로젝트';
+      const message = isNew 
+        ? `${projectName}에 새 작업이 추가되었습니다.` 
+        : `${projectName}의 작업 상태가 ${notification.status}(으)로 변경되었습니다.`;
+      
+      // 링크 생성 (작업이 있는 칸반보드로 이동)
+      const link = notification.projectId 
+        ? `/kanban?projectId=${notification.projectId}`
+        : "/kanban";
+
+      return {
+        id: `task-${notification.id}-${Date.now()}`, // 고유 ID 생성
+        type,
+        title: notification.title,
+        message,
+        link,
+        createdAt: notification.updatedAt, // 최근 업데이트 시간 사용
+        icon,
+        iconBgColor,
+        iconColor,
+        projectId: notification.projectId,
+        taskId: notification.taskId,
+        isRead: false,
+      };
+    });
+  } catch (error) {
+    console.error("Error fetching or processing task notifications:", error);
     return []; // 에러 발생 시 빈 배열 반환
   }
 };
@@ -129,6 +228,8 @@ export default function Home() {
     loading: projectLoading,
     currentProject,
     setCurrentProject,
+    acceptProjectInvitation,
+    rejectProjectInvitation
   } = useProject();
   const { tasks = [], loading: tasksLoading } = useTasks(
     currentProject?.id || null
@@ -138,6 +239,12 @@ export default function Home() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationLoading, setNotificationLoading] = useState(false);
   const [notificationError, setNotificationError] = useState<string | null>(null);
+  const [hasNewNotifications, setHasNewNotifications] = useState(false);
+  const lastNotificationCountRef = useRef(0);
+  const notificationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [processingInvitation, setProcessingInvitation] = useState<string | null>(null);
+  const previousNotificationsRef = useRef<Notification[]>([]);
+  const initialLoadDoneRef = useRef(false);
 
   // 테마 변경 시 localStorage에 저장하고 body 클래스 변경
   useEffect(() => {
@@ -156,6 +263,125 @@ export default function Home() {
   const toggleTheme = () => {
     setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
   };
+
+  // 알림을 가져오는 함수
+  const loadNotifications = async () => {
+    if (user) { // 사용자가 로그인된 경우에만 알림 가져오기
+      try {
+        // 초기 로딩 또는 알림창이 열릴 때만 로딩 상태 표시
+        const shouldShowLoading = showNotifications && !initialLoadDoneRef.current;
+        if (shouldShowLoading) {
+          setNotificationLoading(true);
+        }
+        setNotificationError(null);
+        
+        // 프로젝트 초대 알림 가져오기
+        const invitationNotifications = await fetchProjectInvitationsAsNotifications();
+        
+        // 작업 관련 알림 가져오기
+        const taskNotifications = await fetchTaskNotifications();
+        
+        // 모든 알림 병합
+        const allNotifications = [...invitationNotifications, ...taskNotifications];
+        
+        // 알림을 날짜순으로 정렬
+        const sortedNotifications = allNotifications.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        
+        // 새 알림이 있는지 확인
+        const newCount = sortedNotifications.length;
+        const oldCount = lastNotificationCountRef.current;
+        
+        // 새 알림이 추가된 경우에만 애니메이션 표시
+        if (newCount > oldCount) {
+          setHasNewNotifications(true);
+          // 새 알림이 있을 때 소리 알림이나 브라우저 알림 표시 가능
+          // new Audio('/notification-sound.mp3').play().catch(e => console.log('알림 소리 재생 실패:', e));
+        }
+        
+        // 현재 알림 수 업데이트
+        lastNotificationCountRef.current = newCount;
+        
+        // 내용 비교를 위한 함수
+        const areNotificationsEqual = (prev: Notification[], next: Notification[]) => {
+          if (prev.length !== next.length) return false;
+          
+          // ID 기반으로 정렬하여 비교
+          const sortById = (a: Notification, b: Notification) => a.id.localeCompare(b.id);
+          const sortedPrev = [...prev].sort(sortById);
+          const sortedNext = [...next].sort(sortById);
+          
+          // 모든 항목 비교
+          return sortedPrev.every((notification, index) => 
+            notification.id === sortedNext[index].id &&
+            notification.type === sortedNext[index].type
+          );
+        };
+        
+        // 알림 내용이 변경된 경우에만 상태 업데이트
+        if (!areNotificationsEqual(previousNotificationsRef.current, sortedNotifications)) {
+          setNotifications(sortedNotifications);
+          previousNotificationsRef.current = sortedNotifications;
+        }
+        
+        // 초기 로딩 완료 표시
+        initialLoadDoneRef.current = true;
+      } catch (err: any) {
+        console.error("알림 로딩 중 오류:", err);
+        setNotificationError(err.message || "알림 로딩 중 오류 발생");
+      } finally {
+        // 로딩 상태 업데이트 (로딩 완료)
+        if (showNotifications && !initialLoadDoneRef.current) {
+          setNotificationLoading(false);
+        }
+      }
+    }
+  };
+
+  // 알림창을 열면 새 알림 표시를 리셋
+  useEffect(() => {
+    if (showNotifications) {
+      setHasNewNotifications(false);
+      // 알림창이 열릴 때만 로딩 중 표시 (최초 한 번)
+      if (!initialLoadDoneRef.current) {
+        setNotificationLoading(true);
+      }
+      loadNotifications();
+    }
+  }, [showNotifications]);
+
+  // 컴포넌트 마운트 시 알림 주기적 체크 설정 & 언마운트 시 정리
+  useEffect(() => {
+    // 초기 로딩
+    if (user && !authLoading) {
+      loadNotifications();
+    }
+    
+    // 1초마다 알림 체크
+    if (user && !authLoading && !notificationIntervalRef.current) {
+      // 마지막 API 호출 시간을 추적하는 변수
+      let lastApiCallTime = Date.now();
+      
+      notificationIntervalRef.current = setInterval(() => {
+        const now = Date.now();
+        // API 호출 간 최소 간격 (5초)을 설정하여 서버 부하 방지
+        // 알림창이 열려있을 때는 실시간으로 업데이트하기 위해 무시
+        if (showNotifications || now - lastApiCallTime >= 5000) {
+          loadNotifications();
+          lastApiCallTime = now;
+        }
+      }, 1000); // 1초
+    }
+    
+    // 컴포넌트 언마운트 시 인터벌 정리
+    return () => {
+      if (notificationIntervalRef.current) {
+        clearInterval(notificationIntervalRef.current);
+        notificationIntervalRef.current = null;
+      }
+    };
+  }, [user, authLoading, showNotifications]);
 
   // Handle redirects with useEffect
   useEffect(() => {
@@ -194,37 +420,6 @@ export default function Home() {
     return date.toLocaleDateString("ko-KR");
   };
   
-  // 알림 데이터 가져오기
-  useEffect(() => {
-    if (showNotifications) { // 알림창이 열릴 때마다 데이터를 새로고침하도록 변경 (선택사항)
-    // 또는 notifications.length === 0 조건 유지하여 최초 한 번만 로드
-    // if (showNotifications && notifications.length === 0) {
-      const loadNotifications = async () => {
-        setNotificationLoading(true);
-        setNotificationError(null);
-        try {
-          // 실제 프로젝트 초대 알림 가져오기
-          const invitationNotifications = await fetchProjectInvitationsAsNotifications();
-          
-          // TODO: 다른 유형의 알림 (예: 문서, 작업 등)을 가져오는 로직 추가
-          // const otherNotifications = await fetchOtherNotificationTypes();
-          // setNotifications([...invitationNotifications, ...otherNotifications].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-
-          // 현재는 초대 알림만 표시
-          setNotifications(invitationNotifications.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-
-        } catch (err: any) {
-          setNotificationError(err.message || "알림 로딩 중 오류 발생");
-          setNotifications([]);
-        } finally {
-          setNotificationLoading(false);
-        }
-      };
-      loadNotifications();
-    }
-  // }, [showNotifications, notifications.length]); // 최초 한 번 로드 조건
-  }, [showNotifications]); // 알림창 열릴 때마다 새로고침 조건
-
   // 로딩 중이면 로딩 표시
   if (authLoading || projectLoading || tasksLoading) {
     return (
@@ -269,6 +464,80 @@ export default function Home() {
       await logout();
     } catch (error) {
       console.error("로그아웃 오류:", error);
+    }
+  };
+
+  // 초대 수락 처리 함수
+  const handleAcceptInvitation = async (invitationId: string, projectId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // 상위 요소 클릭 이벤트 차단
+    
+    if (processingInvitation) return; // 이미 처리 중이면 중복 실행 방지
+    
+    try {
+      setProcessingInvitation(invitationId);
+      
+      // 디버깅용 로그 추가
+      console.log("초대 수락 시도:", { invitationId, projectId });
+      
+      // 초대 수락 처리
+      await acceptProjectInvitation(projectId);
+      
+      // 성공 토스트 또는 알림 표시 (선택 사항)
+      // toast.success("프로젝트 초대가 수락되었습니다.");
+      
+      // 수락 성공 후 알림 목록에서 해당 초대 제거
+      setNotifications(prev => prev.filter(notification => 
+        notification.type !== 'invitation' || notification.id !== invitationId)
+      );
+      
+      // 현재 알림 수 업데이트
+      lastNotificationCountRef.current = Math.max(0, lastNotificationCountRef.current - 1);
+      
+    } catch (error) {
+      console.error("초대 수락 오류:", error);
+      // 오류 발생 시 알림 표시 가능
+      // toast.error("초대 수락 중 오류가 발생했습니다.");
+    } finally {
+      setProcessingInvitation(null);
+      // 알림 목록 새로고침
+      loadNotifications();
+    }
+  };
+  
+  // 초대 거절 처리 함수
+  const handleRejectInvitation = async (invitationId: string, projectId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // 상위 요소 클릭 이벤트 차단
+    
+    if (processingInvitation) return; // 이미 처리 중이면 중복 실행 방지
+    
+    try {
+      setProcessingInvitation(invitationId);
+      
+      // 디버깅용 로그 추가
+      console.log("초대 거절 시도:", { invitationId, projectId });
+      
+      // 초대 거절 처리
+      await rejectProjectInvitation(projectId);
+      
+      // 성공 토스트 또는 알림 표시 (선택 사항)
+      // toast.success("프로젝트 초대가 거절되었습니다.");
+      
+      // 거절 성공 후 알림 목록에서 해당 초대 제거
+      setNotifications(prev => prev.filter(notification => 
+        notification.type !== 'invitation' || notification.id !== invitationId)
+      );
+      
+      // 현재 알림 수 업데이트
+      lastNotificationCountRef.current = Math.max(0, lastNotificationCountRef.current - 1);
+      
+    } catch (error) {
+      console.error("초대 거절 오류:", error);
+      // 오류 발생 시 알림 표시 가능
+      // toast.error("초대 거절 중 오류가 발생했습니다.");
+    } finally {
+      setProcessingInvitation(null);
+      // 알림 목록 새로고침
+      loadNotifications();
     }
   };
 
@@ -340,7 +609,7 @@ export default function Home() {
                 <BellIcon className="w-5 h-5" />
                 {/* 알림 배지 개선 - 알림이 있을 때만 표시 */}
                 {notifications.length > 0 && (
-                  <span className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full shadow-sm animate-pulse">
+                  <span className={`absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full shadow-sm ${hasNewNotifications ? 'animate-bounce' : 'animate-pulse'}`}>
                     {/* 실제 읽지 않은 알림 수 또는 전체 알림 수 표시 */}
                     {notifications.filter(n => !n.isRead).length > 0 ? notifications.filter(n => !n.isRead).length : notifications.length}
                   </span>
@@ -348,11 +617,13 @@ export default function Home() {
               </button>
               {/* 알림창 UI 시작 */}
               {showNotifications && (
-                <div className={`absolute right-0 mt-2 w-80 md:w-96 ${
-                  theme === 'dark'
-                    ? 'bg-[#2A2A2C] border-gray-700'
-                    : 'bg-white border-gray-200'
-                } rounded-lg shadow-xl border z-50`}>
+                <div 
+                  className={`absolute right-0 mt-2 w-80 md:w-96 ${
+                    theme === 'dark'
+                      ? 'bg-[#2A2A2C] border-gray-700'
+                      : 'bg-white border-gray-200'
+                  } rounded-lg shadow-xl border z-50 transition-opacity duration-200 ease-in-out`}
+                >
                   <div className="p-4">
                     <div className="flex justify-between items-center mb-3">
                       <h3 className={`text-lg font-medium ${
@@ -389,25 +660,88 @@ export default function Home() {
                         {notifications.map((notification) => (
                           <div 
                             key={notification.id} 
-                            className={`p-3 rounded-md flex items-start ${notification.iconBgColor || 'bg-gray-50'}`}
-                            onClick={() => {
-                              // TODO: 알림 읽음 처리 API 호출 등
-                              router.push(notification.link);
-                              setShowNotifications(false);
-                            }}
+                            className={`p-3 rounded-md flex flex-col ${notification.iconBgColor || (theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50')} transition-all duration-300 ease-in-out`}
                           >
-                            <div className={`flex-shrink-0 p-1.5 rounded-full ${notification.iconBgColor ? notification.iconBgColor.replace('bg-', 'bg-opacity-20 ') : 'bg-gray-100'} mr-3`}>
-                              {notification.icon || <BellIcon className="w-5 h-5" />}
+                            <div className="flex items-start">
+                              <div className={`flex-shrink-0 p-1.5 rounded-full ${notification.iconBgColor ? notification.iconBgColor.replace('bg-', 'bg-opacity-20 ') : theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} mr-3`}>
+                                {notification.icon || <BellIcon className="w-5 h-5" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm font-medium ${notification.iconColor || (theme === 'dark' ? 'text-gray-200' : 'text-gray-900')}`}>{notification.title}</p>
+                                <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} mt-0.5 truncate`}>
+                                  {notification.message}
+                                </p>
+                                <p className={`text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'} mt-1`}>
+                                  {formatDateForNotification(notification.createdAt)}
+                                </p>
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-sm font-medium ${notification.iconColor || 'text-gray-900'}`}>{notification.title}</p>
-                              <p className="text-xs text-gray-600 mt-0.5 truncate">
-                                {notification.message}
-                              </p>
-                              <p className="text-xs text-gray-400 mt-1">
-                                {formatDateForNotification(notification.createdAt)}
-                              </p>
-                            </div>
+                            
+                            {/* 초대 알림인 경우 수락/거절 버튼 표시 */}
+                            {notification.type === 'invitation' && notification.projectId && (
+                              <div className="mt-3 flex justify-end space-x-2">
+                                {processingInvitation === notification.id ? (
+                                  <div className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} flex items-center`}>
+                                    <div className="mr-2 w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                                    처리 중...
+                                  </div>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={(e) => handleRejectInvitation(notification.id, notification.projectId as string, e)}
+                                      className={`px-3 py-1 rounded text-xs font-medium ${
+                                        theme === 'dark'
+                                          ? 'bg-red-900 hover:bg-red-800 text-red-200'
+                                          : 'bg-red-100 hover:bg-red-200 text-red-700'
+                                      } transition-colors`}
+                                    >
+                                      거절
+                                    </button>
+                                    <button
+                                      onClick={(e) => handleAcceptInvitation(notification.id, notification.projectId as string, e)}
+                                      className={`px-3 py-1 rounded text-xs font-medium ${
+                                        theme === 'dark'
+                                          ? 'bg-blue-900 hover:bg-blue-800 text-blue-200'
+                                          : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
+                                      } transition-colors`}
+                                    >
+                                      수락
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                            
+                            {/* 작업 알림인 경우 바로가기 버튼 표시 */}
+                            {(notification.type === 'task_created' || notification.type === 'task_updated') && (
+                              <div className="mt-3 flex justify-end">
+                                <button
+                                  onClick={() => {
+                                    router.push(notification.link);
+                                    setShowNotifications(false);
+                                  }}
+                                  className={`px-3 py-1 rounded text-xs font-medium ${
+                                    theme === 'dark'
+                                      ? 'bg-purple-900 hover:bg-purple-800 text-purple-200'
+                                      : 'bg-purple-100 hover:bg-purple-200 text-purple-700'
+                                  } transition-colors`}
+                                >
+                                  칸반보드로 이동
+                                </button>
+                              </div>
+                            )}
+                            
+                            {/* 일반 알림인 경우 전체 영역 클릭 시 링크 이동 */}
+                            {notification.type !== 'invitation' && notification.type !== 'task_created' && notification.type !== 'task_updated' && (
+                              <div 
+                                className="absolute inset-0 cursor-pointer"
+                                onClick={() => {
+                                  // TODO: 알림 읽음 처리 API
+                                  router.push(notification.link);
+                                  setShowNotifications(false);
+                                }}
+                              ></div>
+                            )}
                           </div>
                         ))}
                       </div>
