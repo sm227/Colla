@@ -792,6 +792,19 @@ const CalendarPage: React.FC = () => {
 
   const [calendarView, setCalendarView] = useState<'month'|'week'|'day'>('month');
 
+  // 일정 색상 추출 함수
+  function getCalendarEventColor(tasks: Task[]) {
+    // isCalendarEvent: true인 일정에서 색상 추출(없으면 indigo-500)
+    const calendarEvent = tasks.find(t => t.isCalendarEvent);
+    // color 필드가 있다면 calendarEvent.color 사용
+    return calendarEvent ? '#6366f1' : '#6366f1'; // indigo-500
+  }
+  function getProjectTaskColor(tasks: Task[]) {
+    // isCalendarEvent: false인 태스크에서 색상 추출(없으면 blue-500)
+    const projectTask = tasks.find(t => !t.isCalendarEvent);
+    return projectTask ? '#3b82f6' : '#3b82f6'; // blue-500
+  }
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* 좌측 패널 */}
@@ -802,22 +815,38 @@ const CalendarPage: React.FC = () => {
           {/* 미니 달력 자리 (추후 라이브러리 적용 가능) */}
           <div className="grid grid-cols-7 gap-1 text-xs text-center text-gray-500">
             {['일','월','화','수','목','금','토'].map(d => <div key={d}>{d}</div>)}
-            {/* 1~31일 등 날짜 표시 (간단 예시) */}
             {[...Array(31)].map((_,i) => <div key={i} className="py-1 rounded hover:bg-blue-100 cursor-pointer">{i+1}</div>)}
           </div>
         </div>
         {/* 일정 추가 버튼 */}
-        <Button className="w-full mb-4" onClick={() => setAddEventDialog({show:true,date:null})}>
+        <Button className="w-full mb-4" onClick={() => {
+          setAddEventDialog({show:true,date:null});
+          setShowAddForm(true);
+          setNewEvent({
+            ...newEvent,
+            startDate: format(new Date(), 'yyyy-MM-dd'),
+            endDate: '',
+            projectId: ''
+          });
+        }}>
           <PlusIcon className="w-4 h-4 mr-1" /> 새 일정 추가
-            </Button>
-        {/* 계정/캘린더 목록 (예시) */}
+        </Button>
+        {/* 계정/캘린더 목록 (색상 동적 적용) */}
         <div className="mb-4">
           <div className="text-xs text-gray-400 mb-1">내 캘린더</div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> 나의 일정
+            <span
+              className="w-2 h-2 rounded-full inline-block"
+              style={{ backgroundColor: getCalendarEventColor(tasks) }}
+            />
+            나의 일정
           </div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> 프로젝트 일정
+            <span
+              className="w-2 h-2 rounded-full inline-block"
+              style={{ backgroundColor: getProjectTaskColor(tasks) }}
+            />
+            프로젝트 일정
           </div>
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2 h-2 rounded-full bg-gray-400 inline-block" /> 공휴일/기념일
@@ -970,49 +999,60 @@ const CalendarPage: React.FC = () => {
         {/* 일정 추가 폼: showAddForm이 true일 때만 표시 */}
         {showAddForm && (
           <div className="mb-6 border-b pb-4">
-            <div className="font-bold text-lg mb-2">새 일정 추가</div>
-            <div className="space-y-2">
-              <input
-                type="text"
-                value={newEvent.title}
-                onChange={e => setNewEvent({ ...newEvent, title: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                placeholder="제목"
-                required
-              />
-              <textarea
-                value={newEvent.description}
-                onChange={e => setNewEvent({ ...newEvent, description: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                rows={2}
-                placeholder="설명 (선택)"
-              />
-              <div className="grid grid-cols-2 gap-2">
+            <div className="font-bold text-lg mb-4">새 일정 추가</div>
+            <div className="space-y-6">
+              {/* 제목 */}
+              <div>
+                <input
+                  type="text"
+                  value={newEvent.title}
+                  onChange={e => setNewEvent({ ...newEvent, title: e.target.value })}
+                  className="w-full bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-lg font-semibold placeholder-gray-400"
+                  placeholder="제목을 입력하세요"
+                  required
+                />
+              </div>
+              {/* 설명 */}
+              <div>
+                <textarea
+                  value={newEvent.description}
+                  onChange={e => setNewEvent({ ...newEvent, description: e.target.value })}
+                  className="w-full bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-base placeholder-gray-400 resize-none"
+                  rows={2}
+                  placeholder="설명을 입력하세요"
+                />
+              </div>
+              {/* 날짜 */}
+              <div className="flex gap-4">
                 <input
                   type="date"
                   value={newEvent.startDate}
                   onChange={e => setNewEvent({ ...newEvent, startDate: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="flex-1 bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-base placeholder-gray-400"
                   required
                 />
                 <input
                   type="date"
                   value={newEvent.endDate}
                   onChange={e => setNewEvent({ ...newEvent, endDate: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="flex-1 bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-base placeholder-gray-400"
                 />
               </div>
-              <select
-                value={newEvent.projectId}
-                onChange={e => setNewEvent({ ...newEvent, projectId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              >
-                <option value="">개인 일정</option>
-                {projects && projects.map(project => (
-                  <option key={project.id} value={project.id}>{project.name}</option>
-                ))}
-              </select>
-              <div className="flex gap-2">
+              {/* 프로젝트 셀렉트 */}
+              <div>
+                <select
+                  value={newEvent.projectId}
+                  onChange={e => setNewEvent({ ...newEvent, projectId: e.target.value })}
+                  className="w-full bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-base placeholder-gray-400"
+                >
+                  <option value="">개인 일정</option>
+                  {projects && projects.map(project => (
+                    <option key={project.id} value={project.id}>{project.name}</option>
+                  ))}
+                </select>
+              </div>
+              {/* 버튼 */}
+              <div className="flex gap-2 pt-2">
                 <Button className="flex-1" onClick={() => {
                   addCalendarEvent(newEvent);
                   setShowAddForm(false);
