@@ -79,6 +79,25 @@ export function useTasks(projectId?: string | null) {
       
       const createdTask = await response.json();
       setTasks((prevTasks) => [...prevTasks, createdTask]);
+      
+      // 작업 생성 이벤트 트리거 (새 작업 알림 용도)
+      try {
+        await fetch("/api/notifications/task-events", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            eventType: "task_created",
+            taskId: createdTask.id,
+            projectId: createdTask.projectId,
+          }),
+        });
+      } catch (notificationError) {
+        console.error("작업 생성 알림 전송 실패:", notificationError);
+        // 알림 전송 실패해도 작업 추가는 성공한 것으로 처리
+      }
+      
       setError(null);
       return createdTask;
     } catch (err) {
@@ -109,6 +128,26 @@ export function useTasks(projectId?: string | null) {
       setTasks((prevTasks) =>
         prevTasks.map((task) => (task.id === taskId ? updatedTask : task))
       );
+      
+      // 작업 상태 변경 이벤트 트리거 (상태 변경 알림 용도)
+      try {
+        await fetch("/api/notifications/task-events", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            eventType: "task_updated",
+            taskId: updatedTask.id,
+            projectId: updatedTask.projectId,
+            newStatus: newStatus,
+          }),
+        });
+      } catch (notificationError) {
+        console.error("작업 상태 변경 알림 전송 실패:", notificationError);
+        // 알림 전송 실패해도 작업 업데이트는 성공한 것으로 처리
+      }
+      
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
