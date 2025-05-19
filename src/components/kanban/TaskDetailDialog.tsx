@@ -69,7 +69,7 @@ const processTiptapContent = (content: string): string => {
   return content;
 };
 
-const RichTextEditor = ({ content, onChange }: { content: string, onChange: (html: string) => void }) => {
+const RichTextEditor = ({ content, onChange, theme = "light" }: { content: string, onChange: (html: string) => void, theme?: "light" | "dark" }) => {
   // 초기 콘텐츠에서 HTML 태그 처리
   const processedContent = processTiptapContent(content);
   
@@ -110,12 +110,20 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
     return null;
   }
 
+  const editorStyles = getEditorStyles(theme);
+  const scrollbarStyles = getScrollbarStyles(theme);
+
   return (
     <div className="rich-text-editor border rounded-md overflow-hidden">
-      <div className="bg-gray-50 border-b p-2 flex flex-wrap gap-1">
+      <style>{editorStyles}</style>
+      <style>{scrollbarStyles}</style>
+      
+      <div className={`border-b p-2 flex flex-wrap gap-1 ${
+        theme === 'dark' ? 'bg-[#353538] border-gray-700' : 'bg-gray-50'
+      }`}>
         <button
           onClick={() => editor.chain().focus().toggleBold().run()}
-          className={`p-1 rounded hover:bg-gray-200 ${editor.isActive('bold') ? 'bg-gray-200' : ''}`}
+          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('bold') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
           type="button"
           title="굵게"
         >
@@ -123,7 +131,7 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
         </button>
         <button
           onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={`p-1 rounded hover:bg-gray-200 ${editor.isActive('italic') ? 'bg-gray-200' : ''}`}
+          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('italic') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
           type="button"
           title="기울임"
         >
@@ -132,7 +140,7 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
         <span className="w-px h-6 bg-gray-300 mx-1"></span>
         <button
           onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={`p-1 rounded hover:bg-gray-200 ${editor.isActive('bulletList') ? 'bg-gray-200' : ''}`}
+          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('bulletList') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
           type="button"
           title="글머리 기호"
         >
@@ -140,7 +148,7 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
         </button>
         <button
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          className={`p-1 rounded hover:bg-gray-200 ${editor.isActive('orderedList') ? 'bg-gray-200' : ''}`}
+          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('orderedList') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
           type="button"
           title="번호 목록"
         >
@@ -148,7 +156,7 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
         </button>
         <button
           onClick={() => editor.chain().focus().toggleTaskList().run()}
-          className={`p-1 rounded hover:bg-gray-200 ${editor.isActive('taskList') ? 'bg-gray-200' : ''}`}
+          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('taskList') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
           type="button"
           title="작업 항목"
         >
@@ -162,7 +170,7 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
               editor.chain().focus().setLink({ href: url }).run();
             }
           }}
-          className={`p-1 rounded hover:bg-gray-200 ${editor.isActive('link') ? 'bg-gray-200' : ''}`}
+          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('link') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
           type="button"
           title="링크"
         >
@@ -175,7 +183,7 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
               editor.chain().focus().setImage({ src: url }).run();
             }
           }}
-          className="p-1 rounded hover:bg-gray-200"
+          className="p-1 rounded hover:bg-gray-700 text-gray-300"
           type="button"
           title="이미지"
         >
@@ -183,7 +191,7 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
         </button>
         <button
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          className={`p-1 rounded hover:bg-gray-200 ${editor.isActive('codeBlock') ? 'bg-gray-200' : ''}`}
+          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('codeBlock') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
           type="button"
           title="코드"
         >
@@ -195,16 +203,61 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
             onChange={(e) => {
               editor.chain().focus().setColor(e.target.value).run();
             }}
-            className="border rounded p-1 text-xs bg-white hover:bg-gray-50"
+            className={`border rounded p-1 text-xs ${
+              theme === 'dark' 
+                ? 'bg-[#2A2A2C] border-gray-700 text-gray-300 hover:bg-gray-800' 
+                : 'bg-white hover:bg-gray-50'
+            }`}
             title="텍스트 색상"
           >
-            <option value="">색상</option>
-            <option value="#ff5630" style={{ color: '#ff5630' }}>빨강</option>
-            <option value="#00b8d9" style={{ color: '#00b8d9' }}>파랑</option>
-            <option value="#36b37e" style={{ color: '#36b37e' }}>초록</option>
-            <option value="#ff991f" style={{ color: '#ff991f' }}>주황</option>
-            <option value="#6554c0" style={{ color: '#6554c0' }}>보라</option>
-            <option value="#172b4d" style={{ color: '#172b4d' }}>검정</option>
+            <option 
+              value="" 
+              className={theme === 'dark' ? 'bg-[#2A2A2C] text-gray-300' : ''}
+            >
+              색상
+            </option>
+            <option 
+              value="#ff5630" 
+              style={{ color: theme === 'dark' ? '#ff5630' : '#ff5630' }}
+              className={theme === 'dark' ? 'bg-[#2A2A2C] text-red-400' : ''}
+            >
+              빨강
+            </option>
+            <option 
+              value="#00b8d9" 
+              style={{ color: theme === 'dark' ? '#00b8d9' : '#00b8d9' }}
+              className={theme === 'dark' ? 'bg-[#2A2A2C] text-blue-400' : ''}
+            >
+              파랑
+            </option>
+            <option 
+              value="#36b37e" 
+              style={{ color: theme === 'dark' ? '#36b37e' : '#36b37e' }}
+              className={theme === 'dark' ? 'bg-[#2A2A2C] text-green-400' : ''}
+            >
+              초록
+            </option>
+            <option 
+              value="#ff991f" 
+              style={{ color: theme === 'dark' ? '#ff991f' : '#ff991f' }}
+              className={theme === 'dark' ? 'bg-[#2A2A2C] text-orange-400' : ''}
+            >
+              주황
+            </option>
+            <option 
+              value="#6554c0" 
+              style={{ color: theme === 'dark' ? '#6554c0' : '#6554c0' }}
+              className={theme === 'dark' ? 'bg-[#2A2A2C] text-purple-400' : ''}
+            >
+              보라
+            </option>
+            <option 
+              value="#172b4d" 
+              style={{ color: theme === 'dark' ? '#ffffff' : '#172b4d' }}
+              className={theme === 'dark' ? 'bg-[#2A2A2C] text-white' : ''}
+            >
+              검정
+            </option>
           </select>
         </div>
         <button
@@ -214,34 +267,19 @@ const RichTextEditor = ({ content, onChange }: { content: string, onChange: (htm
               editor.chain().focus().insertContent(emoji).run();
             }
           }}
-          className="p-1 rounded hover:bg-gray-200"
+          className="p-1 rounded hover:bg-gray-700 text-gray-300"
           type="button"
           title="이모지"
         >
           <Smile size={16} />
         </button>
       </div>
-      {/* 에디터 스타일을 적용하여 HTML 태그가 보이지 않도록 함 */}
-      <style>
-        {`
-          .ProseMirror {
-            /* HTML 태그가 보이지 않도록 설정 */
-            -webkit-user-modify: read-write;
-            overflow-wrap: break-word;
-            word-break: break-word;
-            white-space: pre-wrap;
-          }
-          .ProseMirror p {
-            /* 단락 스타일 조정 */
-            margin: 0;
-            line-height: 1.5;
-          }
-          .ProseMirror:focus {
-            outline: none;
-          }
-        `}
-      </style>
-      <EditorContent editor={editor} className="p-3 min-h-[150px] prose max-w-none" />
+      <EditorContent 
+        editor={editor} 
+        className={`p-3 min-h-[150px] prose max-w-none ${
+          theme === 'dark' ? 'bg-[#2A2A2C]' : ''
+        }`} 
+      />
     </div>
   );
 };
@@ -259,6 +297,58 @@ const removeHtmlTags = (html: string): string => {
   
   // 서버 사이드 렌더링 시: 간단한 정규식으로 태그 제거
   return html.replace(/<[^>]*>|&[^;]+;/g, '');
+};
+
+// 스타일 템플릿을 함수 내부로 이동하고 theme 파라미터 추가
+const getEditorStyles = (theme: "light" | "dark") => {
+  return `
+    .ProseMirror {
+      -webkit-user-modify: read-write;
+      overflow-wrap: break-word;
+      word-break: break-word;
+      white-space: pre-wrap;
+      ${theme === 'dark' ? `
+        background-color: #2A2A2C;
+        color: #D1D5DB;
+      ` : ''}
+    }
+    .ProseMirror p {
+      margin: 0;
+      line-height: 1.5;
+      ${theme === 'dark' ? 'color: #D1D5DB;' : ''}
+    }
+    .ProseMirror:focus {
+      outline: none;
+    }
+  `;
+};
+
+// 스크롤바 스타일 함수 유지
+const getScrollbarStyles = (theme: "light" | "dark") => {
+  return `
+    ${theme === 'dark' ? `
+      .dark-scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: #4A4A4E #2A2A2C;
+      }
+      .dark-scrollbar::-webkit-scrollbar {
+        width: 10px;
+        background-color: #2A2A2C;
+      }
+      .dark-scrollbar::-webkit-scrollbar-track {
+        background: #2A2A2C;
+        border-left: 1px solid #353538;
+      }
+      .dark-scrollbar::-webkit-scrollbar-thumb {
+        background: #4A4A4E;
+        border-left: 1px solid #353538;
+        border-radius: 4px;
+      }
+      .dark-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #5A5A5E;
+      }
+    ` : ''}
+  `;
 };
 
 export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, theme = "light" }: TaskDetailDialogProps) {
@@ -676,6 +766,9 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
     return epic?.color || "#CCCCCC";
   };
 
+  // 스크롤바 스타일 추가 (함수 호출)
+  const scrollbarStyles = getScrollbarStyles(theme);
+
   if (!isOpen) return null;
 
   return (
@@ -688,9 +781,16 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
       {/* 모달 컨테이너 */}
       <div 
         ref={dialogRef}
-        className={`${theme === 'dark' ? 'bg-[#2A2A2C] text-gray-200' : 'bg-white'} rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col`}
+        className={`
+          ${theme === 'dark' ? 'dark-scrollbar' : ''} 
+          ${theme === 'dark' ? 'bg-[#2A2A2C] text-gray-200' : 'bg-white'} 
+          rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col
+        `}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* 스타일 태그 추가 */}
+        <style>{scrollbarStyles}</style>
+        
         {/* 헤더 영역 */}
         <div className={`p-4 border-b flex justify-between items-center ${theme === 'dark' ? 'bg-[#353538] border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
           <div className="flex items-center gap-2">
@@ -734,7 +834,7 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
 
         <div className="flex flex-1 overflow-hidden">
           {/* 메인 콘텐츠 영역 */}
-          <div className="flex-1 overflow-y-auto">
+          <div className={`flex-1 overflow-y-auto ${theme === 'dark' ? 'dark-scrollbar' : ''}`}>
             <div className={`p-6 ${theme === 'dark' ? 'text-gray-200' : ''}`}>
               <Input
                 value={editedTask.title}
@@ -752,6 +852,7 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
                 <RichTextEditor 
                   content={editedTask.description || ''} 
                   onChange={handleDescriptionChange} 
+                  theme={theme}
                 />
               </div>
 
@@ -955,7 +1056,7 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
           </div>
 
           {/* 사이드바 영역 */}
-          <div className={`w-80 border-l overflow-y-auto ${theme === 'dark' ? 'bg-[#353538] border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
+          <div className={`w-80 border-l overflow-y-auto ${theme === 'dark' ? 'dark-scrollbar bg-[#353538] border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
             <div className="p-4">
               <div className="mb-6">
                 <div className="flex justify-between items-center mb-2">
@@ -1133,11 +1234,13 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
                   <select
                     value={editedTask.priority}
                     onChange={(e) => handleChange({...editedTask, priority: e.target.value as 'high' | 'medium' | 'low'})}
-                    className="w-full border rounded-md p-2 pl-8 text-sm bg-white appearance-none"
+                    className={`w-full border rounded-md p-2 pl-8 text-sm appearance-none ${
+                      theme === 'dark' ? 'bg-[#2A2A2C] border-gray-700 text-gray-200' : 'bg-white'
+                    }`}
                   >
-                    <option value="high" className="bg-red-100 text-red-800">높음</option>
-                    <option value="medium" className="bg-yellow-100 text-yellow-800">중간</option>
-                    <option value="low" className="bg-green-100 text-green-800">낮음</option>
+                    <option value="high" className={theme === 'dark' ? 'bg-[#2A2A2C] text-red-400' : 'bg-red-100 text-red-800'}>높음</option>
+                    <option value="medium" className={theme === 'dark' ? 'bg-[#2A2A2C] text-yellow-400' : 'bg-yellow-100 text-yellow-800'}>중간</option>
+                    <option value="low" className={theme === 'dark' ? 'bg-[#2A2A2C] text-green-400' : 'bg-green-100 text-green-800'}>낮음</option>
                   </select>
                   <div className="absolute left-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
                     {getPriorityIcon(editedTask.priority)}
@@ -1152,13 +1255,17 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
                 <div className="flex justify-between items-center mb-2">
                   <h3 className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>마감일</h3>
                 </div>
-                <div className="flex items-center gap-2 border rounded-md p-2 bg-white">
-                  <CalendarIcon className="h-4 w-4 text-gray-400" />
+                <div className={`flex items-center gap-2 border rounded-md p-2 ${
+                  theme === 'dark' ? 'bg-[#2A2A2C] border-gray-700' : 'bg-white'
+                }`}>
+                  <CalendarIcon className={`h-4 w-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-400'}`} />
                   <input
                     type="date"
                     value={editedTask.dueDate ? new Date(editedTask.dueDate).toISOString().split('T')[0] : ""}
                     onChange={(e) => handleDateChange(e.target.value)}
-                    className="border-0 p-0 h-auto focus-visible:ring-0 text-sm w-full"
+                    className={`border-0 p-0 h-auto focus-visible:ring-0 text-sm w-full ${
+                      theme === 'dark' ? 'bg-[#2A2A2C] text-gray-200' : ''
+                    }`}
                   />
                 </div>
               </div>
@@ -1199,7 +1306,11 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
                   <Button 
                     variant="outline" 
                     size="sm"
-                    className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 w-full"
+                    className={`w-full ${
+                      theme === 'dark' 
+                        ? 'text-red-400 border-red-900 bg-[#2A2A2C] hover:bg-red-950 hover:text-red-300 hover:border-red-800' 
+                        : 'text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700'
+                    }`}
                     onClick={handleDelete}
                   >
                     <Trash2 size={14} className="mr-1" />

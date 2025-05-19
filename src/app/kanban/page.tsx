@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { useProject } from "@/app/contexts/ProjectContext";
 import Link from "next/link";
-import { HomeIcon, ArrowLeftIcon, Trello, PlusIcon, FolderIcon, ChevronDownIcon, ClockIcon, CalendarIcon } from "lucide-react";
+import { HomeIcon, ArrowLeftIcon, Trello, PlusIcon, FolderIcon, ChevronDownIcon, ClockIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function KanbanPage() {
@@ -225,7 +225,7 @@ export default function KanbanPage() {
               href={selectedProjectId ? `/kanban?projectId=${selectedProjectId}` : '/kanban'}
               className={`flex items-center space-x-2 py-3 px-4 ${theme === 'dark' ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'} border-b-2`}
             >
-              <Trello className="w-5 h-5" />
+              <Trello className={`w-5 h-5 ${theme === 'dark' ? 'text-white' : ''}`} />
               <span>칸반보드</span>
             </Link>
             
@@ -233,16 +233,8 @@ export default function KanbanPage() {
               href={selectedProjectId ? `/timeline?projectId=${selectedProjectId}` : '/timeline'}
               className={`flex items-center space-x-2 py-3 px-4 border-b-2 border-transparent hover:${theme === 'dark' ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'} transition-colors mr-4`}
             >
-              <ClockIcon className="w-5 h-5" />
+              <ClockIcon className={`w-5 h-5 ${theme === 'dark' ? 'text-white' : ''}`} />
               <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>타임라인</span>
-            </Link>
-
-            <Link
-              href={selectedProjectId ? `/calendar?projectId=${selectedProjectId}` : '/calendar'}
-              className={`flex items-center space-x-2 py-3 px-4 border-b-2 border-transparent hover:${theme === 'dark' ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'} transition-colors`}
-            >
-              <CalendarIcon className="w-5 h-5" />
-              <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>캘린더</span>
             </Link>
           </div>
         </div>
