@@ -110,6 +110,15 @@ const CalendarPage: React.FC = () => {
     projectId: ''
   });
   
+  // 테마 상태 추가
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  
+  // 테마 설정 로직 추가
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark';
+    setTheme(savedTheme || 'light');
+  }, []);
+  
   // 로컬 스토리지 대신 API에서 캘린더 이벤트 직접 불러오기
   const fetchCalendarEvents = useCallback(async () => {
     setIsLoading(true);
@@ -781,7 +790,7 @@ const CalendarPage: React.FC = () => {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Link href="/" className="text-gray-500 hover:text-blue-600 transition-colors">
-              <HomeIcon className="w-5 h-5" />
+              <HomeIcon className={`w-5 h-5 ${theme === 'dark' ? 'text-white' : 'text-gray-500'}`} />
             </Link>
             <span className="text-gray-500">/</span>
             <span className="text-gray-900 font-medium">캘린더</span>
@@ -801,7 +810,7 @@ const CalendarPage: React.FC = () => {
               size="sm"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             >
-              <CalendarIcon className="w-4 h-4 mr-1" />
+              <CalendarIcon className={`w-4 h-4 ${theme === 'dark' ? 'text-white' : 'text-blue-600'} mr-1`} />
               예약되지 않은 업무
             </Button>
           </div>
@@ -812,7 +821,7 @@ const CalendarPage: React.FC = () => {
         {/* 캘린더 헤더 */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center">
-            <CalendarIcon className="w-6 h-6 text-blue-600 mr-2" />
+            <CalendarIcon className={`w-6 h-6 ${theme === 'dark' ? 'text-white' : 'text-blue-600'} mr-2`} />
             <h1 className="text-2xl font-bold">캘린더</h1>
           </div>
           

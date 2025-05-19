@@ -205,7 +205,7 @@ export default function TimelinePage() {
               href={selectedProjectId ? `/kanban?projectId=${selectedProjectId}` : '/kanban'}
               className="flex items-center space-x-2 py-3 px-4 border-b-2 border-transparent hover:text-blue-600 hover:border-blue-600 transition-colors mr-4"
             >
-              <TrelloIcon className="w-5 h-5" />
+              <TrelloIcon className={`w-5 h-5 ${theme === 'dark' ? 'text-white' : ''}`} />
               <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>칸반보드</span>
             </Link>
             
@@ -213,7 +213,7 @@ export default function TimelinePage() {
               href={selectedProjectId ? `/timeline?projectId=${selectedProjectId}` : '/timeline'}
               className="flex items-center space-x-2 py-3 px-4 text-blue-600 border-blue-600 border-b-2"
             >
-              <ClockIcon className="w-5 h-5" />
+              <ClockIcon className={`w-5 h-5 ${theme === 'dark' ? 'text-white' : ''}`} />
               <span>타임라인</span>
             </Link>
 
@@ -221,7 +221,7 @@ export default function TimelinePage() {
               href={selectedProjectId ? `/calendar?projectId=${selectedProjectId}` : '/calendar'}
               className="flex items-center space-x-2 py-3 px-4 border-b-2 border-transparent hover:text-blue-600 hover:border-blue-600 transition-colors"
             >
-              <CalendarIcon className="w-5 h-5" />
+              <CalendarIcon className={`w-5 h-5 ${theme === 'dark' ? 'text-white' : ''}`} />
               <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>캘린더</span>
             </Link>
           </div>
