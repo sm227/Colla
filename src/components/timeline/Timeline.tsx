@@ -62,21 +62,22 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
   
   const router = useRouter();
 
-  // 로컬 스토리지에서 테마 설정 불러오기
-  const savedTheme = typeof window !== 'undefined' ? 
-    (localStorage.getItem('theme') as 'light' | 'dark') : null;
-  const [theme, setTheme] = useState<"light" | "dark">(savedTheme || initialTheme || "dark");
+  const getInitialTheme = () => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("theme") as "light" | "dark") || "light";
+    }
+    return "light";
+  };
 
-  // 테마 변경 시 로컬 스토리지에 저장하고 클래스 변경
+  const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme());
+
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('theme', theme);
-      
-      // document.documentElement의 클래스를 변경하여 전체 스타일 적용
-      if (theme === 'dark') {
-        document.documentElement.classList.add('dark-mode');
+    if (typeof window !== "undefined") {
+      localStorage.setItem("theme", theme);
+      if (theme === "dark") {
+        document.documentElement.classList.add("dark-mode");
       } else {
-        document.documentElement.classList.remove('dark-mode');
+        document.documentElement.classList.remove("dark-mode");
       }
     }
   }, [theme]);
