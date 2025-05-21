@@ -2,8 +2,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
+import Calendar from 'react-calendar';
+import 'react-calendar/dist/Calendar.css';
 import {
   VideoIcon,
   UsersIcon,
@@ -11,6 +13,7 @@ import {
   Trello,
   FileTextIcon,
   CalendarIcon,
+  CalendarDaysIcon,
   MessageSquareIcon,
   LayoutDashboardIcon,
   ClipboardListIcon,
@@ -32,6 +35,15 @@ import {
   AlertCircleIcon,
   CheckCircleIcon,
   ClockIcon,
+  ChevronDownIcon,
+  FilterIcon,
+  ViewIcon,
+  GanttChartSquareIcon,
+  ColumnsIcon,
+  ListChecksIcon,
+  TableIcon,
+  ArchiveIcon,
+  StarIcon,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -39,6 +51,15 @@ import { useAuth } from "./contexts/AuthContext";
 import { useProject } from "./contexts/ProjectContext";
 import { Task, TaskStatus } from "@/components/kanban/KanbanBoard";
 import { useTasks } from "@/hooks/useTasks";
+
+// API 응답에 project 객체가 포함되므로, 이를 반영하는 새로운 타입을 정의합니다.
+// 기존 Task 타입의 필드도 포함하도록 확장합니다.
+interface TaskWithProjectInfo extends Task {
+  project?: {
+    id: string;
+    name: string;
+  } | null;
+}
 
 // 알림 타입 정의
 type Notification = {
@@ -75,20 +96,29 @@ type TaskNotification = {
 type Invitation = {
   id: string;
   projectId: string;
-  // userId: string; // Notification에서는 직접 사용 안 함
-  // role: string; // Notification에서는 직접 사용 안 함
-  // inviteStatus: string; // Notification에서는 직접 사용 안 함 (pending 상태의 초대만 가져올 것이므로)
   createdAt: string;
-  // updatedAt: string; // Notification에서는 직접 사용 안 함
   project: {
     id: string;
     name: string;
-    // description?: string; // Notification에서는 직접 사용 안 함
-    user?: { // 초대자 정보
-      // id: string;
+    user?: { 
       name: string;
-      // email: string;
     };
+  };
+};
+
+// 일정 타입 정의
+type CalendarEvent = {
+  id: string;
+  title: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  createdAt: string;
+  projectId?: string;
+  userId?: string;
+  project?: {
+    id: string;
+    name: string;
   };
 };
 
@@ -97,39 +127,33 @@ const fetchProjectInvitationsAsNotifications = async (): Promise<Notification[]>
   try {
     const response = await fetch("/api/projects/invitations", {
       headers: {
-        "Cache-Control": "no-cache", // 최신 데이터를 가져오도록 설정
+        "Cache-Control": "no-cache", 
       },
     });
 
     if (!response.ok) {
-      // API 에러 응답을 좀 더 자세히 로깅하거나 사용자에게 알릴 수 있습니다.
       console.error("Failed to fetch invitations:", response.status, await response.text());
-      // 빈 배열을 반환하거나, 에러를 throw하여 호출부에서 처리하게 할 수 있습니다.
-      // 여기서는 빈 배열을 반환하여 알림창에 '에러 발생' 대신 '알림 없음'으로 표시되도록 합니다.
       return [];
     }
 
     const invitations: Invitation[] = await response.json();
 
-    // Invitation[]을 Notification[]으로 변환
-    // API 응답에서 inviteStatus가 'pending'인 것만 필터링해야 할 수 있습니다.
-    // 현재는 API가 pending 상태의 초대만 반환한다고 가정합니다.
     return invitations.map((invitation) => ({
-      id: invitation.id, // 각 알림의 고유 ID로 사용
-      projectId: invitation.projectId, // 프로젝트 ID 추가
+      id: invitation.id, 
+      projectId: invitation.projectId, 
       type: "invitation",
       title: `'${invitation.project.name}' 프로젝트 초대`,
       message: `초대자: ${invitation.project.user?.name || '정보 없음'}`,
-      link: "/projects/invitations", // 초대 확인 페이지로 링크
+      link: "/projects/invitations", 
       createdAt: invitation.createdAt,
       icon: <UsersIcon className="w-5 h-5" />,
       iconBgColor: "bg-blue-50",
       iconColor: "text-blue-500",
-      isRead: false, // 기본적으로 읽지 않음 상태
+      isRead: false, 
     }));
   } catch (error) {
     console.error("Error fetching or processing project invitations:", error);
-    return []; // 에러 발생 시 빈 배열 반환
+    return []; 
   }
 };
 
@@ -138,7 +162,7 @@ const fetchTaskNotifications = async (): Promise<Notification[]> => {
   try {
     const response = await fetch("/api/notifications/tasks", {
       headers: {
-        "Cache-Control": "no-cache", // 최신 데이터를 가져오도록 설정
+        "Cache-Control": "no-cache", 
       },
     });
 
@@ -149,9 +173,7 @@ const fetchTaskNotifications = async (): Promise<Notification[]> => {
 
     const taskNotifications: TaskNotification[] = await response.json();
 
-    // 작업 알림을 Notification 형식으로 변환
     return taskNotifications.map((notification) => {
-      // 상태에 따라 아이콘과 배경색 설정
       let icon = <Trello className="w-5 h-5" />;
       let iconBgColor = "bg-purple-50";
       let iconColor = "text-purple-500";
@@ -174,28 +196,25 @@ const fetchTaskNotifications = async (): Promise<Notification[]> => {
         iconColor = "text-green-500";
       }
 
-      // 알림 유형 확인 (생성 또는 업데이트)
       const isNew = new Date(notification.createdAt).getTime() === new Date(notification.updatedAt).getTime();
       const type = isNew ? "task_created" : "task_updated";
       
-      // 알림 메시지 생성
       const projectName = notification.project?.name || '프로젝트';
       const message = isNew 
         ? `${projectName}에 새 작업이 추가되었습니다.` 
         : `${projectName}의 작업 상태가 ${notification.status}(으)로 변경되었습니다.`;
       
-      // 링크 생성 (작업이 있는 칸반보드로 이동)
       const link = notification.projectId 
         ? `/kanban?projectId=${notification.projectId}`
         : "/kanban";
 
       return {
-        id: `task-${notification.id}-${Date.now()}`, // 고유 ID 생성
+        id: `task-${notification.id}-${Date.now()}`, 
         type,
         title: notification.title,
         message,
         link,
-        createdAt: notification.updatedAt, // 최근 업데이트 시간 사용
+        createdAt: notification.updatedAt, 
         icon,
         iconBgColor,
         iconColor,
@@ -206,17 +225,229 @@ const fetchTaskNotifications = async (): Promise<Notification[]> => {
     });
   } catch (error) {
     console.error("Error fetching or processing task notifications:", error);
-    return []; // 에러 발생 시 빈 배열 반환
+    return []; 
   }
 };
 
+// 작업 생성 모달 컴포넌트
+function TaskCreateModal({ 
+  isOpen, 
+  onClose, 
+  onSubmit, 
+  projectId,
+  theme = "dark"
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onSubmit: (task: any) => Promise<void>;
+  projectId?: string;
+  theme: "light" | "dark";
+}) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [status, setStatus] = useState<TaskStatus>("todo");
+  const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
+  const [dueDate, setDueDate] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // 모달 외부 클릭 감지
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onClose]);
+
+  // ESC 키 감지
+  useEffect(() => {
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEsc);
+    }
+    
+    return () => {
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [isOpen, onClose]);
+
+  // 폼 제출 핸들러
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!title.trim()) {
+      alert("제목을 입력해주세요.");
+      return;
+    }
+    
+    try {
+      setIsSubmitting(true);
+      
+      await onSubmit({
+        title,
+        description,
+        status,
+        priority,
+        dueDate: dueDate ? dueDate : undefined,
+        projectId
+      });
+      
+      // 폼 초기화
+      setTitle("");
+      setDescription("");
+      setStatus("todo");
+      setPriority("medium");
+      setDueDate("");
+      
+      onClose();
+    } catch (error) {
+      console.error("작업 생성 중 오류:", error);
+      alert("작업 생성 중 오류가 발생했습니다.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50`}>
+      <div 
+        ref={modalRef}
+        className={`w-full max-w-md p-6 rounded-lg shadow-xl ${theme === 'dark' ? 'bg-gray-800 text-gray-100' : 'bg-white text-gray-900'}`}
+      >
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold">새 작업 추가</h3>
+          <button 
+            onClick={onClose} 
+            className={`p-1 rounded-md hover:${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}
+          >
+            <XIcon className="w-5 h-5" />
+          </button>
+        </div>
+        
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">제목 *</label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className={`w-full px-3 py-2 rounded-md ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-100' : 'bg-white border-gray-300 text-gray-900'} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                placeholder="작업 제목"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">설명</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className={`w-full px-3 py-2 rounded-md ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-100' : 'bg-white border-gray-300 text-gray-900'} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                placeholder="작업 설명"
+                rows={3}
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">상태</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as TaskStatus)}
+                  className={`w-full px-3 py-2 rounded-md ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-100' : 'bg-white border-gray-300 text-gray-900'} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                >
+                  <option value="todo">할 일</option>
+                  <option value="in-progress">진행 중</option>
+                  <option value="review">검토</option>
+                  <option value="done">완료</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">우선순위</label>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as "low" | "medium" | "high")}
+                  className={`w-full px-3 py-2 rounded-md ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-100' : 'bg-white border-gray-300 text-gray-900'} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                >
+                  <option value="low">낮음</option>
+                  <option value="medium">중간</option>
+                  <option value="high">높음</option>
+                </select>
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">마감일</label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className={`w-full px-3 py-2 rounded-md ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-100' : 'bg-white border-gray-300 text-gray-900'} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              />
+            </div>
+            
+            <div className="flex justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className={`px-4 py-2 rounded-md ${
+                  theme === 'dark'
+                    ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                }`}
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`px-4 py-2 rounded-md ${
+                  theme === 'dark'
+                    ? 'bg-blue-700 hover:bg-blue-600 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                } ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+              >
+                {isSubmitting ? (
+                  <span className="flex items-center">
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+                    저장 중...
+                  </span>
+                ) : '저장'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const router = useRouter();
+  const pathname = usePathname();
   const [roomId, setRoomId] = useState("");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
+  const [showNotificationPanel, setShowNotificationPanel] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
   
-  // 로컬 스토리지에서 테마 설정 불러와서 초기값으로 사용
   const savedTheme = typeof window !== 'undefined' ? 
     (localStorage.getItem('theme') as 'light' | 'dark') : null;
   const [theme, setTheme] = useState<"light" | "dark">(savedTheme || "dark");
@@ -235,7 +466,6 @@ export default function Home() {
     currentProject?.id || null
   );
 
-  // 알림 상태 관리
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationLoading, setNotificationLoading] = useState(false);
   const [notificationError, setNotificationError] = useState<string | null>(null);
@@ -246,162 +476,132 @@ export default function Home() {
   const previousNotificationsRef = useRef<Notification[]>([]);
   const initialLoadDoneRef = useRef(false);
 
-  // 테마 변경 시 localStorage에 저장하고 body 클래스 변경
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('theme', theme);
-      // document.body의 클래스를 변경하여 전체 스타일 적용 가능
       if (theme === 'dark') {
         document.documentElement.classList.add('dark-mode');
+        document.documentElement.classList.remove('light-mode');
       } else {
         document.documentElement.classList.remove('dark-mode');
+        document.documentElement.classList.add('light-mode');
       }
     }
   }, [theme]);
 
-  // 테마 토글 함수
   const toggleTheme = () => {
     setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
   };
 
-  // 알림을 가져오는 함수
-  const loadNotifications = async () => {
-    if (user) { // 사용자가 로그인된 경우에만 알림 가져오기
+  const loadNotifications = async (isPanelOpening?: boolean) => {
+    if (user) { 
+      let shouldShowLoadingOuter = false;
       try {
-        // 초기 로딩 또는 알림창이 열릴 때만 로딩 상태 표시
-        const shouldShowLoading = showNotifications && !initialLoadDoneRef.current;
-        if (shouldShowLoading) {
+        shouldShowLoadingOuter = (isPanelOpening && !initialLoadDoneRef.current) || !initialLoadDoneRef.current;
+        if (shouldShowLoadingOuter) {
           setNotificationLoading(true);
         }
         setNotificationError(null);
         
-        // 프로젝트 초대 알림 가져오기
         const invitationNotifications = await fetchProjectInvitationsAsNotifications();
-        
-        // 작업 관련 알림 가져오기
         const taskNotifications = await fetchTaskNotifications();
-        
-        // 모든 알림 병합
         const allNotifications = [...invitationNotifications, ...taskNotifications];
         
-        // 알림을 날짜순으로 정렬
         const sortedNotifications = allNotifications.sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
         
-        // 새 알림이 있는지 확인
         const newCount = sortedNotifications.length;
         const oldCount = lastNotificationCountRef.current;
         
-        // 새 알림이 추가된 경우에만 애니메이션 표시
-        if (newCount > oldCount) {
+        if (initialLoadDoneRef.current && newCount > previousNotificationsRef.current.length) {
+           const prevIds = new Set(previousNotificationsRef.current.map(n => n.id));
+           const hasTrulyNew = sortedNotifications.some(n => !prevIds.has(n.id));
+           if (hasTrulyNew) {
           setHasNewNotifications(true);
-          // 새 알림이 있을 때 소리 알림이나 브라우저 알림 표시 가능
-          // new Audio('/notification-sound.mp3').play().catch(e => console.log('알림 소리 재생 실패:', e));
+           }
         }
         
-        // 현재 알림 수 업데이트
         lastNotificationCountRef.current = newCount;
         
-        // 내용 비교를 위한 함수
         const areNotificationsEqual = (prev: Notification[], next: Notification[]) => {
           if (prev.length !== next.length) return false;
-          
-          // ID 기반으로 정렬하여 비교
           const sortById = (a: Notification, b: Notification) => a.id.localeCompare(b.id);
           const sortedPrev = [...prev].sort(sortById);
           const sortedNext = [...next].sort(sortById);
           
-          // 모든 항목 비교
           return sortedPrev.every((notification, index) => 
             notification.id === sortedNext[index].id &&
-            notification.type === sortedNext[index].type
+            notification.type === sortedNext[index].type &&
+            notification.message === sortedNext[index].message 
           );
         };
         
-        // 알림 내용이 변경된 경우에만 상태 업데이트
         if (!areNotificationsEqual(previousNotificationsRef.current, sortedNotifications)) {
           setNotifications(sortedNotifications);
-          previousNotificationsRef.current = sortedNotifications;
+          previousNotificationsRef.current = [...sortedNotifications];
         }
         
-        // 초기 로딩 완료 표시
         initialLoadDoneRef.current = true;
       } catch (err: any) {
         console.error("알림 로딩 중 오류:", err);
         setNotificationError(err.message || "알림 로딩 중 오류 발생");
       } finally {
-        // 로딩 상태 업데이트 (로딩 완료)
-        if (showNotifications && !initialLoadDoneRef.current) {
+        if (shouldShowLoadingOuter) {
           setNotificationLoading(false);
         }
       }
     }
   };
 
-  // 알림창을 열면 새 알림 표시를 리셋
   useEffect(() => {
-    if (showNotifications) {
+    if (showNotificationPanel) {
       setHasNewNotifications(false);
-      // 알림창이 열릴 때만 로딩 중 표시 (최초 한 번)
-      if (!initialLoadDoneRef.current) {
-        setNotificationLoading(true);
+      loadNotifications(true);
       }
-      loadNotifications();
-    }
-  }, [showNotifications]);
+  }, [showNotificationPanel]);
 
-  // 컴포넌트 마운트 시 알림 주기적 체크 설정 & 언마운트 시 정리
   useEffect(() => {
-    // 초기 로딩
     if (user && !authLoading) {
+      if (!initialLoadDoneRef.current) {
       loadNotifications();
+      }
     }
     
-    // 1초마다 알림 체크
     if (user && !authLoading && !notificationIntervalRef.current) {
-      // 마지막 API 호출 시간을 추적하는 변수
       let lastApiCallTime = Date.now();
       
       notificationIntervalRef.current = setInterval(() => {
         const now = Date.now();
-        // API 호출 간 최소 간격 (5초)을 설정하여 서버 부하 방지
-        // 알림창이 열려있을 때는 실시간으로 업데이트하기 위해 무시
-        if (showNotifications || now - lastApiCallTime >= 5000) {
+        if (now - lastApiCallTime >= 5000) { 
           loadNotifications();
           lastApiCallTime = now;
         }
-      }, 1000); // 1초
+      }, 1000); 
     }
     
-    // 컴포넌트 언마운트 시 인터벌 정리
     return () => {
       if (notificationIntervalRef.current) {
         clearInterval(notificationIntervalRef.current);
         notificationIntervalRef.current = null;
       }
     };
-  }, [user, authLoading, showNotifications]);
+  }, [user, authLoading]);
 
-  // Handle redirects with useEffect
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/auth/login");
     } else if (!authLoading && !projectLoading && user && !hasProjects) {
-      // 프로젝트가 없는 경우에만 프로젝트 생성 페이지로 리디렉션
       router.push("/projects/new");
     }
-    // 프로젝트가 있는 경우 현재 대시보드 페이지에 머무름
   }, [authLoading, projectLoading, user, hasProjects, router]);
 
-  // 현재 프로젝트가 선택되지 않았으면 첫 번째 프로젝트 선택
   useEffect(() => {
     if (hasProjects && !currentProject && projects.length > 0) {
       setCurrentProject(projects[0]);
     }
   }, [hasProjects, currentProject, projects, setCurrentProject]);
 
-  // 날짜 포맷팅 함수 (기존 함수 재사용 또는 개선)
   const formatDateForNotification = (dateStr: string | Date | null) => {
     if (!dateStr) return "날짜 없음";
     const date = new Date(dateStr);
@@ -420,29 +620,27 @@ export default function Home() {
     return date.toLocaleDateString("ko-KR");
   };
   
-  // 로딩 중이면 로딩 표시
   if (authLoading || projectLoading || tasksLoading) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${theme === 'dark' ? 'bg-[#1F1F21]' : 'bg-gray-50'}`}>
+      <div className={`min-h-screen flex items-center justify-center ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'}`}>
         <div className="text-center flex flex-col items-center">
-          <div className={`relative w-24 h-24 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
+          <div className={`relative w-24 h-24 ${theme === 'dark' ? 'text-blue-500' : 'text-blue-600'}`}>
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className={`w-16 h-16 border-4 border-current border-solid rounded-full opacity-20 ${theme === 'dark' ? 'border-blue-400' : 'border-blue-600'}`}></div>
+              <div className={`w-16 h-16 border-4 border-current border-solid rounded-full opacity-20 ${theme === 'dark' ? 'border-blue-500' : 'border-blue-600'}`}></div>
             </div>
             <div className="absolute inset-0 flex items-center justify-center">
               <div className={`w-16 h-16 border-4 border-current border-solid rounded-full border-t-transparent animate-spin`}></div>
             </div>
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className={`text-3xl font-bold ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>C</span>
+              <span className={`text-3xl font-bold ${theme === 'dark' ? 'text-blue-500' : 'text-blue-600'}`}>C</span>
             </div>
           </div>
-          <p className={`mt-6 text-lg font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Colla 로딩 중...</p>
+          <p className={`mt-6 text-lg font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Colla 로딩 중...</p>
         </div>
       </div>
     );
   }
 
-  // 사용자가 없거나 프로젝트가 없으면 빈 화면 렌더링 (useEffect에서 리디렉션 처리)
   if (!user || !hasProjects) {
     return null;
   }
@@ -467,178 +665,302 @@ export default function Home() {
     }
   };
 
-  // 초대 수락 처리 함수
   const handleAcceptInvitation = async (invitationId: string, projectId: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // 상위 요소 클릭 이벤트 차단
-    
-    if (processingInvitation) return; // 이미 처리 중이면 중복 실행 방지
-    
+    e.stopPropagation(); 
+    if (processingInvitation) return; 
     try {
       setProcessingInvitation(invitationId);
-      
-      // 디버깅용 로그 추가
-      console.log("초대 수락 시도:", { invitationId, projectId });
-      
-      // 초대 수락 처리
       await acceptProjectInvitation(projectId);
-      
-      // 성공 토스트 또는 알림 표시 (선택 사항)
-      // toast.success("프로젝트 초대가 수락되었습니다.");
-      
-      // 수락 성공 후 알림 목록에서 해당 초대 제거
       setNotifications(prev => prev.filter(notification => 
-        notification.type !== 'invitation' || notification.id !== invitationId)
-      );
-      
-      // 현재 알림 수 업데이트
+        !(notification.type === 'invitation' && notification.id === invitationId)
+      ));
       lastNotificationCountRef.current = Math.max(0, lastNotificationCountRef.current - 1);
-      
     } catch (error) {
       console.error("초대 수락 오류:", error);
-      // 오류 발생 시 알림 표시 가능
-      // toast.error("초대 수락 중 오류가 발생했습니다.");
     } finally {
       setProcessingInvitation(null);
-      // 알림 목록 새로고침
       loadNotifications();
     }
   };
   
-  // 초대 거절 처리 함수
   const handleRejectInvitation = async (invitationId: string, projectId: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // 상위 요소 클릭 이벤트 차단
-    
-    if (processingInvitation) return; // 이미 처리 중이면 중복 실행 방지
-    
+    e.stopPropagation(); 
+    if (processingInvitation) return; 
     try {
       setProcessingInvitation(invitationId);
-      
-      // 디버깅용 로그 추가
-      console.log("초대 거절 시도:", { invitationId, projectId });
-      
-      // 초대 거절 처리
       await rejectProjectInvitation(projectId);
-      
-      // 성공 토스트 또는 알림 표시 (선택 사항)
-      // toast.success("프로젝트 초대가 거절되었습니다.");
-      
-      // 거절 성공 후 알림 목록에서 해당 초대 제거
       setNotifications(prev => prev.filter(notification => 
-        notification.type !== 'invitation' || notification.id !== invitationId)
-      );
-      
-      // 현재 알림 수 업데이트
+        !(notification.type === 'invitation' && notification.id === invitationId)
+      ));
       lastNotificationCountRef.current = Math.max(0, lastNotificationCountRef.current - 1);
-      
     } catch (error) {
       console.error("초대 거절 오류:", error);
-      // 오류 발생 시 알림 표시 가능
-      // toast.error("초대 거절 중 오류가 발생했습니다.");
     } finally {
       setProcessingInvitation(null);
-      // 알림 목록 새로고침
       loadNotifications();
     }
   };
 
+  const handleAddTask = async (taskData: any) => {
+    try {
+      const url = taskData.projectId 
+        ? `/api/projects/${taskData.projectId}/tasks` 
+        : "/api/tasks";
+      
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(taskData),
+      });
+      
+      if (!response.ok) {
+        throw new Error("작업을 추가하는데 실패했습니다.");
+      }
+      
+      const createdTask = await response.json();
+      
+      // 작업 생성 이벤트 트리거 (새 작업 알림 용도)
+      try {
+        await fetch("/api/notifications/task-events", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            eventType: "task_created",
+            taskId: createdTask.id,
+            projectId: createdTask.projectId,
+          }),
+        });
+      } catch (notificationError) {
+        console.error("작업 생성 알림 전송 실패:", notificationError);
+      }
+      
+      alert("작업이 성공적으로 추가되었습니다.");
+    } catch (error) {
+      console.error("작업 추가 중 오류:", error);
+      throw error; // 모달에서 처리할 수 있도록 오류를 다시 던짐
+    }
+  };
+
   return (
-    <div className={`min-h-screen ${theme === 'dark' ? 'bg-[#1F1F21]' : 'bg-gray-50'}`}>
-      {/* 상단 네비게이션 바 */}
-      <nav className={`${theme === 'dark' ? 'bg-[#2A2A2C] border-gray-800' : 'bg-white border-gray-200'} border-b fixed w-full z-30`}>
-        <div className="px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center">
-            <button
-              className="md:hidden mr-2"
-              onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-            >
-              {mobileSidebarOpen ? (
-                <XIcon className={`w-6 h-6 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`} />
-              ) : (
-                <MenuIcon className={`w-6 h-6 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`} />
-              )}
-            </button>
+    <>
+      <CalendarStyles />
+      <div className={`flex h-screen ${theme === 'dark' ? 'bg-gray-900 text-gray-100' : 'bg-white text-gray-900'}`}>
+        <aside
+          className={`fixed inset-y-0 left-0 z-30 w-64 ${
+            theme === 'dark' ? 'bg-gray-800 border-r border-gray-700' : 'bg-gray-50 border-r border-gray-200'
+          } transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
+            mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          } md:relative md:flex-shrink-0 flex flex-col`}
+        >
+          <div className="flex items-center justify-between h-16 px-4 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}">
             <div className="flex items-center">
               <div className={`w-8 h-8 ${theme === 'dark' ? 'bg-blue-600' : 'bg-black'} rounded-lg flex items-center justify-center mr-2`}>
                 <span className="text-white font-bold text-lg">C</span>
               </div>
-              <span className={`text-2xl font-bold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>Colla</span>
+              <span className={`text-xl font-semibold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>Colla</span>
+            </div>
+            <button
+              className="md:hidden"
+              onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+            >
+              <XIcon className={`w-6 h-6 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`} />
+            </button>
+          </div>
+
+          <nav className="flex-grow px-4 py-4 space-y-2 overflow-y-auto">
+            <SidebarLink
+              icon={<SearchIcon className="w-5 h-5" />}
+              text="검색"
+              href="#" 
+              theme={theme}
+              onClick={(e) => { e.preventDefault(); alert('검색 기능 구현 예정'); }}
+            />
+            <SidebarLink
+              icon={<LayoutDashboardIcon className="w-5 h-5" />}
+              text="대시보드"
+              href="/"
+              active={pathname === "/"}
+              theme={theme}
+            />
+            <SidebarLink
+              icon={<BellIcon className="w-5 h-5" />}
+              text="알림"
+              href="#" 
+              theme={theme}
+              onClick={(e) => { 
+                e.preventDefault(); 
+                setShowNotificationPanel(!showNotificationPanel);
+              }}
+              badgeCount={hasNewNotifications ? 'new' : undefined}
+            />
+            <SidebarLink
+              icon={<SettingsIcon className="w-5 h-5" />}
+              text="설정"
+              href="/settings" 
+              active={pathname === "/settings"}
+              theme={theme}
+            />
+            
+            <div className="pt-4">
+              <h3 className={`px-2 text-xs font-semibold uppercase tracking-wider ${
+                theme === 'dark' ? 'text-gray-500' : 'text-gray-400'
+              }`}>
+                내 작업 공간
+              </h3>
+              <div className="mt-2 space-y-1">
+                <SidebarLink
+                  icon={<Trello className="w-5 h-5" />}
+                  text="칸반보드"
+                  href={currentProject ? `/kanban?projectId=${currentProject.id}` : "/kanban"}
+                  active={pathname?.startsWith("/kanban")}
+                  theme={theme}
+                  small
+                />
+                <SidebarLink
+                  icon={<CalendarIcon className="w-5 h-5" />}
+                  text="캘린더"
+                  href={currentProject ? `/calendar?projectId=${currentProject.id}` : "/calendar"}
+                  active={pathname?.startsWith("/calendar")}
+                  theme={theme}
+                  small
+                />
+                <SidebarLink
+                  icon={<FileTextIcon className="w-5 h-5" />}
+                  text="문서"
+                  href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
+                  active={pathname?.startsWith("/documents")}
+                  onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                    if (currentProject?.id) {
+                      e.preventDefault();
+                      fetch(`/api/projects/${currentProject.id}`)
+                        .then((response) => {
+                          if (response.ok) {
+                            router.push(`/documents?projectId=${currentProject.id}`);
+                          } else {
+                            alert("선택된 프로젝트에 접근할 수 없습니다. 일반 문서 목록으로 이동합니다.");
+                            router.push("/documents");
+                          }
+                        })
+                        .catch(() => router.push("/documents"));
+                    }
+                  }}
+                  theme={theme}
+                  small
+                />
+                <SidebarLink 
+                  icon={<UsersIcon className="w-5 h-5"/>} 
+                  text="팀원 관리" 
+                  href={currentProject ? `/projects/${currentProject.id}/members` : "/projects"}
+                  active={pathname?.includes("/projects") && pathname?.includes("/members")}
+                  theme={theme}
+                  small 
+                />
+                <SidebarLink
+                  icon={<VideoIcon className="w-5 h-5" />}
+                  text="화상 회의"
+                  href="/meeting"
+                  active={pathname?.startsWith("/meeting")}
+                  theme={theme}
+                  small
+                />
             </div>
           </div>
 
-          <div className="flex-1 mx-10 hidden md:block">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="검색..."
-                className={`w-full pl-10 pr-4 py-2 rounded-lg border ${
-                  theme === 'dark' 
-                    ? 'border-gray-700 bg-[#353538] text-gray-200' 
-                    : 'border-gray-300 bg-white text-gray-700'
-                } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-              />
-              <SearchIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
+            <div className="pt-4">
+              <h3 className={`px-2 text-xs font-semibold uppercase tracking-wider ${
+                theme === 'dark' ? 'text-gray-500' : 'text-gray-400'
+              }`}>
+                프로젝트
+              </h3>
+              <nav className="mt-2 space-y-1">
+                {projects.map((project) => (
+                  <SidebarLink
+                    key={project.id}
+                    icon={<FolderIcon className="w-5 h-5" />}
+                    text={project.name}
+                    href={`/?projectId=${project.id}`} 
+                    small
+                    active={currentProject?.id === project.id && pathname === "/"}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentProject(project);
+                      router.push(`/?projectId=${project.id}`); 
+                    }}
+                    theme={theme}
+                    isProject={true}
+                  />
+                ))}
+                <SidebarLink
+                  icon={<PlusIcon className="w-5 h-5" />}
+                  text="새 프로젝트"
+                  href="/projects/new"
+                  active={pathname === "/projects/new"}
+                  theme={theme}
+                  small
+                  onClick={() => router.push("/projects/new")}
+                />
+              </nav>
             </div>
-          </div>
+          </nav>
 
-          <div className="flex items-center space-x-4">
-            {/* 테마 전환 버튼 */}
+          <div className={`p-4 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div className="flex items-center justify-between mb-3">
             <button
               onClick={toggleTheme}
-              className={`p-2 rounded-full ${
-                theme === 'dark' 
-                  ? 'hover:bg-gray-700 text-gray-300' 
-                  : 'hover:bg-gray-100 text-gray-600'
-              } transition-colors duration-200`}
-            >
-              {theme === 'dark' ? (
-                <SunIcon className="w-5 h-5" />
-              ) : (
-                <MoonIcon className="w-5 h-5" />
-              )}
-            </button>
-            
-            <div className="relative">
-              <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                className={`relative p-2 rounded-full ${
-                  theme === 'dark'
-                    ? 'hover:bg-gray-700 text-gray-300'
-                    : 'hover:bg-gray-100 text-gray-600'
-                } transition-colors duration-200`}
+                className={`p-2 rounded-md hover:${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}
+                title={theme === 'dark' ? "라이트 모드로 변경" : "다크 모드로 변경"}
               >
-                <BellIcon className="w-5 h-5" />
-                {/* 알림 배지 개선 - 알림이 있을 때만 표시 */}
-                {notifications.length > 0 && (
-                  <span className={`absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full shadow-sm ${hasNewNotifications ? 'animate-bounce' : 'animate-pulse'}`}>
-                    {/* 실제 읽지 않은 알림 수 또는 전체 알림 수 표시 */}
-                    {notifications.filter(n => !n.isRead).length > 0 ? notifications.filter(n => !n.isRead).length : notifications.length}
-                  </span>
-                )}
+                {theme === 'dark' ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
+            </button>
+               <Link href="/mypage" className={`flex items-center p-2 rounded-md hover:${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                  <UserIcon className={`w-5 h-5 mr-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`} />
+                  <span className="text-sm">{user.name}</span>
+                </Link>
+            </div>
+              <button
+              onClick={handleLogout}
+              className={`flex items-center px-3 py-2 text-sm font-medium rounded-md w-full ${
+                  theme === 'dark'
+                  ? 'text-gray-300 hover:bg-gray-700' 
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <LogOutIcon className="w-5 h-5 mr-2" />
+              로그아웃
               </button>
-              {/* 알림창 UI 시작 */}
-              {showNotifications && (
-                <div 
-                  className={`absolute right-0 mt-2 w-80 md:w-96 ${
+          </div>
+        </aside>
+
+        {showNotificationPanel && (
+          <div 
+              className={`fixed top-0 left-0 md:left-64 h-full w-80 md:w-96 z-40 transform transition-transform duration-300 ease-in-out ${
+              showNotificationPanel ? 'translate-x-0' : '-translate-x-full'
+              } ${
                     theme === 'dark'
-                      ? 'bg-[#2A2A2C] border-gray-700'
-                      : 'bg-white border-gray-200'
-                  } rounded-lg shadow-xl border z-50 transition-opacity duration-200 ease-in-out`}
-                >
-                  <div className="p-4">
-                    <div className="flex justify-between items-center mb-3">
-                      <h3 className={`text-lg font-medium ${
-                        theme === 'dark' ? 'text-gray-100' : 'text-gray-900'
-                      }`}>알림</h3>
-                      <button onClick={() => setShowNotifications(false)} className={`text-gray-400 hover:${
-                        theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-                      }`}>
+                  ? 'bg-gray-800 border-r border-gray-700 text-gray-200'
+                  : 'bg-white border-r border-gray-300 text-gray-800'
+              } shadow-lg flex flex-col`}
+          >
+              <div className={`p-4 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}> 
+                  <div className="flex justify-between items-center">
+                  <h3 className={`text-lg font-semibold`}>알림</h3>
+                  <button 
+                      onClick={() => setShowNotificationPanel(false)} 
+                      className={`p-1 rounded-md hover:${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}
+                  >
                         <XIcon className="w-5 h-5" />
                       </button>
+                  </div>
                     </div>
                     
+              <div className="flex-grow overflow-y-auto p-4 space-y-3">
                     {notificationLoading && (
                       <div className="flex justify-center items-center py-10">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${theme === 'dark' ? 'border-blue-500' : 'border-blue-600'}`}></div>
                       </div>
                     )}
 
@@ -649,39 +971,43 @@ export default function Home() {
                     )}
 
                     {!notificationLoading && !notificationError && notifications.length === 0 && (
-                      <div className="text-center py-10 text-gray-400">
-                        <BellIcon className="w-10 h-10 mx-auto mb-2 text-gray-500" />
+                  <div className={`text-center py-10 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
+                  <BellIcon className="w-10 h-10 mx-auto mb-2" />
                         <p>새로운 알림이 없습니다.</p>
                       </div>
                     )}
 
                     {!notificationLoading && !notificationError && notifications.length > 0 && (
-                      <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {notifications.map((notification) => (
+                  notifications.map((notification) => (
                           <div 
                             key={notification.id} 
-                            className={`p-3 rounded-md flex flex-col ${notification.iconBgColor || (theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50')} transition-all duration-300 ease-in-out`}
+                      className={`p-4 rounded-lg flex flex-col transition-colors duration-150 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} border-b last:border-b-0`}
+                      onClick={() => {
+                      if (notification.type !== 'invitation') {
+                          router.push(notification.link);
+                          setShowNotificationPanel(false); 
+                      }
+                      }}
                           >
                             <div className="flex items-start">
-                              <div className={`flex-shrink-0 p-1.5 rounded-full ${notification.iconBgColor ? notification.iconBgColor.replace('bg-', 'bg-opacity-20 ') : theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} mr-3`}>
+                          <div className={`flex-shrink-0 p-2 rounded-full ${notification.iconBgColor ? notification.iconBgColor.replace('bg-', 'bg-opacity-20 ') : (theme === 'dark' ? 'bg-gray-600' : 'bg-gray-100')} mr-4`}>
                                 {notification.icon || <BellIcon className="w-5 h-5" />}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className={`text-sm font-medium ${notification.iconColor || (theme === 'dark' ? 'text-gray-200' : 'text-gray-900')}`}>{notification.title}</p>
-                                <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} mt-0.5 truncate`}>
+                          <p className={`text-sm font-semibold ${notification.iconColor || (theme === 'dark' ? 'text-gray-100' : 'text-gray-900')}`}>{notification.title}</p>
+                                  <p className={`text-xs ${theme === 'dark' ? 'text-gray-300' : 'text-gray-500'} mt-1 truncate`}>
                                   {notification.message}
                                 </p>
-                                <p className={`text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'} mt-1`}>
+                                  <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} mt-1.5`}>
                                   {formatDateForNotification(notification.createdAt)}
                                 </p>
                               </div>
                             </div>
                             
-                            {/* 초대 알림인 경우 수락/거절 버튼 표시 */}
                             {notification.type === 'invitation' && notification.projectId && (
                               <div className="mt-3 flex justify-end space-x-2">
                                 {processingInvitation === notification.id ? (
-                                  <div className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} flex items-center`}>
+                                      <div className={`text-xs flex items-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                                     <div className="mr-2 w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
                                     처리 중...
                                   </div>
@@ -691,7 +1017,7 @@ export default function Home() {
                                       onClick={(e) => handleRejectInvitation(notification.id, notification.projectId as string, e)}
                                       className={`px-3 py-1 rounded text-xs font-medium ${
                                         theme === 'dark'
-                                          ? 'bg-red-900 hover:bg-red-800 text-red-200'
+                                              ? 'bg-red-700 hover:bg-red-600 text-red-100'
                                           : 'bg-red-100 hover:bg-red-200 text-red-700'
                                       } transition-colors`}
                                     >
@@ -701,7 +1027,7 @@ export default function Home() {
                                       onClick={(e) => handleAcceptInvitation(notification.id, notification.projectId as string, e)}
                                       className={`px-3 py-1 rounded text-xs font-medium ${
                                         theme === 'dark'
-                                          ? 'bg-blue-900 hover:bg-blue-800 text-blue-200'
+                                              ? 'bg-blue-700 hover:bg-blue-600 text-blue-100'
                                           : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
                                       } transition-colors`}
                                     >
@@ -711,18 +1037,16 @@ export default function Home() {
                                 )}
                               </div>
                             )}
-                            
-                            {/* 작업 알림인 경우 바로가기 버튼 표시 */}
                             {(notification.type === 'task_created' || notification.type === 'task_updated') && (
                               <div className="mt-3 flex justify-end">
                                 <button
                                   onClick={() => {
                                     router.push(notification.link);
-                                    setShowNotifications(false);
+                                          setShowNotificationPanel(false);
                                   }}
                                   className={`px-3 py-1 rounded text-xs font-medium ${
                                     theme === 'dark'
-                                      ? 'bg-purple-900 hover:bg-purple-800 text-purple-200'
+                                          ? 'bg-purple-700 hover:bg-purple-600 text-purple-100'
                                       : 'bg-purple-100 hover:bg-purple-200 text-purple-700'
                                   } transition-colors`}
                                 >
@@ -730,582 +1054,154 @@ export default function Home() {
                                 </button>
                               </div>
                             )}
-                            
-                            {/* 일반 알림인 경우 전체 영역 클릭 시 링크 이동 */}
-                            {notification.type !== 'invitation' && notification.type !== 'task_created' && notification.type !== 'task_updated' && (
-                              <div 
-                                className="absolute inset-0 cursor-pointer"
-                                onClick={() => {
-                                  // TODO: 알림 읽음 처리 API
-                                  router.push(notification.link);
-                                  setShowNotifications(false);
-                                }}
-                              ></div>
-                            )}
                           </div>
-                        ))}
-                      </div>
+                  ))
                     )}
+              </div>
                     
-                    <div className="mt-4 text-center border-t pt-3">
+              <div className={`p-4 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} text-center`}>
                       <Link 
-                        href="/notifications" // TODO: 모든 알림 보기 페이지 경로로 수정
-                        onClick={() => setShowNotifications(false)}
-                        className="text-sm font-medium text-blue-600 hover:text-blue-800"
-                      >
-                        모든 알림 보기
+                  href="/notifications" 
+                  onClick={() => {
+                      setShowNotificationPanel(false);
+                  }}
+                  className={`text-sm font-medium ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}
+                  >
+                  모든 알림 보기 페이지로
                       </Link>
-                    </div>
                   </div>
                 </div>
               )}
-              {/* 알림창 UI 끝 */}
-            </div>
-            <div className="relative">
-              <Link href="/mypage" className="flex items-center">
-                <div className={`w-8 h-8 rounded-full ${
-                  theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
-                } flex items-center justify-center`}>
-                  <UserIcon className={`w-5 h-5 ${
-                    theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-                  }`} />
-                </div>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
 
-      {/* 사이드바 및 메인 콘텐츠 */}
-      <div className="flex pt-16">
-        {/* 사이드바 - 모바일에서는 오버레이로 표시 */}
-        <aside
-          className={`fixed inset-y-0 left-0 z-20 w-64 ${
-            theme === 'dark'
-              ? 'bg-[#2A2A2C] border-gray-800'
-              : 'bg-white border-gray-200'
-          } border-r transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
-            mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
-          } md:relative md:w-64 md:flex-shrink-0`}
-        >
-          <div className="h-full overflow-y-auto">
-            <div className="px-4 py-5">
-              <nav className="space-y-1">
-                <SidebarLink
-                  icon={<HomeIcon className="w-5 h-5" />}
-                  text="홈"
-                  href="/"
-                  active={true}
-                  theme={theme}
-                />
-                <SidebarLink
-                  icon={<VideoIcon className="w-5 h-5" />}
-                  text="화상 회의"
-                  href="/meeting"
-                  theme={theme}
-                />
-                <SidebarLink
-                  icon={<Trello className="w-5 h-5" />}
-                  text="칸반보드"
-                  href={
-                    currentProject
-                      ? `/kanban?projectId=${currentProject.id}`
-                      : "/kanban"
-                  }
-                  theme={theme}
-                />
-                <SidebarLink
-                  icon={<FileTextIcon className="w-5 h-5" />}
-                  text="문서"
-                  href={
-                    currentProject?.id
-                      ? `/documents?projectId=${currentProject.id}`
-                      : "/documents"
-                  }
-                  onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                    if (currentProject?.id) {
-                      e.preventDefault();
-                      console.log(
-                        "사이드바에서 문서 클릭, 프로젝트 ID:",
-                        currentProject.id
-                      );
-
-                      // 유효한 프로젝트 ID인지 확인 후 이동
-                      fetch(`/api/projects/${currentProject.id}`)
-                        .then((response) => {
-                          if (response.ok) {
-                            router.push(
-                              `/documents?projectId=${currentProject.id}`
-                            );
-                          } else {
-                            console.error(
-                              "유효하지 않은 프로젝트 ID:",
-                              currentProject.id
-                            );
-                            alert(
-                              "선택된 프로젝트에 접근할 수 없습니다. 일반 문서 목록으로 이동합니다."
-                            );
-                            router.push("/documents");
-                          }
-                        })
-                        .catch((error) => {
-                          console.error("프로젝트 확인 중 오류:", error);
-                          router.push("/documents");
-                        });
-                    }
-                  }}
-                  theme={theme}
-                />
-                <SidebarLink
-                  icon={<CalendarIcon className="w-5 h-5" />}
-                  text="일정"
-                  href="/calendar"
-                  theme={theme}
-                />
-                <SidebarLink
-                  icon={<MessageSquareIcon className="w-5 h-5" />}
-                  text="메시지"
-                  href="/messages"
-                  theme={theme}
-                />
-                <SidebarLink
-                  icon={<BarChart3Icon className="w-5 h-5" />}
-                  text="보고서"
-                  href="/reports"
-                  theme={theme}
-                />
-                <SidebarLink
-                  icon={<UsersIcon className="w-5 h-5" />}
-                  text="팀원 관리"
-                  href={
-                    currentProject
-                      ? `/projects/${currentProject.id}/members`
-                      : "/projects"
-                  }
-                  theme={theme}
-                />
-                <SidebarLink
-                  icon={<BellIcon className="w-5 h-5" />}
-                  text="초대 확인"
-                  href="/projects/invitations"
-                  theme={theme}
-                />
-              </nav>
-
-              <div className="mt-8">
-                <h3 className={`px-3 text-xs font-semibold uppercase tracking-wider ${
-                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                }`}>
-                  프로젝트
-                </h3>
-                <nav className="mt-2 space-y-1">
-                  {projects.map((project) => (
-                    <SidebarLink
-                      key={project.id}
-                      icon={<FolderIcon className="w-5 h-5" />}
-                      text={project.name}
-                      href="/"
-                      small
-                      active={currentProject?.id === project.id}
-                      onClick={() => {
-                        setCurrentProject(project);
-                        router.push("/");
-                      }}
-                      theme={theme}
-                    />
-                  ))}
-                </nav>
-              </div>
-
-              <div className="mt-8">
+        <div className={`flex-1 flex flex-col overflow-hidden ${showNotificationPanel ? 'pl-80 md:pl-96' : ''} transition-all duration-300 ease-in-out`}>
+          <header className={`h-16 flex items-center justify-between px-6 border-b ${
+            theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200' 
+          } shadow-sm`}>
+            <div className="flex items-center">
                 <button
-                  onClick={() => router.push("/projects/new")}
-                  className={`flex items-center px-3 py-2 text-sm font-medium rounded-md w-full ${
-                    theme === 'dark' 
-                      ? 'text-gray-300 hover:bg-gray-700' 
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  <PlusIcon className="w-5 h-5 mr-2" />새 프로젝트
+                className="md:hidden mr-4 -ml-2 p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700"
+                onClick={() => setMobileSidebarOpen(true)}
+              >
+                <MenuIcon className="w-6 h-6" />
                 </button>
+              <h1 className="text-xl font-semibold">{currentProject?.name || "대시보드"}</h1>
               </div>
-
-              <div className={`absolute bottom-0 left-0 right-0 p-4 border-t ${theme === 'dark' ? 'border-gray-800' : 'border-gray-200'}`}>
-                <div className="mb-3 flex justify-between items-center">
-                  <button 
-                    onClick={toggleTheme} 
-                    className={`flex items-center px-3 py-2 text-sm font-medium ${
-                      theme === 'dark' 
-                        ? 'text-gray-300 hover:bg-gray-700'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    } rounded-md w-full`}
-                  >
-                    {theme === 'dark' ? (
-                      <>
-                        <SunIcon className="w-5 h-5 mr-2" />
-                        라이트 모드
-                      </>
-                    ) : (
-                      <>
-                        <MoonIcon className="w-5 h-5 mr-2" />
-                        다크 모드
-                      </>
-                    )}
-                  </button>
-                </div>
-                <button className={`flex items-center px-3 py-2 text-sm font-medium ${
-                  theme === 'dark' 
-                    ? 'text-gray-300 hover:bg-gray-700'
-                    : 'text-gray-600 hover:bg-gray-100'
-                } rounded-md w-full`}>
-                  <SettingsIcon className="w-5 h-5 mr-2" />
-                  설정
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className={`flex items-center px-3 py-2 text-sm font-medium ${
-                    theme === 'dark' 
-                      ? 'text-gray-300 hover:bg-gray-700'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  } rounded-md w-full mt-2`}
-                >
-                  <LogOutIcon className="w-5 h-5 mr-2" />
-                  로그아웃
-                </button>
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        {/* 메인 콘텐츠 영역 */}
-        <main className="flex-1 p-6 overflow-y-auto">
-          {/* 대시보드 헤더 */}
-          <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>대시보드</h1>
-              <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                안녕하세요, {user.name}님! {currentProject?.name || "프로젝트"}
-                의 업무를 확인하세요
-              </p>
-            </div>
-            <div className="mt-4 md:mt-0 flex space-x-3">
+            {/* <div className="flex items-center space-x-3">
               <button
                 onClick={createNewMeeting}
-                className={`flex items-center justify-center gap-2 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex items-center justify-center gap-2 text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
                   theme === 'dark'
-                    ? 'bg-blue-800 hover:bg-blue-700'
-                    : 'bg-blue-600 hover:bg-blue-700'
+                      ? 'bg-blue-700 hover:bg-blue-600 text-white'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
                 }`}
               >
                 <VideoIcon className="w-4 h-4" />새 회의
               </button>
-              <Link
-                href="/kanban/new"
-                className={`flex items-center justify-center gap-2 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  <button
+                className={`flex items-center justify-center gap-2 text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
                   theme === 'dark'
-                    ? 'bg-purple-800 hover:bg-purple-700'
-                    : 'bg-purple-600 hover:bg-purple-700'
+                    ? 'bg-green-600 hover:bg-green-500 text-white'
+                    : 'bg-green-500 hover:bg-green-600 text-white'
                 }`}
+                onClick={() => alert('새 작업/문서 생성 기능 구현 예정')}
               >
-                <Trello className="w-4 h-4" />새 보드
-              </Link>
-              <Link
-                href={
-                  currentProject?.id
-                    ? `/documents/new?projectId=${currentProject.id}`
-                    : "/documents/new"
-                }
-                className={`flex items-center justify-center gap-2 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  theme === 'dark'
-                    ? 'bg-green-800 hover:bg-green-700'
-                    : 'bg-green-600 hover:bg-green-700'
-                }`}
-                onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                  if (currentProject?.id) {
-                    e.preventDefault();
+                <PlusIcon className="w-4 h-4" /> 만들기
+                  </button>
+            </div> */}
+          </header>
 
-                    // 프로젝트 ID가 유효한지 먼저 확인
-                    console.log(
-                      "대시보드에서 새 문서 버튼 클릭, 프로젝트 ID:",
-                      currentProject.id
-                    );
-
-                    // 유효한 프로젝트 ID인지 확인 후 이동
-                    fetch(`/api/projects/${currentProject.id}`)
-                      .then((response) => {
-                        if (response.ok) {
-                          router.push(
-                            `/documents/new?projectId=${currentProject.id}`
-                          );
-                        } else {
-                          console.error(
-                            "유효하지 않은 프로젝트 ID:",
-                            currentProject.id
-                          );
-                          alert(
-                            "현재 선택된 프로젝트에 접근할 수 없습니다. 다른 프로젝트를 선택하세요."
-                          );
-                          router.push("/documents/new");
-                        }
-                      })
-                      .catch((error) => {
-                        console.error("프로젝트 확인 중 오류:", error);
-                        router.push("/documents/new");
-                      });
-                  }
-                }}
-              >
-                <FileTextIcon className="w-4 h-4" />새 문서
-              </Link>
-              <Link
-                href={
-                  currentProject
-                    ? `/projects/${currentProject.id}/members`
-                    : "/projects"
-                }
-                className={`flex items-center justify-center gap-2 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  theme === 'dark'
-                    ? 'bg-yellow-800 hover:bg-yellow-700'
-                    : 'bg-yellow-600 hover:bg-yellow-700'
-                }`}
-              >
-                <UsersIcon className="w-4 h-4" />
-                팀원 관리
-              </Link>
-            </div>
+          <main className={`flex flex-col flex-1 p-6 lg:p-8 overflow-y-auto bg-opacity-50 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
+            <div className="mb-8">
+              <h2 className="text-3xl font-bold mb-2">안녕하세요, {user.name}님!</h2>
+              <p className={`text-lg ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                
+                </p>
           </div>
 
-          {/* 새로운 섹션: 프로젝트 팀 */}
-          {currentProject && (
-            <div className={`${theme === 'dark' ? 'bg-[#2A2A2C]' : 'bg-white'} rounded-lg shadow-sm p-4 mb-6`}>
-              <div className="flex justify-between items-center mb-4">
-                <h2 className={`text-lg font-medium ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>
-                  프로젝트 팀
-                </h2>
-                <Link
-                  href={`/projects/${currentProject.id}/members`}
-                  className={`text-sm flex items-center ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
-                >
-                  <UsersIcon className="w-4 h-4 mr-1" />
-                  팀원 관리
-                </Link>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex -space-x-2">
-                  {/* 프로젝트 소유자 아바타 */}
-                  {currentProject.user && (
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white border-2 z-10 ${
-                      theme === 'dark' 
-                        ? 'bg-blue-700 border-gray-800' 
-                        : 'bg-blue-600 border-white'
-                    }`}>
-                      {currentProject.user.name.charAt(0)}
-                    </div>
-                  )}
-
-                  {/* 팀원 아바타 (최대 3명) */}
-                  {currentProject.members &&
-                    currentProject.members
-                      .filter((member) => member.inviteStatus === "accepted")
-                      .slice(0, 3)
-                      .map((member, index) => (
-                        <div
-                          key={member.id}
-                          className={`w-10 h-10 rounded-full flex items-center justify-center text-white border-2 ${
-                            theme === 'dark' 
-                              ? 'bg-gray-600 border-gray-800' 
-                              : 'bg-gray-400 border-white'
-                          }`}
-                          style={{ zIndex: 10 - index }}
-                        >
-                          {member.user?.name.charAt(0)}
-                        </div>
-                      ))}
-
-                  {/* 추가 팀원 수 표시 */}
-                  {currentProject.members &&
-                    currentProject.members.filter(
-                      (m) => m.inviteStatus === "accepted"
-                    ).length > 3 && (
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
-                        theme === 'dark' 
-                          ? 'bg-gray-700 text-gray-300 border-gray-800' 
-                          : 'bg-gray-300 text-gray-600 border-white'
-                      }`}>
-                        +
-                        {currentProject.members.filter(
-                          (m) => m.inviteStatus === "accepted"
-                        ).length - 3}
-                      </div>
-                    )}
+            <div className="grid grid-cols-1 min-[1400px]:grid-cols-12 min-[1400px]:grid-rows-[auto_1fr] gap-8 flex-1">
+              {/* 1. 빠른 실행 (Mobile: 1st, Desktop: Top-Left, Col Span 6) */}
+              <DashboardWidget
+                title="빠른 실행"
+                theme={theme}
+                className="order-1 min-[1400px]:order-1 min-[1400px]:col-span-6"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <QuickActionButton icon={<PlusIcon />} text="새 작업 만들기" onClick={() => setShowTaskModal(true)} theme={theme} large />
+                  <QuickActionButton icon={<FileTextIcon />} text="새 문서 만들기" onClick={() => router.push(currentProject ? `/documents/new?projectId=${currentProject.id}` : '/documents/new')} theme={theme} large />
+                  <form onSubmit={joinMeeting} className="sm:col-span-2 flex gap-3 items-center">
+                    <input
+                      type="text"
+                      value={roomId}
+                      onChange={(e) => setRoomId(e.target.value)}
+                      placeholder="회의 코드로 바로 참여"
+                      className={`flex-1 px-4 py-3 text-base rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none ${theme === 'dark' ? 'border border-gray-700 bg-gray-700 text-gray-200 placeholder-gray-500' : 'border border-gray-300 bg-white text-gray-700 placeholder-gray-400'}`}
+                    />
+                    <button
+                      type="submit"
+                      className={`px-5 py-3 text-base font-medium rounded-lg transition-colors ${theme === 'dark' ? 'bg-blue-700 hover:bg-blue-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                    >
+                      회의 참여
+                    </button>
+                  </form>
                 </div>
+              </DashboardWidget>
 
-                <Link
-                  href={`/projects/${currentProject.id}/members`}
-                  className={`flex items-center ${
-                    theme === 'dark' 
-                      ? 'text-blue-400 hover:text-blue-300' 
-                      : 'text-blue-600 hover:text-blue-800'
-                  }`}
-                >
-                  <UserPlusIcon className="w-5 h-5 mr-1" />
-                  팀원 초대
-                </Link>
-              </div>
-            </div>
-          )}
-
-          {/* 빠른 액세스 - 회의 참여 */}
-          <div className={`${theme === 'dark' ? 'bg-[#2A2A2C]' : 'bg-white'} rounded-lg shadow-sm p-4 mb-6`}>
-            <h2 className={`text-lg font-medium mb-3 ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>
-              빠른 회의 참여
-            </h2>
-            <form onSubmit={joinMeeting} className="flex gap-2">
-              <input
-                type="text"
-                value={roomId}
-                onChange={(e) => setRoomId(e.target.value)}
-                placeholder="회의 코드 입력"
-                className={`flex-1 px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none ${
-                  theme === 'dark' 
-                    ? 'border border-gray-700 bg-[#353538] text-gray-200' 
-                    : 'border border-gray-300 bg-white text-gray-700'
-                }`}
-              />
-              <button
-                type="submit"
-                className={`${
-                  theme === 'dark' ? 'bg-blue-800 hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'
-                } text-white px-4 py-2 rounded-lg transition-colors`}
+              {/* 2. 나에게 할당된 작업 (Mobile: 2nd, Desktop: Top-Right, Col Span 6) */}
+              <DashboardWidget
+                title="나에게 할당된 작업"
+                viewAllLink="/kanban"
+                theme={theme}
+                className="order-2 min-[1400px]:order-2 min-[1400px]:col-span-6"
               >
-                참여하기
-              </button>
-            </form>
-          </div>
+                <SimplifiedKanbanBoard theme={theme} />
+              </DashboardWidget>
 
-          {/* 대시보드 그리드 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* 간략한 칸반 보드 */}
-            <div className={`${theme === 'dark' ? 'bg-[#2A2A2C]' : 'bg-white'} rounded-lg shadow-sm p-4 lg:col-span-2`}>
-              <div className="flex justify-between items-center mb-4">
-                <h2 className={`text-lg font-medium ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>칸반 보드</h2>
-                <Link
-                  href="/kanban"
-                  className={`text-sm ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
-                >
-                  전체 보기
-                </Link>
-              </div>
-              <SimplifiedKanbanBoard theme={theme} />
-            </div>
+              {/* 3. 다가오는 일정 (Mobile: 3rd, Desktop: Bottom-Left, Col Span 6) */}
+              <DashboardWidget
+                title="다가오는 일정"
+                viewAllLink="/calendar"
+                theme={theme}
+                className="order-3 min-[1400px]:order-3 min-[1400px]:col-span-6 h-full"
+              >
+                <UpcomingEvents theme={theme} />
+              </DashboardWidget>
 
-            {/* 예정된 일정 */}
-            <div className={`${theme === 'dark' ? 'bg-[#2A2A2C]' : 'bg-white'} rounded-lg shadow-sm p-4`}>
-              <div className="flex justify-between items-center mb-4">
-                <h2 className={`text-lg font-medium ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>
-                  예정된 일정
-                </h2>
-                <Link
-                  href="/calendar"
-                  className={`text-sm flex items-center ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
-                >
-                  <CalendarIcon className="w-4 h-4 mr-1" />
-                  캘린더
-                </Link>
-              </div>
-              
-            </div>
-
-            {/* 최근 문서 */}
-            <div className={`${theme === 'dark' ? 'bg-[#2A2A2C]' : 'bg-white'} rounded-lg shadow-sm p-4`}>
-              <div className="flex justify-between items-center mb-4">
-                <h2 className={`text-lg font-medium ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>최근 문서</h2>
-                <Link
-                  href={
-                    currentProject
-                      ? `/documents?projectId=${currentProject.id}`
-                      : "/documents"
-                  }
-                  className={`text-sm ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
-                  onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                    if (currentProject) {
-                      e.preventDefault();
-                      console.log(
-                        "최근 문서 모두 보기 클릭, 프로젝트 ID:",
-                        currentProject.id
-                      );
-                      router.push(`/documents?projectId=${currentProject.id}`);
-                    }
-                  }}
-                >
-                  모두 보기
-                </Link>
-              </div>
-              <RecentDocuments projectId={currentProject?.id} theme={theme} />
-            </div>
-
-            {/* 활성 칸반보드 */}
-            <div className={`${theme === 'dark' ? 'bg-[#2A2A2C]' : 'bg-white'} rounded-lg shadow-sm p-4`}>
-              <div className="flex justify-between items-center mb-4">
-                <h2 className={`text-lg font-medium ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>
-                  활성 칸반보드
-                </h2>
-                <Link
-                  href="/kanban"
-                  className={`text-sm ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
-                >
-                  모두 보기
-                </Link>
-              </div>
-              <div className="space-y-3">
-                <KanbanItem
-                  title="마케팅 캠페인"
-                  tasks={{ total: 12, completed: 9 }}
-                  icon={<Trello className={`w-4 h-4 ${theme === 'dark' ? 'text-purple-400' : 'text-purple-600'}`} />}
+              {/* 4. 최근 문서 & 최근 회의 컨테이너 (Mobile: 4th & 5th sequentially, Desktop: Bottom-Right, Col Span 6) */}
+              <div className="order-4 min-[1400px]:order-4 min-[1400px]:col-span-6 flex flex-col gap-8 h-full">
+                {/* 4a. 최근 문서 */}
+                <DashboardWidget
+                  title="최근 문서"
+                  viewAllLink={currentProject ? `/documents?projectId=${currentProject.id}` : "/documents"}
                   theme={theme}
-                />
-
-                <KanbanItem
-                  title="웹사이트 리디자인"
-                  tasks={{ total: 8, completed: 3 }}
-                  icon={<Trello className={`w-4 h-4 ${theme === 'dark' ? 'text-purple-400' : 'text-purple-600'}`} />}
-                  theme={theme}
-                />
-
-                <KanbanItem
-                  title="모바일 앱 개발"
-                  tasks={{ total: 15, completed: 7 }}
-                  icon={<Trello className={`w-4 h-4 ${theme === 'dark' ? 'text-purple-400' : 'text-purple-600'}`} />}
-                  theme={theme}
-                />
-
-                <KanbanItem
-                  title="고객 피드백 처리"
-                  tasks={{ total: 5, completed: 2 }}
-                  icon={<Trello className={`w-4 h-4 ${theme === 'dark' ? 'text-purple-400' : 'text-purple-600'}`} />}
-                  theme={theme}
-                />
-              </div>
-            </div>
-
-            {/* 최근 회의 */}
-            <div className={`${theme === 'dark' ? 'bg-[#2A2A2C]' : 'bg-white'} rounded-lg shadow-sm p-4`}>
-              <div className="flex justify-between items-center mb-4">
-                <h2 className={`text-lg font-medium ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>최근 회의</h2>
-                <Link
-                  href="/meeting"
-                  className={`text-sm ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
+                  className="flex-1"
                 >
-                  모두 보기
-                </Link>
+                  <RecentDocuments projectId={currentProject?.id} theme={theme} />
+                </DashboardWidget>
+
+                {/* 4b. 최근 회의 */}
+                <DashboardWidget
+                  title="최근 회의"
+                  viewAllLink="/meeting/records"
+                  theme={theme}
+                  className="flex-1"
+                >
+                  <RecentMeetings theme={theme} />
+                </DashboardWidget>
               </div>
-              <RecentMeetings theme={theme} />
             </div>
-          </div>
-        </main>
-      </div>
-    </div>
+          </main>
+        </div> {/* flex-1 flex flex-col overflow-hidden ... 의 닫는 태그 */}
+
+        {/* 작업 생성 모달 */}
+        <TaskCreateModal 
+          isOpen={showTaskModal} 
+          onClose={() => setShowTaskModal(false)} 
+          onSubmit={handleAddTask}
+          projectId={currentProject?.id}
+          theme={theme}
+        />
+      </div> {/* flex h-screen ... 의 닫는 태그 */}
+    </> // 최상위 Fragment 닫는 태그
   );
 }
 
@@ -1316,7 +1212,9 @@ function SidebarLink({
   active = false,
   small = false,
   onClick,
-  theme = "dark"
+  theme = "dark", 
+  badgeCount,
+  isProject = false // 프로젝트 링크인지 여부를 확인하는 새 prop
 }: {
   icon: React.ReactNode;
   text: string;
@@ -1325,193 +1223,122 @@ function SidebarLink({
   small?: boolean;
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
   theme?: "light" | "dark";
+  badgeCount?: string | number;
+  isProject?: boolean;
 }) {
+  // 활성 상태의 프로젝트를 위한 배경색 계산
+  const activeProjectBg = theme === 'dark' 
+    ? 'bg-blue-900 bg-opacity-30' // 다크 모드: 짙은 파란색 배경 (투명도 30%)
+    : 'bg-blue-100 bg-opacity-50'; // 라이트 모드: 연한 파란색 배경 (투명도 50%)
+    
   return (
     <Link
       href={href}
       onClick={onClick}
-      className={`flex items-center px-3 py-2 ${
-        small ? "text-sm" : "text-base"
-      } font-medium rounded-md ${
+      className={`flex items-center justify-between px-2 py-1.5 ${small ? "text-sm" : "text-[15px]"} rounded-md transition-colors duration-150 ${
         theme === 'dark'
-          ? (active ? "bg-blue-900 text-blue-300" : "text-gray-300 hover:bg-gray-700")
-          : (active ? "bg-blue-50 text-blue-600" : "text-gray-600 hover:bg-gray-100")
+          ? active && isProject
+            ? `${activeProjectBg} text-gray-300 hover:bg-gray-700 hover:text-gray-100` // 활성 프로젝트: 투명한 파란색 배경
+            : "text-gray-300 hover:bg-gray-700 hover:text-gray-100" // 일반/활성 상태: 텍스트 색상 동일
+          : active && isProject
+            ? `${activeProjectBg} text-gray-600 hover:bg-gray-200 hover:text-gray-900` // 활성 프로젝트: 투명한 파란색 배경
+            : "text-gray-600 hover:bg-gray-200 hover:text-gray-900" // 일반/활성 상태: 텍스트 색상 동일
       }`}
     >
-      <div className={`${small ? "mr-2" : "mr-3"}`}>{icon}</div>
-      {text}
-    </Link>
-  );
-}
-
-function ProjectCard({
-  title,
-  description,
-  progress,
-  type,
-  icon,
-  link,
-  upcoming = false,
-}: {
-  title: string;
-  description: string;
-  progress: number;
-  type: string;
-  icon: React.ReactNode;
-  link: string;
-  upcoming?: boolean;
-}) {
-  return (
-    <Link href={link} className="block">
-      <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-        <div className="flex justify-between items-start mb-2">
           <div className="flex items-center">
-            <div className="mr-2">{icon}</div>
-            <span className="text-xs font-medium text-gray-500">{type}</span>
+        <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{icon}</div>
+        <span>{text}</span>
           </div>
-          {upcoming && (
-            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-              예정됨
+      {badgeCount && (
+        <span className={`px-1.5 py-0.5 text-xs font-semibold rounded-full ${badgeCount === 'new' ? (theme === 'dark' ? 'bg-red-500 text-white' : 'bg-red-500 text-white') : (theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-700')}`}>
+          {badgeCount === 'new' ? '' : badgeCount}
             </span>
           )}
-        </div>
-        <h3 className="font-semibold text-gray-900 mb-1">{title}</h3>
-        <p className="text-sm text-gray-600 mb-3">{description}</p>
-        {progress > 0 && (
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div
-              className="bg-blue-600 h-2 rounded-full"
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
+    </Link>
+  );
+}
+
+function DashboardWidget({ 
+  title,
+  children, 
+  className = "",
+  viewAllLink,
+  theme
+}: {
+  title: string;
+  children: React.ReactNode; 
+  className?: string;
+  viewAllLink?: string;
+  theme: "light" | "dark";
+}) {
+  return (
+    <div className={`rounded-xl shadow-sm ${theme === 'dark' ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'} p-6 flex flex-col ${className}`}>
+      <div className="flex justify-between items-center mb-5">
+        <h3 className={`text-xl font-semibold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>{title}</h3>
+        {viewAllLink && (
+          <Link href={viewAllLink} className={`text-base font-medium ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}>
+            모두 보기
+          </Link>
         )}
-      </div>
-    </Link>
-  );
-}
-
-function ScheduleItem({
-  title,
-  time,
-  type,
-  icon,
-}: {
-  title: string;
-  time: string;
-  type: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
-      <div className="flex items-center">
-        <div className="mr-3 p-2 bg-gray-100 rounded-full">{icon}</div>
-        <div>
-          <h4 className="font-medium text-gray-900">{title}</h4>
-          <p className="text-sm text-gray-500">{time}</p>
         </div>
-      </div>
-      <span className="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded-full">
-        {type}
-      </span>
+      <div className="flex-1 overflow-y-auto">{children}</div>
     </div>
   );
 }
 
-function DocumentItem({
-  title,
-  updatedAt,
+function QuickActionButton({ 
   icon,
+  text, 
+  onClick,
+  theme = "dark",
+  large = false
 }: {
-  title: string;
-  updatedAt: string;
   icon: React.ReactNode;
-}) {
-  // 현재 프로젝트 ID 가져오기
-  const { currentProject } = useProject();
-  const router = useRouter();
-
-  return (
-    <div
-      onClick={() => {
-        const url = `/documents/${title.toLowerCase().replace(/\s+/g, "-")}${
-          currentProject ? `?projectId=${currentProject.id}` : ""
-        }`;
-        console.log("문서 아이템 클릭:", {
-          title,
-          url,
-          projectId: currentProject?.id,
-        });
-        router.push(url);
-      }}
-      className="flex items-center p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer"
-    >
-      <div className="mr-3 p-2 bg-gray-100 rounded-full">{icon}</div>
-      <div>
-        <h4 className="font-medium text-gray-900">{title}</h4>
-        <p className="text-sm text-gray-500">수정됨: {updatedAt}</p>
-      </div>
-    </div>
-  );
-}
-
-function KanbanItem({
-  title,
-  tasks,
-  icon,
-  theme = "dark"
-}: {
-  title: string;
-  tasks: { total: number; completed: number };
-  icon: React.ReactNode;
+  text: string; 
+  onClick: () => void;
   theme?: "light" | "dark";
+  large?: boolean;
 }) {
-  const percentage = Math.round((tasks.completed / tasks.total) * 100);
-
   return (
-    <Link
-      href={`/kanban/${title.toLowerCase().replace(/\s+/g, "-")}`}
-      className="block"
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center px-4 py-3 text-base font-medium rounded-lg transition-colors ${theme === 'dark' ? 'text-gray-200 bg-gray-750 hover:bg-gray-700' : 'text-gray-700 bg-gray-100 hover:bg-gray-200'} ${large ? 'sm:py-4 sm:text-lg' : ''}`}
     >
-      <div className={`flex items-center p-3 rounded-lg ${
-        theme === 'dark'
-          ? 'border border-gray-700 hover:bg-gray-800'
-          : 'border border-gray-100 hover:bg-gray-50'
-      }`}>
-        <div className={`mr-3 p-2 rounded-full ${
-          theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
-        }`}>{icon}</div>
-        <div className="flex-1">
-          <h4 className={`font-medium ${
-            theme === 'dark' ? 'text-gray-200' : 'text-gray-900'
-          }`}>{title}</h4>
-          <div className="flex items-center justify-between">
-            <p className={`text-sm ${
-              theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-            }`}>
-              {tasks.completed}/{tasks.total} 작업 완료
-            </p>
-            <span className={`text-xs font-medium ${
-              theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
-            }`}>
-              {percentage}%
-            </span>
-          </div>
-          <div className={`w-full rounded-full h-1.5 mt-1 ${
-            theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
-          }`}>
-            <div
-              className={`${theme === 'dark' ? 'bg-purple-500' : 'bg-purple-600'} h-1.5 rounded-full`}
-              style={{ width: `${percentage}%` }}
-            ></div>
-          </div>
-        </div>
-      </div>
-    </Link>
+      <div className={`mr-3 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{icon}</div>
+      {text}
+    </button>
   );
 }
 
-// 최근 회의 컴포넌트
-function RecentMeetings({ theme = "dark" }: { theme?: "light" | "dark" }) {
+function UserAvatar({ 
+  name, 
+  imageUrl, 
+  theme = "dark",
+  isOwner = false,
+  style,
+  size = 'normal'
+}: { 
+  name: string; 
+  imageUrl?: string; 
+  theme?: "light" | "dark";
+  isOwner?: boolean;
+  style?: React.CSSProperties;
+  size?: 'normal' | 'large';
+}) {
+  const initials = name.charAt(0).toUpperCase();
+  const sizeClasses = size === 'large' ? 'w-10 h-10 text-base' : 'w-8 h-8 text-sm';
+  return (
+    <div 
+      title={name}
+      style={style}
+      className={`${sizeClasses} rounded-full flex items-center justify-center font-semibold border-2 ${isOwner ? (theme === 'dark' ? 'bg-blue-600 border-gray-800 text-white' : 'bg-blue-500 border-white text-white') : (theme === 'dark' ? 'bg-gray-600 border-gray-800 text-gray-200' : 'bg-gray-300 border-white text-gray-700')}`}
+    >
+      {imageUrl ? <Image src={imageUrl} alt={name} width={size === 'large' ? 40 : 32} height={size === 'large' ? 40 : 32} className="rounded-full" /> : initials}
+          </div>
+  );
+}
+
+function RecentMeetings({ theme }: { theme: "light" | "dark" }) {
   const [meetings, setMeetings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1522,124 +1349,57 @@ function RecentMeetings({ theme = "dark" }: { theme?: "light" | "dark" }) {
       try {
         setLoading(true);
         const response = await fetch('/api/meetings');
-        
-        if (!response.ok) {
-          throw new Error('회의 목록을 불러오는데 실패했습니다');
-        }
-        
+        if (!response.ok) throw new Error('회의 목록을 불러오는데 실패했습니다');
         const result = await response.json();
-        // 최근 4개의 회의만 표시
-        setMeetings(result.data.slice(0, 4));
+        setMeetings(result.data.slice(0, 3)); 
         setError(null);
       } catch (err) {
-        console.error("최근 회의 로딩 오류:", err);
         setError('회의 목록을 불러오는데 실패했습니다');
         setMeetings([]);
       } finally {
         setLoading(false);
       }
     };
-
     fetchMeetings();
   }, []);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return new Intl.DateTimeFormat("ko-KR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    }).format(date);
+    return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium" }).format(date);
   };
 
   const getParticipantCount = (participants: any) => {
     if (!participants) return 0;
     try {
-      // JSON string이라면 파싱
-      const parsedParticipants = typeof participants === 'string' 
-        ? JSON.parse(participants) 
-        : participants;
-      
+      const parsedParticipants = typeof participants === 'string' ? JSON.parse(participants) : participants;
       return Array.isArray(parsedParticipants) ? parsedParticipants.length : 0;
-    } catch (error) {
-      console.error("참가자 정보 파싱 오류:", error);
-      return 0;
-    }
+    } catch { return 0; }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center py-6">
-        <div className={`animate-spin rounded-full h-6 w-6 border-b-2 ${
-          theme === 'dark' ? 'border-blue-500' : 'border-blue-600'
-        }`}></div>
-      </div>
-    );
-  }
+  if (loading) return <div className={`flex justify-center items-center py-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}> 로딩 중...</div>;
+  if (error) return <div className={`text-center py-4 ${theme === 'dark' ? 'text-red-400' : 'text-red-500'}`}>{error}</div>;
+  if (meetings.length === 0) return <div className={`text-center py-4 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>회의 기록 없음</div>;
 
-  if (error) {
     return (
-      <div className={`text-center py-6 ${
-        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-      }`}>
-        <p>{error}</p>
-      </div>
-    );
-  }
-
-  if (meetings.length === 0) {
-    return (
-      <div className={`text-center py-6 ${
-        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-      }`}>
-        <p className="mb-4">아직 회의 기록이 없습니다</p>
-        <button
-          onClick={() => {
-            const newRoomId = uuidv4().substring(0, 8);
-            router.push(`/meeting/${newRoomId}`);
-          }}
-          className={`inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white rounded-md ${
-            theme === 'dark' ? 'bg-blue-800 hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'
-          }`}
-        >
-          <VideoIcon className="w-4 h-4 mr-2" />
-          새 회의 시작하기
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {meetings.map((meeting) => (
         <div
           key={meeting.id}
           onClick={() => router.push(`/meeting/records/${meeting.id}`)}
-          className={`flex items-center p-3 rounded-lg cursor-pointer ${
-            theme === 'dark'
-              ? 'border border-gray-700 hover:bg-gray-800'
-              : 'border border-gray-100 hover:bg-gray-50'
-          }`}
+          className={`flex items-center p-2.5 rounded-lg cursor-pointer transition-colors ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
         >
-          <div className={`mr-3 p-2 rounded-full ${
-            theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
-          }`}>
-            <VideoIcon className={`w-4 h-4 ${
-              theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
-            }`} />
+          <div className={`mr-3 p-1.5 rounded-full ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+            <VideoIcon className={`w-4 h-4 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className={`font-medium truncate ${
-              theme === 'dark' ? 'text-gray-200' : 'text-gray-900'
-            }`}>{meeting.title || "제목 없는 회의"}</h4>
-            <div className={`flex items-center text-sm ${
-              theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-            }`}>
-              <span className="mr-3">{formatDate(meeting.startTime)}</span>
-              <div className="flex items-center">
-                <UsersIcon className="w-3 h-3 mr-1" />
+            <h4 className={`text-sm font-medium truncate ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`}>
+              {meeting.title || "제목 없는 회의"}
+            </h4>
+            <div className={`flex items-center text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              <span>{formatDate(meeting.startTime)}</span>
+              <span className="mx-1.5">·</span>
+              <UsersIcon className="w-3 h-3 mr-0.5" />
                 <span>{getParticipantCount(meeting.participants)}명</span>
-              </div>
             </div>
           </div>
         </div>
@@ -1648,142 +1408,90 @@ function RecentMeetings({ theme = "dark" }: { theme?: "light" | "dark" }) {
   );
 }
 
-function SimplifiedKanbanBoard({ theme = "dark" }: { theme?: "light" | "dark" }) {
-  // 현재 선택된 프로젝트의 태스크 가져오기
+function SimplifiedKanbanBoard({ theme }: { theme: "light" | "dark" }) {
   const { currentProject } = useProject();
-  const { tasks = [], loading } = useTasks(currentProject?.id || null);
+  const { user } = useAuth();
+  const [assignedTasks, setAssignedTasks] = useState<TaskWithProjectInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // 상태별로 태스크 필터링
-  const todoTasks = tasks.filter((task) => task.status === "todo").slice(0, 2);
-  const inProgressTasks = tasks
-    .filter((task) => task.status === "in-progress")
-    .slice(0, 2);
-  const doneTasks = tasks.filter((task) => task.status === "done").slice(0, 2);
+  useEffect(() => {
+    const fetchAssignedTasks = async () => {
+      if (!user) return;
+      
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await fetch(`/api/tasks/user/${user.id}`);
+        
+        if (!response.ok) {
+          throw new Error('할당된 작업을 불러오는데 실패했습니다');
+        }
+        
+        const data = await response.json();
+        setAssignedTasks(data as TaskWithProjectInfo[]);
+      } catch (err) {
+        console.error('할당된 작업 로딩 중 오류:', err);
+        setError('할당된 작업을 불러오는데 실패했습니다');
+        setAssignedTasks([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchAssignedTasks();
+  }, [user]);
 
-  // 로딩 중이면 로딩 표시
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-40">
-        <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${
-          theme === 'dark' ? 'border-blue-500' : 'border-blue-600'
-        }`}></div>
-      </div>
-    );
-  }
+  if (loading) return <div className={`flex justify-center items-center py-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}> 로딩 중...</div>;
+  if (error) return <div className={`text-center py-4 ${theme === 'dark' ? 'text-red-400' : 'text-red-500'}`}>{error}</div>;
+  if (assignedTasks.length === 0) return <div className={`text-center py-4 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>할당된 작업이 없습니다</div>;
 
-  // 태스크가 없으면 빈 상태 표시
-  if (tasks.length === 0) {
-    return (
-      <div className={`flex flex-col items-center justify-center h-40 ${
-        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-      }`}>
-        <p className="text-center mb-4">현재 프로젝트에 작업이 없습니다</p>
-        <Link
-          href="/kanban/new"
-          className={`flex items-center justify-center gap-2 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            theme === 'dark' ? 'bg-purple-800 hover:bg-purple-700' : 'bg-purple-600 hover:bg-purple-700'
-          }`}
-        >
-          <PlusIcon className="w-4 h-4" />새 작업 추가
-        </Link>
-      </div>
-    );
-  }
+  const todoTasks = assignedTasks.filter((task) => task.status === "todo").slice(0, 3);
+  const inProgressTasks = assignedTasks.filter((task) => task.status === "in-progress").slice(0, 3);
+  const reviewTasks = assignedTasks.filter((task) => task.status === "review").slice(0, 2);
+  const doneTasks = assignedTasks.filter((task) => task.status === "done").slice(0, 2);
 
-        // 간략화된 칸반 컬럼 컴포넌트
-  const SimplifiedColumn = ({
-    title,
-    status,
-    statusColor,
-    tasks,
-    theme = "dark"
-  }: {
-    title: string;
-    status: string;
-    statusColor: string;
-    tasks: Task[];
-    theme?: "light" | "dark";
-  }) => (
-    <div className={`${
-      theme === 'dark' ? 'bg-[#353538]' : 'bg-gray-50'
-    } rounded-lg p-3`}>
-      <h3 className={`font-medium mb-2 flex items-center ${
-        theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-      }`}>
-        <span
-          className={`inline-block w-3 h-3 ${statusColor} rounded-full mr-2`}
-        ></span>
-        {title}
-      </h3>
+  const SimplifiedColumn = ({ title, statusColor, tasks }: { title: string; statusColor: string; tasks: TaskWithProjectInfo[]}) => (
+    <div className="flex-1">
+      <h4 className={`text-sm font-semibold mb-2 flex items-center ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+        <span className={`w-2.5 h-2.5 ${statusColor} rounded-full mr-2`}></span>
+        {title} ({tasks.length})
+      </h4>
       <div className="space-y-2">
-        {tasks.length > 0 ? (
-          tasks.map((task) => (
+        {tasks.length > 0 ? tasks.map(task => (
             <div
               key={task.id}
-              className={`p-2 rounded shadow-sm ${
-                theme === 'dark' 
-                  ? 'bg-[#2A2A2C] border border-gray-700' 
-                  : 'bg-white border border-gray-200'
-              }`}
-            >
-              <p className={`text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-800'
-              }`}>{task.title}</p>
-              <div className="flex justify-between items-center mt-2">
-                <span className={`text-xs ${
-                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                }`}>
-                  {task.priority === "high"
-                    ? "우선순위 높음"
-                    : task.priority === "medium"
-                    ? "중간 우선순위"
-                    : "낮은 우선순위"}
-                </span>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className={`p-2 rounded shadow-sm text-center ${
-            theme === 'dark' 
-              ? 'bg-[#2A2A2C] border border-gray-700 text-gray-500' 
-              : 'bg-white border border-gray-200 text-gray-400'
-          }`}>
-            <p className="text-xs">작업 없음</p>
+            className={`p-2 rounded-md text-xs ${theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'}`}
+            title={task.project?.name ? `프로젝트: ${task.project.name}` : '개인 작업'}
+          >
+            {task.title}
+            {task.project?.name && (
+              <div className={`mt-1 text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                {task.project.name}
           </div>
         )}
+          </div>
+        )) : <p className={`text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>작업 없음</p>}
       </div>
     </div>
   );
 
   return (
-    <div className="grid grid-cols-3 gap-4">
-      <SimplifiedColumn
-        title="할 일"
-        status="todo"
-        statusColor="bg-gray-400"
-        tasks={todoTasks}
-        theme={theme}
-      />
-      <SimplifiedColumn
-        title="진행 중"
-        status="in-progress"
-        statusColor="bg-blue-400"
-        tasks={inProgressTasks}
-        theme={theme}
-      />
-      <SimplifiedColumn
-        title="완료"
-        status="done"
-        statusColor="bg-green-400"
-        tasks={doneTasks}
-        theme={theme}
-      />
+    <div className="flex space-x-3">
+      <SimplifiedColumn title="할 일" statusColor="bg-gray-400" tasks={todoTasks} />
+      <SimplifiedColumn title="진행 중" statusColor="bg-blue-400" tasks={inProgressTasks} />
+      <div className="flex-1">
+        <div className="mb-3">
+          <SimplifiedColumn title="검토" statusColor="bg-yellow-400" tasks={reviewTasks} />
+        </div>
+        <SimplifiedColumn title="완료" statusColor="bg-green-400" tasks={doneTasks} />
+      </div>
     </div>
   );
 }
 
-// 최근 문서 컴포넌트
-function RecentDocuments({ projectId, theme = "dark" }: { projectId?: string; theme?: "light" | "dark" }) {
+function RecentDocuments({ projectId, theme }: { projectId?: string; theme: "light" | "dark" }) {
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1793,145 +1501,291 @@ function RecentDocuments({ projectId, theme = "dark" }: { projectId?: string; th
     const fetchDocuments = async () => {
       try {
         setLoading(true);
-        // 프로젝트 ID가 있을 때와 없을 때 요청 URL 분기
-        const url = projectId 
-          ? `/api/documents?projectId=${projectId}&limit=4` 
-          : '/api/documents?limit=4';
-        
+        const url = projectId ? `/api/documents?projectId=${projectId}&limit=3` : '/api/documents?limit=3'; 
         const response = await fetch(url);
-        
-        if (!response.ok) {
-          throw new Error('문서를 불러오는 중 문제가 발생했습니다');
-        }
-        
+        if (!response.ok) throw new Error('문서 로딩 실패');
         const data = await response.json();
         setDocuments(data);
         setError(null);
       } catch (err) {
-        console.error("최근 문서 로딩 오류:", err);
-        setError('문서를 불러오는 중 오류가 발생했습니다');
+        setError('문서 로딩 실패');
         setDocuments([]);
       } finally {
         setLoading(false);
       }
     };
-
     fetchDocuments();
   }, [projectId]);
 
   const formatDate = (dateStr: string | Date | null) => {
-    if (!dateStr) return "날짜 없음";
-    
-    // 날짜 객체로 변환
+    if (!dateStr) return "";
     const date = new Date(dateStr);
     const now = new Date();
-    
-    // 시간 차이 계산 (밀리초)
     const diffMs = now.getTime() - date.getTime();
     const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return "방금 전";
     const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}분 전`;
     const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour}시간 전`;
     const diffDay = Math.floor(diffHour / 24);
-    const diffMonth = Math.floor(diffDay / 30);
-    const diffYear = Math.floor(diffMonth / 12);
-    
-    // 상대적 시간 문자열 반환
-    if (diffSec < 60) {
-      return "방금 전";
-    } else if (diffMin < 60) {
-      return `${diffMin}분 전`;
-    } else if (diffHour < 24) {
-      return `${diffHour}시간 전`;
-    } else if (diffDay < 30) {
       return `${diffDay}일 전`;
-    } else if (diffMonth < 12) {
-      return `${diffMonth}개월 전`;
-    } else {
-      return `${diffYear}년 전`;
-    }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center py-8">
-        <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${
-          theme === 'dark' ? 'border-blue-500' : 'border-blue-600'
-        }`}></div>
-      </div>
-    );
-  }
+  if (loading) return <div className={`flex justify-center items-center py-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}> 로딩 중...</div>;
+  if (error) return <div className={`text-center py-4 ${theme === 'dark' ? 'text-red-400' : 'text-red-500'}`}>{error}</div>;
+  if (documents.length === 0) return <div className={`text-center py-4 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>문서 없음</div>;
 
-  if (error) {
     return (
-      <div className={`text-center py-8 ${
-        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-      }`}>
-        <p>{error}</p>
-      </div>
-    );
-  }
-
-  if (documents.length === 0) {
-    return (
-      <div className={`text-center py-8 ${
-        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-      }`}>
-        <p className="mb-4">아직 문서가 없습니다</p>
-        <Link
-          href={projectId ? `/documents/new?projectId=${projectId}` : "/documents/new"}
-          className={`inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white rounded-md ${
-            theme === 'dark' ? 'bg-blue-800 hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'
-          }`}
-        >
-          <PlusIcon className="w-4 h-4 mr-2" />
-          새 문서 만들기
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {documents.map((doc) => (
         <div
           key={doc.id}
           onClick={() => router.push(`/documents/${doc.id}${projectId ? `?projectId=${projectId}` : ''}`)}
-          className={`flex items-center p-3 rounded-lg cursor-pointer ${
-            theme === 'dark'
-              ? 'border border-gray-700 hover:bg-gray-800'
-              : 'border border-gray-100 hover:bg-gray-50'
-          }`}
+          className={`flex items-center p-2.5 rounded-lg cursor-pointer transition-colors ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
         >
-          <div className={`mr-3 p-2 rounded-full ${
-            theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
-          }`}>
-            {doc.emoji ? (
-              <span className="text-xl">{doc.emoji}</span>
-            ) : (
-              <FileTextIcon className={`w-4 h-4 ${
-                theme === 'dark' ? 'text-green-400' : 'text-green-600'
-              }`} />
-            )}
+          <div className={`mr-2.5 p-1 rounded-md ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+            {doc.emoji ? <span className="text-lg">{doc.emoji}</span> : <FileTextIcon className={`w-4 h-4 ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`} />}
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className={`font-medium truncate ${
-              theme === 'dark' ? 'text-gray-200' : 'text-gray-900'
-            }`}>{doc.title || "무제 문서"}</h4>
-            <p className={`text-sm ${
-              theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-            }`}>
-              수정됨: {formatDate(doc.updatedAt || doc.createdAt)}
+            <h4 className={`text-sm font-medium truncate ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`}>{doc.title || "무제 문서"}</h4>
+            <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              {formatDate(doc.updatedAt || doc.createdAt)}
+              {doc.isStarred && <StarIcon className="w-3 h-3 inline-block ml-1.5 text-yellow-500" />}
             </p>
           </div>
-          {doc.isStarred && (
-            <span className="ml-2 text-yellow-500">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z" clipRule="evenodd" />
-              </svg>
-            </span>
-          )}
         </div>
       ))}
+      </div>
+    );
+  }
+
+function UpcomingEvents({ theme }: { theme: "light" | "dark" }) {
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/calendar?limit=10'); 
+        if (!response.ok) throw new Error('일정을 불러오는데 실패했습니다');
+        const data = await response.json();
+        setEvents(data.sort((a: CalendarEvent, b: CalendarEvent) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()));
+        setError(null);
+      } catch (err) {
+        setError('일정을 불러오는데 실패했습니다');
+        setEvents([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchEvents();
+  }, []);
+
+  const formatDateForEventGroup = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+
+    if (date.toDateString() === today.toDateString()) {
+      return `오늘 ${date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}`;
+    }
+    if (date.toDateString() === tomorrow.toDateString()) {
+      return `내일 ${date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}`;
+    }
+    return date.toLocaleDateString('ko-KR', { weekday: 'short', month: 'long', day: 'numeric' });
+  };
+
+  const formatTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: 'numeric', hour12: true });
+  };
+
+  const groupEventsByDate = (eventsToGroup: CalendarEvent[]) => {
+    return eventsToGroup.reduce((acc, event) => {
+      const dateKey = new Date(event.startDate).toDateString();
+      if (!acc[dateKey]) {
+        acc[dateKey] = [];
+      }
+      acc[dateKey].push(event);
+      return acc;
+    }, {} as Record<string, CalendarEvent[]>);
+  };
+
+  if (loading) return <div className={`flex justify-center items-center py-8 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>로딩 중...</div>;
+  if (error) return <div className={`text-center py-8 ${theme === 'dark' ? 'text-red-400' : 'text-red-500'}`}>{error}</div>;
+  if (events.length === 0) return <div className={`text-center py-8 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>예정된 일정이 없습니다</div>;
+
+  const groupedEvents = groupEventsByDate(events);
+
+  return (
+    <div className={`flex h-full ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} p-1`}>
+      <div className={`w-1/3 pr-6 py-2 flex flex-col items-center ${theme === 'dark' ? 'border-r border-gray-700' : 'border-r border-gray-200'}`}> 
+        <div className="w-full max-w-[260px] mx-auto calendar-container py-2">
+          <Calendar
+            value={new Date()} 
+            view="month"
+            locale="ko-KR"
+            className={theme === 'dark' ? 'dark-calendar' : 'light-calendar'}
+            formatDay={(locale, date) => new Date(date).getDate().toString()} // 날짜만 표시
+            tileClassName={({ date, view }) => { // 오늘 날짜 강조를 위한 클래스 추가 로직
+              if (view === 'month' && date.toDateString() === new Date().toDateString()) {
+                return theme === 'dark' ? 'today-dark' : 'today-light';
+              }
+              return null;
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="w-2/3 pl-6 py-2 space-y-4 overflow-y-auto flex-1" style={{ maxHeight: '100%' }}>
+        {Object.keys(groupedEvents).map((dateKey, groupIndex) => (
+          <div key={dateKey}>
+            <h4 className={`text-sm font-semibold mb-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              {formatDateForEventGroup(dateKey)}
+            </h4>
+    <div className="space-y-3">
+              {groupedEvents[dateKey].map((event, eventIndex) => (
+                <div 
+                  key={event.id} 
+                  className={`flex items-start p-2 rounded-md transition-colors duration-150 ${theme === 'dark' ? 'hover:bg-gray-750' : 'hover:bg-gray-50'}`}
+                >
+                  <div className={`w-px ${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'} mr-3 self-stretch`}></div>
+                  <div className="flex-1">
+                    <p className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>{event.title}</p>
+                    <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} mt-0.5`}>
+                      {formatTime(event.startDate)} - {event.project?.name || '개인 일정'}
+            </p>
+          </div>
+        </div>
+      ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
+
+const CalendarStyles = () => (
+  <style jsx global>{`
+    .calendar-container .react-calendar {
+      border: none;
+      border-radius: 0.5rem; /* 8px */
+      font-family: inherit;
+      width: 100%;
+      line-height: 1.2em; /* 기본 line-height 조정 */
+    }
+    .light-calendar.react-calendar {
+      background-color: #ffffff; /* white */
+    }
+    .dark-calendar.react-calendar {
+      background-color: #1f2937; /* gray-800 */
+    }
+    .calendar-container .react-calendar__navigation button {
+      min-width: 30px;
+      font-size: 0.875rem; /* 14px */
+      padding: 0.5em 0.3em;
+    }
+    .light-calendar .react-calendar__navigation button {
+      color: #374151; /* gray-700 */
+    }
+    .dark-calendar .react-calendar__navigation button {
+      color: #d1d5db; /* gray-300 */
+    }
+    .light-calendar .react-calendar__navigation button:hover,
+    .light-calendar .react-calendar__navigation button:focus {
+      background-color: #f3f4f6; /* gray-100 */
+    }
+    .dark-calendar .react-calendar__navigation button:hover,
+    .dark-calendar .react-calendar__navigation button:focus {
+      background-color: #374151; /* gray-700 */
+    }
+    .calendar-container .react-calendar__month-view__weekdays {
+      font-size: 0.7rem; /* 요일 폰트 크기 */
+      font-weight: 500;
+    }
+    .light-calendar .react-calendar__month-view__weekdays__weekday abbr {
+      text-decoration: none;
+      color: #6b7280; /* gray-500 */
+    }
+    .dark-calendar .react-calendar__month-view__weekdays__weekday abbr {
+      text-decoration: none;
+      color: #9ca3af; /* gray-400 */
+    }
+    .calendar-container .react-calendar__tile {
+      padding: 0.4em 0.3em; /* 날짜 타일 패딩 조정 */
+      font-size: 0.8rem; /* 날짜 폰트 크기 */
+      border-radius: 0.25rem; /* 4px */
+      height: auto; /* 높이 자동 조정 */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 30px; /* 최소 높이 */
+    }
+    .light-calendar .react-calendar__tile {
+      color: #1f2937; /* gray-800 */
+    }
+    .dark-calendar .react-calendar__tile {
+      color: #e5e7eb; /* gray-200 */
+    }
+    .light-calendar .react-calendar__tile:enabled:hover,
+    .light-calendar .react-calendar__tile:enabled:focus {
+      background-color: #e5e7eb; /* gray-200 */
+    }
+    .dark-calendar .react-calendar__tile:enabled:hover,
+    .dark-calendar .react-calendar__tile:enabled:focus {
+      background-color: #4b5563; /* gray-600 */
+    }
+    
+    /* 오늘 날짜 스타일 */
+    .light-calendar .react-calendar__tile.today-light {
+      background: #eff6ff !important; /* blue-50 */
+      color: #1d4ed8 !important; /* blue-700 */
+      font-weight: bold;
+    }
+    .dark-calendar .react-calendar__tile.today-dark {
+      background: #1e3a8a !important; /* darker blue-800/900 */
+      color: #93c5fd !important; /* blue-300 */
+      font-weight: bold;
+    }
+
+    /* 선택된 날짜 스타일 (오늘 날짜와 겹칠 때 우선순위) */
+    .light-calendar .react-calendar__tile--active,
+    .light-calendar .react-calendar__tile--active.today-light {
+      background: #2563eb !important; /* blue-600 */
+      color: white !important;
+    }
+    .dark-calendar .react-calendar__tile--active,
+    .dark-calendar .react-calendar__tile--active.today-dark {
+      background: #3b82f6 !important; /* blue-500 */
+      color: white !important;
+    }
+
+    .light-calendar .react-calendar__tile--active:enabled:hover,
+    .light-calendar .react-calendar__tile--active:enabled:focus,
+    .light-calendar .react-calendar__tile--active.today-light:enabled:hover,
+    .light-calendar .react-calendar__tile--active.today-light:enabled:focus {
+      background: #1d4ed8 !important; /* blue-700 */
+    }
+    .dark-calendar .react-calendar__tile--active:enabled:hover,
+    .dark-calendar .react-calendar__tile--active:enabled:focus,
+    .dark-calendar .react-calendar__tile--active.today-dark:enabled:hover,
+    .dark-calendar .react-calendar__tile--active.today-dark:enabled:focus {
+      background: #2563eb !important; /* blue-600 */
+    }
+
+    .calendar-container .react-calendar__month-view__days__day--neighboringMonth {
+      opacity: 0.4;
+    }
+    .calendar-container .react-calendar__year-view .react-calendar__tile,
+    .calendar-container .react-calendar__decade-view .react-calendar__tile,
+    .calendar-container .react-calendar__century-view .react-calendar__tile {
+        padding: 1em 0.5em; /* 년/월 보기 패딩 조정 */
+    }
+  `}</style>
+);
