@@ -13,6 +13,8 @@ import {
   TrashIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TaskDetailDialog } from "../kanban/TaskDetailDialog";
+import type { TaskStatus } from "../kanban/KanbanBoard";
 
 // 타입 정의
 interface Epic {
@@ -46,6 +48,19 @@ interface TimelineProps {
   theme: "light" | "dark";
 }
 
+// string 타입 status를 TaskStatus로 변환하는 함수
+function toTaskStatus(status: string): TaskStatus {
+  if (status === "todo" || status === "in-progress" || status === "review" || status === "done") return status;
+  return "todo";
+}
+
+function convertTaskStatus(task: Task): import("../kanban/KanbanBoard").Task {
+  return {
+    ...task,
+    status: toTaskStatus(task.status),
+  };
+}
+
 export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
   const [epics, setEpics] = useState<Epic[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -56,6 +71,8 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [showEpicMenu, setShowEpicMenu] = useState<string | null>(null);
   const [showTaskMenu, setShowTaskMenu] = useState<{ epicId: string, taskId: string } | null>(null);
+  const [selectedTask, setSelectedTask] = useState<import("../kanban/KanbanBoard").Task | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   
   const newEpicInputRef = useRef<HTMLInputElement>(null);
   const newTaskInputRef = useRef<HTMLInputElement>(null);
@@ -577,6 +594,10 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
                               ? 'hover:bg-[#2A2A2C]' 
                               : 'hover:bg-gray-100'
                           } flex items-center justify-between group/task`}
+                          onClick={() => {
+                            setSelectedTask(convertTaskStatus(task));
+                            setIsDialogOpen(true);
+                          }}
                         >
                           <div className="flex items-center">
                             <span className={`w-1.5 h-1.5 rounded-full mr-3 ${
@@ -765,6 +786,38 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
             </div>
           )}
         </div>
+      )}
+
+      {/* TaskDetailDialog 다이얼로그 */}
+      {selectedTask && (
+        <TaskDetailDialog
+          task={selectedTask}
+          isOpen={isDialogOpen}
+          onClose={() => {
+            setIsDialogOpen(false);
+            setSelectedTask(null);
+          }}
+          onUpdate={(updatedTask) => {
+            // 상태 내 epics의 해당 task만 갱신
+            const fixedTask = convertTaskStatus(updatedTask);
+            setEpics((prevEpics) => prevEpics.map(epic =>
+              epic.id === fixedTask.epicId
+                ? { ...epic, tasks: epic.tasks.map(t => t.id === fixedTask.id ? fixedTask : t) }
+                : epic
+            ));
+          }}
+          onDelete={(taskId) => {
+            // 상태 내 epics에서 해당 task만 제거
+            setEpics((prevEpics) => prevEpics.map(epic =>
+              epic.tasks.some(t => t.id === taskId)
+                ? { ...epic, tasks: epic.tasks.filter(t => t.id !== taskId) }
+                : epic
+            ));
+            setIsDialogOpen(false);
+            setSelectedTask(null);
+          }}
+          theme={theme}
+        />
       )}
     </div>
   );
