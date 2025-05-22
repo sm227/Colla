@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
@@ -442,17 +442,28 @@ function TaskCreateModal({
 
 export default function Home() {
   const router = useRouter();
+  const { user, loading: authLoading, logout } = useAuth();
+  const searchParams = useSearchParams();
   const pathname = usePathname();
-  const [roomId, setRoomId] = useState("");
+  
+  // 테마 상태 관련 (중복 선언 수정)
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('theme') as 'light' | 'dark') || "dark";
+    }
+    return "dark";
+  });
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
+  const [isDocumentsSubmenuOpen, setIsDocumentsSubmenuOpen] = useState(false); // 문서 하위 메뉴 상태 추가
+  const [roomId, setRoomId] = useState(""); // roomId 상태 추가
   
-  const savedTheme = typeof window !== 'undefined' ? 
-    (localStorage.getItem('theme') as 'light' | 'dark') : null;
-  const [theme, setTheme] = useState<"light" | "dark">(savedTheme || "dark");
+  // 기존 코드의 중복된 theme 상태 선언 제거
+  // const savedTheme = typeof window !== 'undefined' ? 
+  //   (localStorage.getItem('theme') as 'light' | 'dark') : null;
+  // const [theme, setTheme] = useState<"light" | "dark">(savedTheme || "dark");
   
-  const { user, loading: authLoading, logout } = useAuth();
   const {
     projects,
     hasProjects,
@@ -833,10 +844,11 @@ export default function Home() {
                   icon={<FileTextIcon className="w-5 h-5" />}
                   text="문서"
                   href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
-                  active={pathname?.startsWith("/documents")}
+                  active={pathname?.startsWith("/documents") || isDocumentsSubmenuOpen}
                   onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                    e.preventDefault();
+                    setIsDocumentsSubmenuOpen(!isDocumentsSubmenuOpen); // 하위메뉴 토글
                     if (currentProject?.id) {
-                      e.preventDefault();
                       fetch(`/api/projects/${currentProject.id}`)
                         .then((response) => {
                           if (response.ok) {
@@ -847,11 +859,70 @@ export default function Home() {
                           }
                         })
                         .catch(() => router.push("/documents"));
+                    } else {
+                      router.push("/documents");
                     }
                   }}
                   theme={theme}
                   small
                 />
+                
+                {/* 문서 하위 메뉴 추가 */}
+                {isDocumentsSubmenuOpen && (
+                  <div 
+                    className={`pl-4 pt-1 space-y-1 ml-2.5 transition-all duration-300 ease-in-out ${
+                      isDocumentsSubmenuOpen ? 'max-h-[20rem] opacity-100' : 'max-h-0 opacity-0'
+                    }`}
+                  >
+                    <div className="transform transition-all duration-300 ease-in-out" 
+                         style={{ 
+                           opacity: isDocumentsSubmenuOpen ? 1 : 0, 
+                           transform: isDocumentsSubmenuOpen ? 'translateY(0)' : 'translateY(-10px)',
+                           transition: 'opacity 300ms ease-in-out, transform 300ms ease-in-out'
+                         }}>
+                      <SidebarLink
+                        icon={<FileTextIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
+                        text="모든 문서"
+                        href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
+                        active={pathname?.startsWith("/documents")}
+                        theme={theme}
+                        small
+                      />
+                    </div>
+                    
+                    <div className="transform transition-all duration-300 ease-in-out" 
+                         style={{ 
+                           opacity: isDocumentsSubmenuOpen ? 1 : 0, 
+                           transform: isDocumentsSubmenuOpen ? 'translateY(0)' : 'translateY(-10px)',
+                           transition: 'opacity 300ms ease-in-out 100ms, transform 300ms ease-in-out 100ms'
+                         }}>
+                      <SidebarLink
+                        icon={<StarIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
+                        text="즐겨찾기"
+                        href={currentProject?.id ? `/documents?projectId=${currentProject.id}&favorites=true` : "/documents?favorites=true"}
+                        active={pathname?.startsWith("/documents") && searchParams?.has("favorites")}
+                        theme={theme}
+                        small
+                      />
+                    </div>
+                    
+                    <div className="transform transition-all duration-300 ease-in-out" 
+                         style={{ 
+                           opacity: isDocumentsSubmenuOpen ? 1 : 0, 
+                           transform: isDocumentsSubmenuOpen ? 'translateY(0)' : 'translateY(-10px)',
+                           transition: 'opacity 300ms ease-in-out 200ms, transform 300ms ease-in-out 200ms'
+                         }}>
+                      <SidebarLink
+                        icon={<PlusIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
+                        text="새 문서 작성"
+                        href={currentProject?.id ? `/documents/new?projectId=${currentProject.id}` : "/documents/new"}
+                        theme={theme}
+                        small
+                      />
+                    </div>
+                  </div>
+                )}
+                
                 <SidebarLink 
                   icon={<UsersIcon className="w-5 h-5"/>} 
                   text="팀원 관리" 
