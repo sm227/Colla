@@ -1,19 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { cookies } from 'next/headers';
+import { jwtVerify } from 'jose';
 
 const prisma = new PrismaClient();
 
-// 현재 사용자 ID 가져오기 (실제 인증 로직으로 대체 필요)
-async function getCurrentUserId() {
-  // 실제 환경에서는 세션이나 토큰을 통해 인증된 사용자의 ID를 가져와야 함
-  const user = await prisma.user.findFirst();
-  return user?.id;
+// 실제 로그인된 사용자 정보 가져오기
+async function getCurrentUserId(request: NextRequest) {
+  // 쿠키에서 토큰 가져오기
+  const cookieStore = cookies();
+  const token = cookieStore.get('token')?.value;
+  // 헤더에서 토큰 확인
+  const authHeader = request.headers.get('authorization');
+  const headerToken = authHeader?.startsWith('Bearer ')
+    ? authHeader.substring(7)
+    : null;
+  const finalToken = token || headerToken;
+  if (!finalToken) return null;
+  try {
+    const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key');
+    const { payload } = await jwtVerify(finalToken, JWT_SECRET);
+    if (typeof payload.id === 'string') {
+      return payload.id;
+    }
+    return null;
+  } catch (error) {
+    console.error('토큰 검증 오류:', error);
+    return null;
+  }
 }
 
 // GET - 캘린더 이벤트 목록 조회
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await getCurrentUserId(request);
     
     if (!userId) {
       return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
@@ -109,7 +129,7 @@ export async function GET(request: NextRequest) {
 // POST - 새 캘린더 이벤트 생성
 export async function POST(request: NextRequest) {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await getCurrentUserId(request);
     
     if (!userId) {
       return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
