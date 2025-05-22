@@ -211,19 +211,15 @@ const CalendarPage: React.FC = () => {
       alert("제목이 필요합니다. 이벤트에 제목을 추가해주세요.");
       return;
     }
-
     try {
+      // datetime-local 값 그대로 ISO로 변환
       const startDateTime = new Date(event.startDate);
-      
-      // 종료 날짜가 없으면 시작 날짜와 동일하게 설정
       let endDateTime;
       if (!event.endDate || event.endDate.trim() === '') {
         endDateTime = new Date(event.startDate);
       } else {
         endDateTime = new Date(event.endDate);
       }
-
-      // 캘린더 API로 이벤트 추가
       const response = await fetch('/api/calendar', {
         method: 'POST',
         headers: {
@@ -234,17 +230,13 @@ const CalendarPage: React.FC = () => {
           description: event.description,
           startDate: startDateTime.toISOString(),
           endDate: endDateTime.toISOString(),
-          projectId: projectId || null  // 쿼리스트링에서 가져온 projectId만 사용
+          projectId: projectId || null
         }),
       });
-
       if (!response.ok) {
         throw new Error('캘린더 이벤트 추가 실패');
       }
-
       const newEvent = await response.json();
-      
-      // 상태 업데이트
       setTasks((prev) => [...prev, {
         ...newEvent,
         id: newEvent.id.toString(),
@@ -254,17 +246,14 @@ const CalendarPage: React.FC = () => {
         createdAt: new Date(newEvent.createdAt),
         isCalendarEvent: true
       }]);
-
       alert("이벤트가 추가되었습니다.");
-
-      // 폼 초기화 및 닫기
       setAddEventDialog({ show: false, date: null });
       setNewEvent({
         title: '',
         description: '',
         startDate: '',
         endDate: '',
-        projectId: ''  // 프로젝트 ID 초기화
+        projectId: ''
       });
     } catch (error) {
       console.error("캘린더 이벤트 추가 오류:", error);
@@ -651,25 +640,33 @@ const CalendarPage: React.FC = () => {
     setCalendarTasks(processedCalendarTasks);
   }, [processedCalendarTasks]);
 
-  // 이전 달로 이동
+  // 이전 달/주/일로 이동
   const handlePrev = () => {
     if (calendarView === 'month') {
       setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1));
     } else if (calendarView === 'week') {
-      setCurrentDate(addDays(currentDate, -7));
+      const newDate = addDays(currentDate, -7);
+      setCurrentDate(newDate);
+      setSelectedDate(newDate); // 주간 뷰: 선택 날짜도 이동
     } else {
-      setCurrentDate(addDays(currentDate, -1));
+      const newDate = addDays(currentDate, -1);
+      setCurrentDate(newDate);
+      setSelectedDate(newDate); // 일간 뷰: 선택 날짜도 이동
     }
   };
 
-  // 다음 달로 이동
+  // 다음 달/주/일로 이동
   const handleNext = () => {
     if (calendarView === 'month') {
       setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
     } else if (calendarView === 'week') {
-      setCurrentDate(addDays(currentDate, 7));
+      const newDate = addDays(currentDate, 7);
+      setCurrentDate(newDate);
+      setSelectedDate(newDate); // 주간 뷰: 선택 날짜도 이동
     } else {
-      setCurrentDate(addDays(currentDate, 1));
+      const newDate = addDays(currentDate, 1);
+      setCurrentDate(newDate);
+      setSelectedDate(newDate); // 일간 뷰: 선택 날짜도 이동
     }
   };
 
@@ -687,19 +684,14 @@ const CalendarPage: React.FC = () => {
       alert("제목이 필요합니다. 이벤트에 제목을 추가해주세요.");
       return;
     }
-
     try {
       const startDateTime = new Date(event.startDate);
-      
-      // 종료 날짜가 없으면 시작 날짜와 동일하게 설정
       let endDateTime;
       if (!event.endDate || event.endDate.trim() === '') {
         endDateTime = new Date(event.startDate);
       } else {
         endDateTime = new Date(event.endDate);
       }
-
-      // 캘린더 API로 이벤트 업데이트
       const response = await fetch(`/api/calendar/${event.id}`, {
         method: 'PATCH',
         headers: {
@@ -713,14 +705,10 @@ const CalendarPage: React.FC = () => {
           projectId: event.projectId || null
         }),
       });
-
       if (!response.ok) {
         throw new Error('캘린더 이벤트 수정 실패');
       }
-
       const updatedEvent = await response.json();
-      
-      // 상태 업데이트
       setTasks(prev => prev.map(task => {
         if (task.id === event.id) {
           return {
@@ -735,10 +723,7 @@ const CalendarPage: React.FC = () => {
         }
         return task;
       }));
-
       alert("이벤트가 수정되었습니다.");
-
-      // 다이얼로그 닫기
       setEditEventDialog({ show: false, event: null });
     } catch (error) {
       console.error("캘린더 이벤트 수정 오류:", error);
@@ -917,15 +902,31 @@ const CalendarPage: React.FC = () => {
                   >
                     <div className="absolute top-2 left-2 text-xs font-semibold">{format(day,'d')}</div>
                     {/* 일정 표시 */}
-                    <div className="mt-6 space-y-1">
+                    <div className="mt-6 space-y-1"
+                      style={{maxHeight: '80px', overflowY: 'auto', paddingRight: 2, scrollbarWidth: 'thin'}}
+                    >
                       {calendarTasks.filter(t=>{
                         const dateToCheck = t.startDate || t.dueDate || undefined;
                         return dateToCheck && isSameDay(dateToCheck, day);
-                      }).map((task,i)=>(
-                        <div key={task.id+''+i} className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}
-                          onClick={() => handleEventClick(task)}
-                        >{task.title}</div>
-                      ))}
+                      }).map((task,i)=>{
+                        // 시간 포맷
+                        const start = task.startDate ? new Date(task.startDate) : undefined;
+                        const end = task.endDate ? new Date(task.endDate) : undefined;
+                        const timeStr = (start && end)
+                          ? `${start.getHours().toString().padStart(2,'0')}:${start.getMinutes().toString().padStart(2,'0')}~${end.getHours().toString().padStart(2,'0')}:${end.getMinutes().toString().padStart(2,'0')}`
+                          : '';
+                        return (
+                          <div key={task.id+''+i} 
+                            className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}
+                            style={{whiteSpace:'normal',wordBreak:'break-all',marginBottom:2,cursor:'pointer'}}
+                            title={task.description || ''}
+                            onClick={() => handleEventClick(task)}
+                          >
+                            <div>{task.title}</div>
+                            {timeStr && <div className="text-[10px] text-gray-500 mt-0.5">{timeStr}</div>}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )
@@ -964,15 +965,30 @@ const CalendarPage: React.FC = () => {
                       onDrop={handleDrop(day)}
                     >
                       <div className="absolute top-2 left-2 text-xs font-semibold">{format(day,'d')}</div>
-                      <div className="mt-6 space-y-1">
+                      <div className="mt-6 space-y-1"
+                        style={{maxHeight: '100px', overflowY: 'auto', paddingRight: 2, scrollbarWidth: 'thin'}}
+                      >
                         {calendarTasks.filter(t=>{
                           const dateToCheck = t.startDate || t.dueDate || undefined;
                           return dateToCheck && isSameDay(dateToCheck, day);
-                        }).map((task,i)=>(
-                          <div key={task.id+''+i} className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}
-                            onClick={() => handleEventClick(task)}
-                          >{task.title}</div>
-                        ))}
+                        }).map((task,i)=>{
+                          const start = task.startDate ? new Date(task.startDate) : undefined;
+                          const end = task.endDate ? new Date(task.endDate) : undefined;
+                          const timeStr = (start && end)
+                            ? `${start.getHours().toString().padStart(2,'0')}:${start.getMinutes().toString().padStart(2,'0')}~${end.getHours().toString().padStart(2,'0')}:${end.getMinutes().toString().padStart(2,'0')}`
+                            : '';
+                          return (
+                            <div key={task.id+''+i} 
+                              className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}
+                              style={{whiteSpace:'normal',wordBreak:'break-all',marginBottom:2,cursor:'pointer'}}
+                              title={task.description || ''}
+                              onClick={() => handleEventClick(task)}
+                            >
+                              <div>{task.title}</div>
+                              {timeStr && <div className="text-[10px] text-gray-500 mt-0.5">{timeStr}</div>}
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
                   )
@@ -988,15 +1004,30 @@ const CalendarPage: React.FC = () => {
             </div>
             <div className="p-8 min-h-[300px]">
               <div className="font-bold mb-2">{format(selectedDate || currentDate, 'd일')}</div>
-              <div className="space-y-2">
+              <div className="space-y-2"
+                style={{maxHeight: '180px', overflowY: 'auto', paddingRight: 2, scrollbarWidth: 'thin'}}
+              >
                 {calendarTasks.filter(t=>{
                   const dateToCheck = t.startDate || t.dueDate || undefined;
                   return dateToCheck && isSameDay(dateToCheck, selectedDate || currentDate);
-                }).map((task,i)=>(
-                  <div key={task.id+''+i} className={`truncate px-2 py-1 rounded text-sm font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}
-                    onClick={() => handleEventClick(task)}
-                  >{task.title}</div>
-                ))}
+                }).map((task,i)=>{
+                  const start = task.startDate ? new Date(task.startDate) : undefined;
+                  const end = task.endDate ? new Date(task.endDate) : undefined;
+                  const timeStr = (start && end)
+                    ? `${start.getHours().toString().padStart(2,'0')}:${start.getMinutes().toString().padStart(2,'0')}~${end.getHours().toString().padStart(2,'0')}:${end.getMinutes().toString().padStart(2,'0')}`
+                    : '';
+                  return (
+                    <div key={task.id+''+i} 
+                      className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}
+                      style={{whiteSpace:'normal',wordBreak:'break-all',marginBottom:2,cursor:'pointer'}}
+                      title={task.description || ''}
+                      onClick={() => handleEventClick(task)}
+                    >
+                      <div>{task.title}</div>
+                      {timeStr && <div className="text-[10px] text-gray-500 mt-0.5">{timeStr}</div>}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -1031,20 +1062,20 @@ const CalendarPage: React.FC = () => {
                   placeholder="설명을 입력하세요"
                 />
               </div>
-              {/* 날짜 */}
-              <div className="flex gap-4">
+              {/* 날짜+시간 */}
+              <div className="flex flex-col gap-2">
                 <input
-                  type="date"
+                  type="datetime-local"
                   value={newEvent.startDate}
                   onChange={e => setNewEvent({ ...newEvent, startDate: e.target.value })}
-                  className="flex-1 bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-base placeholder-gray-400"
+                  className="w-full min-w-0 block bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-base placeholder-gray-400"
                   required
                 />
                 <input
-                  type="date"
+                  type="datetime-local"
                   value={newEvent.endDate}
                   onChange={e => setNewEvent({ ...newEvent, endDate: e.target.value })}
-                  className="flex-1 bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-base placeholder-gray-400"
+                  className="w-full min-w-0 block bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-base placeholder-gray-400"
                 />
               </div>
               {/* 버튼 */}
@@ -1092,20 +1123,20 @@ const CalendarPage: React.FC = () => {
                   placeholder="설명을 입력하세요"
                 />
               </div>
-              {/* 날짜 */}
-              <div className="flex gap-4">
+              {/* 날짜+시간 */}
+              <div className="flex flex-col gap-2">
                 <input
-                  type="date"
+                  type="datetime-local"
                   value={editingEvent.startDate}
                   onChange={e => setEditingEvent({ ...editingEvent, startDate: e.target.value })}
-                  className="flex-1 bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-base placeholder-gray-400"
+                  className="w-full min-w-0 block bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-base placeholder-gray-400"
                   required
                 />
                 <input
-                  type="date"
+                  type="datetime-local"
                   value={editingEvent.endDate}
                   onChange={e => setEditingEvent({ ...editingEvent, endDate: e.target.value })}
-                  className="flex-1 bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-base placeholder-gray-400"
+                  className="w-full min-w-0 block bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-base placeholder-gray-400"
                 />
               </div>
               {/* 버튼 */}
