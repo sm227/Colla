@@ -124,39 +124,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: '캘린더 이벤트를 찾을 수 없습니다' }, { status: 404 });
     }
 
-    // 수정 권한 확인
-    const hasPermission = await hasEventPermission(userId, id);
-    if (!hasPermission) {
-      return NextResponse.json({ error: '캘린더 이벤트를 수정할 권한이 없습니다' }, { status: 403 });
-    }
-
-    // 업데이트할 데이터 구성
+    // 권한 체크 없이 바로 업데이트
     const updateData: any = {};
-    
-    // 변경할 필드만 업데이트에 포함
     if (data.title !== undefined) updateData.title = data.title;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.startDate !== undefined) updateData.startDate = new Date(data.startDate);
     if (data.endDate !== undefined) updateData.endDate = data.endDate ? new Date(data.endDate) : null;
     if (data.isAllDay !== undefined) updateData.isAllDay = data.isAllDay;
-    if (data.projectId !== undefined) {
-      // 프로젝트 ID 변경 시 접근 권한 확인
-      if (data.projectId) {
-        const isMember = await prisma.projectMember.findFirst({
-          where: {
-            userId: userId,
-            projectId: data.projectId,
-            inviteStatus: 'accepted'
-          }
-        });
-        
-        if (!isMember) {
-          return NextResponse.json({ error: '해당 프로젝트에 접근 권한이 없습니다' }, { status: 403 });
-        }
-      }
-      
-      updateData.projectId = data.projectId;
-    }
+    if (data.projectId !== undefined) updateData.projectId = data.projectId;
 
     // 캘린더 이벤트 업데이트
     const updatedEvent = await prisma.calendar.update({
