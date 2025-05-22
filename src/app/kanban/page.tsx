@@ -16,15 +16,18 @@ export default function KanbanPage() {
   const { projects } = useProject();
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   
-  // 로컬 스토리지에서 테마 설정 불러와서 초기값으로 사용
-  const savedTheme = typeof window !== 'undefined' ? 
-    (localStorage.getItem('theme') as 'light' | 'dark') : null;
-  const [theme, setTheme] = useState<"light" | "dark">(savedTheme || "dark");
-  
-  // 테마 설정을 위한 효과
+  // theme 관련 코드 수정 시작
+  const getInitialTheme = () => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("theme") as "light" | "dark") || "light";
+    }
+    return "light";
+  };
+  const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme());
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // document.body의 클래스를 변경하여 전체 스타일 적용 가능
+      localStorage.setItem('theme', theme);
       if (theme === 'dark') {
         document.documentElement.classList.add('dark-mode');
       } else {
@@ -32,6 +35,7 @@ export default function KanbanPage() {
       }
     }
   }, [theme]);
+  // theme 관련 코드 수정 끝
 
   // 드롭다운 메뉴 외부 클릭 시 닫히도록 이벤트 핸들러 등록
   useEffect(() => {
