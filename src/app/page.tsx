@@ -29,6 +29,7 @@ import {
   CheckCircleIcon,
   ClockIcon,
   StarIcon,
+  // Edit3Icon, // 사용하지 않는 아이콘 제거
 } from "lucide-react";
 import Link from "next/link";
 // import Image from "next/image"; // Image 주석 처리
@@ -36,6 +37,16 @@ import { useAuth } from "./contexts/AuthContext";
 import { useProject } from "./contexts/ProjectContext";
 import { Task, TaskStatus } from "@/components/kanban/KanbanBoard";
 // import { useTasks } from "@/hooks/useTasks"; // useTasks 임포트 제거
+
+// shadcn/ui DropdownMenu 컴포넌트 임포트
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // API 응답에 project 객체가 포함되므로, 이를 반영하는 새로운 타입을 정의합니다.
 // 기존 Task 타입의 필드도 포함하도록 확장합니다。
@@ -964,26 +975,33 @@ export default function Home() {
           </nav>
 
           <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-3">
-            <button
-              onClick={toggleTheme}
-                className="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
-                title={theme === 'dark' ? "라이트 모드로 변경" : "다크 모드로 변경"}
-              >
-                {theme === 'dark' ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
-            </button>
-               <Link href="/mypage" className="flex items-center p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700">
-                  <UserIcon className="w-5 h-5 mr-2 text-gray-600 dark:text-gray-300" />
-                  <span className="text-sm">{user.name}</span>
-                </Link>
-            </div>
-              <button
-              onClick={handleLogout}
-              className="flex items-center px-3 py-2 text-sm font-medium rounded-md w-full text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
-            >
-              <LogOutIcon className="w-5 h-5 mr-2" />
-              로그아웃
-              </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center w-full p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
+                  <UserIcon className="w-6 h-6 mr-3 rounded-full bg-gray-200 dark:bg-gray-600 p-0.5 text-gray-700 dark:text-gray-300" />
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user.name}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" sideOffset={5}>
+                <DropdownMenuLabel className="px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {user.email}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => router.push('/mypage')} className="cursor-pointer">
+                  <UserIcon className="w-4 h-4 mr-2" />
+                  <span>정보 수정</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
+                  {theme === 'dark' ? <SunIcon className="w-4 h-4 mr-2" /> : <MoonIcon className="w-4 h-4 mr-2" />}
+                  <span>{theme === 'dark' ? "라이트 모드" : "다크 모드"}</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/50 focus:text-red-600 dark:focus:text-red-400">
+                  <LogOutIcon className="w-4 h-4 mr-2" />
+                  <span>로그아웃</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </aside>
 
