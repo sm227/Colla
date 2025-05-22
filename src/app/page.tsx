@@ -757,6 +757,14 @@ export default function Home() {
     }
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) return "좋은 아침이에요";
+    if (hour >= 12 && hour < 18) return "좋은 오후에요";
+    if (hour >= 18 && hour < 22) return "좋은 저녁이에요";
+    return "좋은 밤 되세요";
+  };
+
   return (
     <> 
       <CalendarStyles />
@@ -1121,7 +1129,7 @@ export default function Home() {
           {/* 상단 헤더 제거 */}
           <main className="flex flex-col flex-1 p-6 lg:p-8 overflow-y-auto bg-background">
             <div className="mb-8">
-              <h2 className="text-3xl font-bold mb-2">안녕하세요, {user.name}님!</h2>
+              <h2 className="text-3xl font-bold mb-2">{getGreeting()}, {user.name}님!</h2>
               <p className={`text-lg ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                 {currentProject ? `${currentProject.name} 에 대한 요약을 확인하세요.` : '프로젝트를 선택하면 요약 정보를 확인할 수 있습니다.'}
               </p>
