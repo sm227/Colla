@@ -1,20 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { cookies } from 'next/headers';
+import { jwtVerify } from 'jose';
 
 const prisma = new PrismaClient();
 
-// 현재 사용자 ID 가져오기 (실제 인증 로직으로 대체 필요)
-async function getCurrentUserId() {
-  // 실제 환경에서는 세션이나 토큰을 통해 인증된 사용자의 ID를 가져와야 함
-  // 테스트용으로 임시로 사용자 ID 반환
-  const user = await prisma.user.findFirst();
-  return user?.id;
+// 실제 로그인된 사용자 정보 가져오기
+async function getCurrentUserId(request: NextRequest) {
+  // 쿠키에서 토큰 가져오기
+  const cookieStore = cookies();
+  const token = cookieStore.get('token')?.value;
+  // 헤더에서 토큰 확인
+  const authHeader = request.headers.get('authorization');
+  const headerToken = authHeader?.startsWith('Bearer ')
+    ? authHeader.substring(7)
+    : null;
+  const finalToken = token || headerToken;
+  if (!finalToken) return null;
+  try {
+    const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key');
+    const { payload } = await jwtVerify(finalToken, JWT_SECRET);
+    if (typeof payload.id === 'string') {
+      return payload.id;
+    }
+    return null;
+  } catch (error) {
+    console.error('토큰 검증 오류:', error);
+    return null;
+  }
 }
 
 // GET - 캘린더 이벤트 목록 조회
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await getCurrentUserId(request);
     
     if (!userId) {
       return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
@@ -27,45 +46,10 @@ export async function GET(request: NextRequest) {
     let events = [];
     
     if (projectId) {
-      // 프로젝트 ID가 있을 경우:
-      // 1. 현재 사용자가 해당 프로젝트의 멤버인지 확인
-      const isMember = await prisma.projectMember.findFirst({
-        where: {
-          userId: userId,
-          projectId: projectId,
-          inviteStatus: 'accepted' // 초대 수락 상태인 멤버만
-        }
-      });
-      
-      if (!isMember) {
-        return NextResponse.json({ error: '프로젝트에 접근 권한이 없습니다' }, { status: 403 });
-      }
-      
-      // 2. 프로젝트 내 모든 멤버 ID 가져오기
-      const members = await prisma.projectMember.findMany({
-        where: {
-          projectId: projectId,
-          inviteStatus: 'accepted'
-        },
-        select: {
-          userId: true
-        }
-      });
-      
-      const memberIds = members.map(member => member.userId);
-      
-      // 3. 프로젝트의 모든 캘린더 이벤트 가져오기 (프로젝트 멤버들의 것 모두 포함)
+      console.log(`[캘린더] userId=${userId}가 projectId=${projectId} 일정 조회 시도`);
       events = await prisma.calendar.findMany({
         where: {
-          OR: [
-            // 해당 프로젝트에 속한 모든 캘린더 이벤트
-            { projectId: projectId },
-            // 프로젝트 멤버들의 개인 일정 (프로젝트 ID가 없는 개인 일정 제외)
-            {
-              userId: { in: memberIds },
-              projectId: null
-            }
-          ]
+          projectId: projectId
         },
         include: {
           user: {
@@ -84,7 +68,9 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { startDate: 'asc' }
       });
+      console.log(`[캘린더] projectId=${projectId} 일정 ${events.length}건 반환`);
     } else {
+      console.log(`[캘린더] userId=${userId}가 전체 일정 조회 시도`);
       // 프로젝트 ID가 없을 경우 현재 사용자의 개인 일정과
       // 사용자가 속한 모든 프로젝트의 일정 가져오기
       
@@ -143,7 +129,7 @@ export async function GET(request: NextRequest) {
 // POST - 새 캘린더 이벤트 생성
 export async function POST(request: NextRequest) {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await getCurrentUserId(request);
     
     if (!userId) {
       return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
@@ -160,21 +146,6 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // 프로젝트ID가 제공된 경우 해당 프로젝트 접근 권한 확인
-    if (data.projectId) {
-      const isMember = await prisma.projectMember.findFirst({
-        where: {
-          userId: userId,
-          projectId: data.projectId,
-          inviteStatus: 'accepted'
-        }
-      });
-      
-      if (!isMember) {
-        return NextResponse.json({ error: '프로젝트에 접근 권한이 없습니다' }, { status: 403 });
-      }
-    }
-
     // 캘린더 이벤트 생성
     const newEvent = await prisma.calendar.create({
         data: {
