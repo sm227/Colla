@@ -844,7 +844,7 @@ const CalendarPage: React.FC = () => {
       </aside>
       
       {/* 중앙 메인 캘린더 */}
-      <main className="flex-1 w-full h-full flex flex-col p-0 m-0 overflow-hidden justify-stretch items-stretch">
+      <main className={`flex-1 w-full h-full flex flex-col p-0 m-0 justify-stretch items-stretch ${calendarView==='week'||calendarView==='day' ? 'overflow-y-auto' : 'overflow-hidden'}` }>
         {/* 상단 네비게이션 */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
@@ -976,17 +976,15 @@ const CalendarPage: React.FC = () => {
                       onDrop={handleDrop(day)}
                     >
                       <div className="absolute top-2 left-2 text-xs font-semibold">{format(day,'d')}</div>
-                      <div className="mt-6 space-y-1 relative h-full">
+                      <div className="mt-6 space-y-1 relative">
                         {(() => {
                           const events = calendarTasks.filter(t=>{
                             const dateToCheck = t.startDate || t.dueDate || undefined;
                             return dateToCheck && isSameDay(dateToCheck, day);
                           });
-                          const showEvents = events.slice(0,2);
-                          const moreCount = events.length - 2;
                           return (
                             <>
-                              {showEvents.map((task,i)=>{
+                              {events.map((task,i)=>{
                                 // 시간 포맷
                                 const start = task.startDate ? new Date(task.startDate) : undefined;
                                 const end = task.endDate ? new Date(task.endDate) : undefined;
@@ -1004,11 +1002,6 @@ const CalendarPage: React.FC = () => {
                                   </div>
                                 )
                               })}
-                              {moreCount > 0 && (
-                                <div className="text-xs text-blue-500 cursor-pointer select-none" style={{marginTop:2}}>
-                                  +{moreCount} 더보기
-                                </div>
-                              )}
                             </>
                           );
                         })()}
@@ -1027,17 +1020,15 @@ const CalendarPage: React.FC = () => {
             </div>
             <div className="p-8 min-h-[300px]">
               <div className="font-bold mb-2">{format(selectedDate || currentDate, 'd일')}</div>
-              <div className="space-y-2 relative h-full">
+              <div className="space-y-2 relative">
                 {(() => {
                   const events = calendarTasks.filter(t=>{
                     const dateToCheck = t.startDate || t.dueDate || undefined;
                     return dateToCheck && isSameDay(dateToCheck, selectedDate || currentDate);
                   });
-                  const showEvents = events.slice(0,2);
-                  const moreCount = events.length - 2;
                   return (
                     <>
-                      {showEvents.map((task,i)=>{
+                      {events.map((task,i)=>{
                         // 시간 포맷
                         const start = task.startDate ? new Date(task.startDate) : undefined;
                         const end = task.endDate ? new Date(task.endDate) : undefined;
@@ -1055,11 +1046,6 @@ const CalendarPage: React.FC = () => {
                           </div>
                         )
                       })}
-                      {moreCount > 0 && (
-                        <div className="text-xs text-blue-500 cursor-pointer select-none" style={{marginTop:2}}>
-                          +{moreCount} 더보기
-                        </div>
-                      )}
                     </>
                   );
                 })()}
