@@ -4,57 +4,41 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
-import { v4 as uuidv4 } from "uuid";
+// import { v4 as uuidv4 } from "uuid"; // uuidv4 주석 처리
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import {
   VideoIcon,
   UsersIcon,
-  Share2Icon,
   Trello,
   FileTextIcon,
   CalendarIcon,
-  CalendarDaysIcon,
-  MessageSquareIcon,
   LayoutDashboardIcon,
-  ClipboardListIcon,
   SearchIcon,
   BellIcon,
   UserIcon,
   SettingsIcon,
-  HomeIcon,
   FolderIcon,
   PlusIcon,
   LogOutIcon,
-  MenuIcon,
   XIcon,
   BarChart3Icon,
-  UserPlusIcon,
   SunIcon,
   MoonIcon,
-  CheckIcon,
   AlertCircleIcon,
   CheckCircleIcon,
   ClockIcon,
-  ChevronDownIcon,
-  FilterIcon,
-  ViewIcon,
-  GanttChartSquareIcon,
-  ColumnsIcon,
-  ListChecksIcon,
-  TableIcon,
-  ArchiveIcon,
   StarIcon,
 } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
+// import Image from "next/image"; // Image 주석 처리
 import { useAuth } from "./contexts/AuthContext";
 import { useProject } from "./contexts/ProjectContext";
 import { Task, TaskStatus } from "@/components/kanban/KanbanBoard";
-import { useTasks } from "@/hooks/useTasks";
+// import { useTasks } from "@/hooks/useTasks"; // useTasks 임포트 제거
 
 // API 응답에 project 객체가 포함되므로, 이를 반영하는 새로운 타입을 정의합니다.
-// 기존 Task 타입의 필드도 포함하도록 확장합니다.
+// 기존 Task 타입의 필드도 포함하도록 확장합니다。
 interface TaskWithProjectInfo extends Task {
   project?: {
     id: string;
@@ -123,10 +107,31 @@ type CalendarEvent = {
   };
 };
 
-// theme prop 타입 정의 추가
-type ThemeProps = {
-  theme: "light" | "dark";
-};
+// 새로 추가된 타입 정의
+interface NewTaskData {
+  title: string;
+  description?: string;
+  status: TaskStatus;
+  priority: "low" | "medium" | "high";
+  dueDate?: string;
+  projectId?: string;
+}
+
+interface MeetingRecord {
+  id: string;
+  title?: string;
+  startTime: string;
+  participants: string | unknown[]; 
+}
+
+interface DocumentSummary {
+  id: string;
+  title?: string;
+  updatedAt: string;
+  createdAt: string;
+  isStarred?: boolean;
+  projectId?: string;
+}
 
 // 실제 프로젝트 초대 알림을 가져오는 함수
 const fetchProjectInvitationsAsNotifications = async (): Promise<Notification[]> => {
@@ -241,13 +246,11 @@ function TaskCreateModal({
   onClose, 
   onSubmit, 
   projectId,
-  theme = "dark"
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
-  onSubmit: (task: any) => Promise<void>;
+  onSubmit: (task: NewTaskData) => Promise<void>; // 타입 변경
   projectId?: string;
-  theme: "light" | "dark";
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -334,13 +337,13 @@ function TaskCreateModal({
     <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50`}>
       <div 
         ref={modalRef}
-        className={`w-full max-w-md p-6 rounded-lg shadow-xl ${theme === 'dark' ? 'bg-gray-800 text-gray-100' : 'bg-white text-gray-900'}`}
+        className={`w-full max-w-md p-6 rounded-lg shadow-xl bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-100`}
       >
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold">새 작업 추가</h3>
           <button 
             onClick={onClose} 
-            className={`p-1 rounded-md hover:${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}
+            className={`p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700`}
           >
             <XIcon className="w-5 h-5" />
           </button>
@@ -354,7 +357,7 @@ function TaskCreateModal({
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className={`w-full px-3 py-2 rounded-md ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-100' : 'bg-white border-gray-300 text-gray-900'} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                className={`w-full px-3 py-2 rounded-md bg-white border-gray-300 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 border focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 placeholder="작업 제목"
                 required
               />
@@ -365,7 +368,7 @@ function TaskCreateModal({
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className={`w-full px-3 py-2 rounded-md ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-100' : 'bg-white border-gray-300 text-gray-900'} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                className={`w-full px-3 py-2 rounded-md bg-white border-gray-300 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 border focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 placeholder="작업 설명"
                 rows={3}
               />
@@ -377,7 +380,7 @@ function TaskCreateModal({
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value as TaskStatus)}
-                  className={`w-full px-3 py-2 rounded-md ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-100' : 'bg-white border-gray-300 text-gray-900'} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  className={`w-full px-3 py-2 rounded-md bg-white border-gray-300 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 border focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 >
                   <option value="todo">할 일</option>
                   <option value="in-progress">진행 중</option>
@@ -391,7 +394,7 @@ function TaskCreateModal({
                 <select
                   value={priority}
                   onChange={(e) => setPriority(e.target.value as "low" | "medium" | "high")}
-                  className={`w-full px-3 py-2 rounded-md ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-100' : 'bg-white border-gray-300 text-gray-900'} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  className={`w-full px-3 py-2 rounded-md bg-white border-gray-300 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 border focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 >
                   <option value="low">낮음</option>
                   <option value="medium">중간</option>
@@ -406,7 +409,7 @@ function TaskCreateModal({
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className={`w-full px-3 py-2 rounded-md ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-100' : 'bg-white border-gray-300 text-gray-900'} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                className={`w-full px-3 py-2 rounded-md bg-white border-gray-300 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 border focus:outline-none focus:ring-2 focus:ring-blue-500`}
               />
             </div>
             
@@ -414,22 +417,20 @@ function TaskCreateModal({
               <button
                 type="button"
                 onClick={onClose}
-                className={`px-4 py-2 rounded-md ${
-                  theme === 'dark'
-                    ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
-                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                }`}
+                className={`px-4 py-2 rounded-md 
+                  bg-gray-200 hover:bg-gray-300 text-gray-700
+                  dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200
+                `}
               >
                 취소
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className={`px-4 py-2 rounded-md ${
-                  theme === 'dark'
-                    ? 'bg-blue-700 hover:bg-blue-600 text-white'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                } ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+                className={`px-4 py-2 rounded-md 
+                  bg-blue-600 hover:bg-blue-700 text-white
+                  dark:bg-blue-700 dark:hover:bg-blue-600
+                 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
                 {isSubmitting ? (
                   <span className="flex items-center">
@@ -468,7 +469,7 @@ export default function Home() {
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [isDocumentsSubmenuOpen, setIsDocumentsSubmenuOpen] = useState(false);
-  const [roomId, setRoomId] = useState("");
+  // const [roomId, /* setRoomId */] = useState(""); // roomId 및 setRoomId 주석 처리
 
   // 기존의 theme 저장 useEffect 제거 (next-themes가 자동으로 처리)
 
@@ -485,9 +486,9 @@ export default function Home() {
     acceptProjectInvitation,
     rejectProjectInvitation
   } = useProject();
-  const { tasks = [], loading: tasksLoading } = useTasks(
-    currentProject?.id || null
-  );
+  // const { tasks = [], loading: tasksLoading } = useTasks( // tasks 변수 제거
+  //   currentProject?.id || null
+  // );
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationLoading, setNotificationLoading] = useState(false);
@@ -498,19 +499,6 @@ export default function Home() {
   const [processingInvitation, setProcessingInvitation] = useState<string | null>(null);
   const previousNotificationsRef = useRef<Notification[]>([]);
   const initialLoadDoneRef = useRef(false);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('theme', theme);
-      if (theme === 'dark') {
-        document.documentElement.classList.add('dark-mode');
-        document.documentElement.classList.remove('light-mode');
-      } else {
-        document.documentElement.classList.remove('dark-mode');
-        document.documentElement.classList.add('light-mode');
-      }
-    }
-  }, [theme]);
 
   const loadNotifications = async (isPanelOpening?: boolean) => {
     if (user) { 
@@ -531,7 +519,6 @@ export default function Home() {
         );
         
         const newCount = sortedNotifications.length;
-        const oldCount = lastNotificationCountRef.current;
         
         if (initialLoadDoneRef.current && newCount > previousNotificationsRef.current.length) {
            const prevIds = new Set(previousNotificationsRef.current.map(n => n.id));
@@ -562,9 +549,10 @@ export default function Home() {
         }
         
         initialLoadDoneRef.current = true;
-      } catch (err: any) {
+      } catch (err: unknown) { // err 타입을 unknown으로 변경
         console.error("알림 로딩 중 오류:", err);
-        setNotificationError(err.message || "알림 로딩 중 오류 발생");
+        const errorMessage = err instanceof Error ? err.message : "알림 로딩 중 오류 발생";
+        setNotificationError(errorMessage);
       } finally {
         if (shouldShowLoadingOuter) {
           setNotificationLoading(false);
@@ -644,9 +632,9 @@ export default function Home() {
     return null;
   }
 
-  if (authLoading || projectLoading || tasksLoading) {
+  if (authLoading || projectLoading) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'}`}>
+      <div className={`min-h-screen flex items-center justify-center bg-background text-foreground`}>
         <div className="text-center flex flex-col items-center">
           <div className={`relative w-24 h-24 ${theme === 'dark' ? 'text-blue-500' : 'text-blue-600'}`}>
             <div className="absolute inset-0 flex items-center justify-center">
@@ -668,18 +656,6 @@ export default function Home() {
   if (!user || !hasProjects) {
     return null;
   }
-
-  const createNewMeeting = () => {
-    const newRoomId = uuidv4().substring(0, 8);
-    router.push(`/meeting/${newRoomId}`);
-  };
-
-  const joinMeeting = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (roomId.trim()) {
-      router.push(`/meeting/${roomId}`);
-    }
-  };
 
   const handleLogout = async () => {
     try {
@@ -725,11 +701,12 @@ export default function Home() {
     }
   };
 
-  const handleAddTask = async (taskData: any) => {
+  const handleAddTask = async (taskData: NewTaskData) => {
     try {
       const url = taskData.projectId 
         ? `/api/projects/${taskData.projectId}/tasks` 
         : "/api/tasks";
+      
       
       const response = await fetch(url, {
         method: "POST",
@@ -770,29 +747,27 @@ export default function Home() {
   };
 
   return (
-    <>
+    <> 
       <CalendarStyles />
       <ModernScrollbarStyles />
-      <div className={`flex h-screen ${theme === 'dark' ? 'bg-gray-900 text-gray-100' : 'bg-white text-gray-900'}`}>
+      <div className="flex h-screen bg-background text-foreground">
         <aside
-          className={`fixed inset-y-0 left-0 z-30 w-64 ${
-            theme === 'dark' ? 'bg-gray-800 border-r border-gray-700' : 'bg-gray-50 border-r border-gray-200'
-          } transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-30 w-64 bg-gray-50 border-r border-gray-200 dark:bg-[#2a2a2c] dark:border-gray-700 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
             mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
           } md:relative md:flex-shrink-0 flex flex-col`}
         >
-          <div className="flex items-center justify-between h-16 px-4 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}">
+          <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center">
-              <div className={`w-8 h-8 ${theme === 'dark' ? 'bg-blue-600' : 'bg-black'} rounded-lg flex items-center justify-center mr-2`}>
+              <div className="w-8 h-8 bg-black dark:bg-blue-600 rounded-lg flex items-center justify-center mr-2">
                 <span className="text-white font-bold text-lg">C</span>
               </div>
-              <span className={`text-xl font-semibold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>Colla</span>
+              <span className="text-xl font-semibold text-gray-900 dark:text-gray-100">Colla</span>
             </div>
             <button
               className="md:hidden"
               onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
             >
-              <XIcon className={`w-6 h-6 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`} />
+              <XIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
             </button>
           </div>
 
@@ -831,9 +806,7 @@ export default function Home() {
             />
             
             <div className="pt-4">
-              <h3 className={`px-2 text-xs font-semibold uppercase tracking-wider ${
-                theme === 'dark' ? 'text-gray-500' : 'text-gray-400'
-              }`}>
+              <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                 내 작업 공간
               </h3>
               <div className="mt-2 space-y-1">
@@ -956,9 +929,7 @@ export default function Home() {
           </div>
 
             <div className="pt-4">
-              <h3 className={`px-2 text-xs font-semibold uppercase tracking-wider ${
-                theme === 'dark' ? 'text-gray-500' : 'text-gray-400'
-              }`}>
+              <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                 프로젝트
               </h3>
               <nav className="mt-2 space-y-1">
@@ -992,27 +963,23 @@ export default function Home() {
             </div>
           </nav>
 
-          <div className={`p-4 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-3">
             <button
               onClick={toggleTheme}
-                className={`p-2 rounded-md hover:${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}
+                className="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
                 title={theme === 'dark' ? "라이트 모드로 변경" : "다크 모드로 변경"}
               >
                 {theme === 'dark' ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
             </button>
-               <Link href="/mypage" className={`flex items-center p-2 rounded-md hover:${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}>
-                  <UserIcon className={`w-5 h-5 mr-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`} />
+               <Link href="/mypage" className="flex items-center p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700">
+                  <UserIcon className="w-5 h-5 mr-2 text-gray-600 dark:text-gray-300" />
                   <span className="text-sm">{user.name}</span>
                 </Link>
             </div>
               <button
               onClick={handleLogout}
-              className={`flex items-center px-3 py-2 text-sm font-medium rounded-md w-full ${
-                  theme === 'dark'
-                  ? 'text-gray-300 hover:bg-gray-700' 
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
+              className="flex items-center px-3 py-2 text-sm font-medium rounded-md w-full text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
             >
               <LogOutIcon className="w-5 h-5 mr-2" />
               로그아웃
@@ -1022,22 +989,18 @@ export default function Home() {
 
         {showNotificationPanel && (
           <div 
-              className={`fixed top-0 left-0 md:left-64 h-full w-80 md:w-96 z-40 transform transition-transform duration-300 ease-in-out ${
+              className={`fixed top-0 left-0 md:left-64 h-full w-80 md:w-96 z-40 transform transition-transform duration-300 ease-in-out ${ 
               showNotificationPanel ? 'translate-x-0' : '-translate-x-full'
-              } ${
-                    theme === 'dark'
-                  ? 'bg-gray-800 border-r border-gray-700 text-gray-200'
-                  : 'bg-white border-r border-gray-300 text-gray-800'
-              } shadow-lg flex flex-col`}
+              } bg-white border-r border-gray-300 text-gray-800 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 shadow-lg flex flex-col`}
           >
-              <div className={`p-4 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}> 
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700"> 
                   <div className="flex justify-between items-center">
                   <h3 className={`text-lg font-semibold`}>알림</h3>
                   <button 
                       onClick={() => setShowNotificationPanel(false)} 
-                      className={`p-1 rounded-md hover:${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}
+                      className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
                   >
-                        <XIcon className="w-5 h-5" />
+                        <XIcon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
                       </button>
                   </div>
                     </div>
@@ -1045,7 +1008,7 @@ export default function Home() {
               <div className="flex-grow overflow-y-auto p-4">
                     {notificationLoading && (
                       <div className="flex justify-center items-center py-10">
-                  <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${theme === 'dark' ? 'border-blue-500' : 'border-blue-600'}`}></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-500"></div>
                       </div>
                     )}
 
@@ -1056,7 +1019,7 @@ export default function Home() {
                     )}
 
                     {!notificationLoading && !notificationError && notifications.length === 0 && (
-                  <div className={`text-center py-10 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
+                  <div className="text-center py-10 text-gray-400 dark:text-gray-500">
                   <BellIcon className="w-10 h-10 mx-auto mb-2" />
                         <p>새로운 알림이 없습니다.</p>
                       </div>
@@ -1066,7 +1029,7 @@ export default function Home() {
                   notifications.map((notification) => (
                           <div 
                             key={notification.id} 
-                      className={`p-4 mb-1 rounded-lg flex flex-col transition-colors duration-150 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                      className="p-4 mb-1 rounded-lg flex flex-col transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-700"
                       onClick={() => {
                       if (notification.type !== 'invitation') {
                           router.push(notification.link);
@@ -1075,15 +1038,15 @@ export default function Home() {
                       }}
                           >
                             <div className="flex items-start">
-                          <div className={`flex-shrink-0 p-2 rounded-full ${notification.iconBgColor ? notification.iconBgColor.replace('bg-', 'bg-opacity-20 ') : (theme === 'dark' ? 'bg-gray-600' : 'bg-gray-100')} mr-4`}>
-                                {notification.icon || <BellIcon className="w-5 h-5" />}
+                          <div className={`flex-shrink-0 p-2 rounded-full ${notification.iconBgColor || 'bg-gray-100'} dark:bg-gray-700 bg-opacity-20 mr-4`}>
+                                {notification.icon || <BellIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" />}
                               </div>
                               <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-semibold ${notification.iconColor || (theme === 'dark' ? 'text-gray-100' : 'text-gray-900')}`}>{notification.title}</p>
-                                  <p className={`text-xs ${theme === 'dark' ? 'text-gray-300' : 'text-gray-500'} mt-1 truncate`}>
+                          <p className={`text-sm font-semibold ${notification.iconColor || 'text-gray-900'} dark:text-gray-100`}>{notification.title}</p>
+                                  <p className="text-xs text-gray-500 dark:text-gray-300 mt-1 truncate">
                                   {notification.message}
                                 </p>
-                                  <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} mt-1.5`}>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
                                   {formatDateForNotification(notification.createdAt)}
                                 </p>
                               </div>
@@ -1092,7 +1055,7 @@ export default function Home() {
                             {notification.type === 'invitation' && notification.projectId && (
                               <div className="mt-3 flex justify-end space-x-2">
                                 {processingInvitation === notification.id ? (
-                                      <div className={`text-xs flex items-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                                      <div className="text-xs flex items-center text-gray-500 dark:text-gray-400">
                                     <div className="mr-2 w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
                                     처리 중...
                                   </div>
@@ -1100,21 +1063,13 @@ export default function Home() {
                                   <>
                                     <button
                                       onClick={(e) => handleRejectInvitation(notification.id, notification.projectId as string, e)}
-                                      className={`px-3 py-1 rounded text-xs font-medium ${
-                                        theme === 'dark'
-                                              ? 'bg-red-700 hover:bg-red-600 text-red-100'
-                                          : 'bg-red-100 hover:bg-red-200 text-red-700'
-                                      } transition-colors`}
+                                      className="px-3 py-1 rounded text-xs font-medium bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-700 dark:hover:bg-red-600 dark:text-red-100 transition-colors"
                                     >
                                       거절
                                     </button>
                                     <button
                                       onClick={(e) => handleAcceptInvitation(notification.id, notification.projectId as string, e)}
-                                      className={`px-3 py-1 rounded text-xs font-medium ${
-                                        theme === 'dark'
-                                              ? 'bg-blue-700 hover:bg-blue-600 text-blue-100'
-                                          : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
-                                      } transition-colors`}
+                                      className="px-3 py-1 rounded text-xs font-medium bg-blue-100 hover:bg-blue-200 text-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 dark:text-blue-100 transition-colors"
                                     >
                                       수락
                                     </button>
@@ -1129,11 +1084,7 @@ export default function Home() {
                                     router.push(notification.link);
                                           setShowNotificationPanel(false);
                                   }}
-                                  className={`px-3 py-1 rounded text-xs font-medium ${
-                                    theme === 'dark'
-                                          ? 'bg-purple-700 hover:bg-purple-600 text-purple-100'
-                                      : 'bg-purple-100 hover:bg-purple-200 text-purple-700'
-                                  } transition-colors`}
+                                  className="px-3 py-1 rounded text-xs font-medium bg-purple-100 hover:bg-purple-200 text-purple-700 dark:bg-purple-700 dark:hover:bg-purple-600 dark:text-purple-100 transition-colors"
                                 >
                                   칸반보드로 이동
                                 </button>
@@ -1150,7 +1101,7 @@ export default function Home() {
 
         <div className={`flex-1 flex flex-col overflow-hidden ${showNotificationPanel ? 'pl-80 md:pl-96' : ''} transition-all duration-300 ease-in-out`}>
           {/* 상단 헤더 제거 */}
-          <main className={`flex flex-col flex-1 p-6 lg:p-8 overflow-y-auto bg-opacity-50 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
+          <main className="flex flex-col flex-1 p-6 lg:p-8 overflow-y-auto bg-background">
             <div className="mb-8">
               <h2 className="text-3xl font-bold mb-2">안녕하세요, {user.name}님!</h2>
               <p className={`text-lg ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -1164,11 +1115,10 @@ export default function Home() {
                 {/* 프로젝트 진행 상황 */}
                 <DashboardWidget
                   title="프로젝트 진행 상황"
-                  theme={theme}
                   // className="order-2 min-[1400px]:order-1 min-[1400px]:col-span-6 h-[250px]"
                   className="min-[1400px]:col-span-6 h-full" // 변경: order 제거, h-full
                 >
-                  <div className={`flex flex-col h-full items-center justify-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <div className="flex flex-col h-full items-center justify-center text-gray-500 dark:text-gray-400">
                     <BarChart3Icon className="w-10 h-10 mb-2 opacity-50" />
                     <p className="text-center">구현예정</p>
                     <p className="text-center text-sm mt-1">
@@ -1181,20 +1131,18 @@ export default function Home() {
                 <DashboardWidget
                   title="나에게 할당된 작업"
                   viewAllLink="/kanban"
-                  theme={theme}
-                  // className="order-3 min-[1400px]:order-1 min-[1400px]:col-span-6 h-[250px]"
-                  className="min-[1400px]:col-span-6 h-full" // 변경: order 제거, h-full
+                  className="min-[1400px]:col-span-6 h-[300px]" // h-full을 h-[300px]로 변경
                   actionButton={
                     <button 
                       onClick={() => setShowTaskModal(true)} 
-                      className={`p-1.5 rounded-md ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'}`}
+                      className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
                       title="새 작업 만들기"
                     >
-                      <PlusIcon className={`w-4 h-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} />
+                      <PlusIcon className="w-4 h-4 text-gray-700 dark:text-gray-300" />
                     </button>
                   }
                 >
-                  <SimplifiedKanbanBoard theme={theme} />
+                  <SimplifiedKanbanBoard /> {/* theme prop 제거 */}
                 </DashboardWidget>
               </div>
 
@@ -1204,11 +1152,10 @@ export default function Home() {
                 <DashboardWidget
                   title="다가오는 일정"
                   viewAllLink="/calendar"
-                  theme={theme}
                   // className="order-4 min-[1400px]:order-2 min-[1400px]:col-span-6 h-full"
                   className="min-[1400px]:col-span-6 h-full" // 변경: order 제거
                 >
-                  <UpcomingEvents theme={theme} />
+                  <UpcomingEvents /> {/* theme prop 제거 */}
                 </DashboardWidget>
 
                 {/* 최근 문서 & 최근 회의 컨테이너 */}
@@ -1218,30 +1165,26 @@ export default function Home() {
                   <DashboardWidget
                     title="최근 문서"
                     viewAllLink={currentProject ? `/documents?projectId=${currentProject.id}` : "/documents"}
-                    theme={theme}
-                    // className="flex-1 h-[350px]"
-                    className="flex-1" // 변경: h-[350px] 제거
                     actionButton={
                       <button 
                         onClick={() => router.push(currentProject ? `/documents/new?projectId=${currentProject.id}` : '/documents/new')} 
-                        className={`p-1.5 rounded-md ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'}`}
+                        className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
                         title="새 문서 만들기"
                       >
-                        <FileTextIcon className={`w-4 h-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} />
+                        <FileTextIcon className="w-4 h-4 text-gray-700 dark:text-gray-300" />
                       </button>
                     }
                   >
-                    <RecentDocuments projectId={currentProject?.id} theme={theme} />
+                    <RecentDocuments projectId={currentProject?.id} /> {/* theme prop 제거 */}
                   </DashboardWidget>
 
                   {/* 4b. 최근 회의 */}
                   <DashboardWidget
                     title="최근 회의"
                     viewAllLink="/meeting/records"
-                    theme={theme}
                     className="flex-1" // 유지
                   >
-                    <RecentMeetings theme={theme} />
+                    <RecentMeetings /> {/* theme prop 제거 */}
                   </DashboardWidget>
                 </div>
               </div>
@@ -1255,7 +1198,6 @@ export default function Home() {
           onClose={() => setShowTaskModal(false)} 
           onSubmit={handleAddTask}
           projectId={currentProject?.id}
-          theme={theme}
         />
       </div> {/* flex h-screen ... 의 닫는 태그 */}
     </> // 최상위 Fragment 닫는 태그
@@ -1320,25 +1262,23 @@ function DashboardWidget({
   children, 
   className = "",
   viewAllLink,
-  theme,
   actionButton
 }: {
   title: string;
   children: React.ReactNode; 
   className?: string;
   viewAllLink?: string;
-  theme: "light" | "dark";
-  actionButton?: React.ReactNode; // 타입 정의 확인
+  actionButton?: React.ReactNode;
 }) {
   return (
-    <div className={`rounded-xl shadow-sm ${theme === 'dark' ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'} p-6 flex flex-col ${className}`}>
+    <div className={`rounded-xl shadow-sm bg-white border border-gray-200 dark:bg-[#2a2a2c] dark:border-gray-700 p-6 flex flex-col ${className}`}>
       <div className="flex justify-between items-center mb-5">
         <div className="flex items-center">
-          <h3 className={`text-xl font-semibold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>{title}</h3>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
           {actionButton && <div className="ml-2">{actionButton}</div>} 
         </div>
         {viewAllLink && (
-          <Link href={viewAllLink} className={`text-base font-medium ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}>
+          <Link href={viewAllLink} className="text-base font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
             모두 보기
           </Link>
         )}
@@ -1348,60 +1288,8 @@ function DashboardWidget({
   );
 }
 
-function QuickActionButton({ 
-  icon,
-  text, 
-  onClick,
-  theme = "dark",
-  large = false
-}: {
-  icon: React.ReactNode;
-  text: string; 
-  onClick: () => void;
-  theme?: "light" | "dark";
-  large?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center px-4 py-3 text-base font-medium rounded-lg transition-colors ${theme === 'dark' ? 'text-gray-200 bg-gray-750 hover:bg-gray-700' : 'text-gray-700 bg-gray-100 hover:bg-gray-200'} ${large ? 'sm:py-4 sm:text-lg' : ''}`}
-    >
-      <div className={`mr-3 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{icon}</div>
-      {text}
-    </button>
-  );
-}
-
-function UserAvatar({ 
-  name, 
-  imageUrl, 
-  theme = "dark",
-  isOwner = false,
-  style,
-  size = 'normal'
-}: { 
-  name: string; 
-  imageUrl?: string; 
-  theme?: "light" | "dark";
-  isOwner?: boolean;
-  style?: React.CSSProperties;
-  size?: 'normal' | 'large';
-}) {
-  const initials = name.charAt(0).toUpperCase();
-  const sizeClasses = size === 'large' ? 'w-10 h-10 text-base' : 'w-8 h-8 text-sm';
-  return (
-    <div 
-      title={name}
-      style={style}
-      className={`${sizeClasses} rounded-full flex items-center justify-center font-semibold border-2 ${isOwner ? (theme === 'dark' ? 'bg-blue-600 border-gray-800 text-white' : 'bg-blue-500 border-white text-white') : (theme === 'dark' ? 'bg-gray-600 border-gray-800 text-gray-200' : 'bg-gray-300 border-white text-gray-700')}`}
-    >
-      {imageUrl ? <Image src={imageUrl} alt={name} width={size === 'large' ? 40 : 32} height={size === 'large' ? 40 : 32} className="rounded-full" /> : initials}
-          </div>
-  );
-}
-
-function RecentMeetings({ theme }: { theme: "light" | "dark" }) {
-  const [meetings, setMeetings] = useState<any[]>([]);
+function RecentMeetings({ /* theme prop 제거 */ }: { /* theme prop 타입 제거 */ }) {
+  const [meetings, setMeetings] = useState<MeetingRecord[]>([]); // 타입 변경
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -1430,7 +1318,7 @@ function RecentMeetings({ theme }: { theme: "light" | "dark" }) {
     return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium" }).format(date);
   };
 
-  const getParticipantCount = (participants: any) => {
+  const getParticipantCount = (participants: string | unknown[]) => { // 타입 변경
     if (!participants) return 0;
     try {
       const parsedParticipants = typeof participants === 'string' ? JSON.parse(participants) : participants;
@@ -1438,9 +1326,9 @@ function RecentMeetings({ theme }: { theme: "light" | "dark" }) {
     } catch { return 0; }
   };
 
-  if (loading) return <div className={`flex justify-center items-center py-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}> 로딩 중...</div>;
-  if (error) return <div className={`text-center py-4 ${theme === 'dark' ? 'text-red-400' : 'text-red-500'}`}>{error}</div>;
-  if (meetings.length === 0) return <div className={`text-center py-4 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>회의 기록 없음</div>;
+  if (loading) return <div className="flex justify-center items-center py-4 text-gray-500 dark:text-gray-400"> 로딩 중...</div>;
+  if (error) return <div className="text-center py-4 text-red-500 dark:text-red-400">{error}</div>;
+  if (meetings.length === 0) return <div className="text-center py-4 text-gray-400 dark:text-gray-500">회의 기록 없음</div>; // 수정: 라이트모드 색상 변경
 
     return (
     <div className="space-y-2">
@@ -1448,16 +1336,16 @@ function RecentMeetings({ theme }: { theme: "light" | "dark" }) {
         <div
           key={meeting.id}
           onClick={() => router.push(`/meeting/records/${meeting.id}`)}
-          className={`flex items-center p-2.5 rounded-lg cursor-pointer transition-colors ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+          className={`flex items-center p-2.5 rounded-lg cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-700`}
         >
-          <div className={`mr-3 p-1.5 rounded-full ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
-            <VideoIcon className={`w-4 h-4 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
+          <div className={`mr-3 p-1.5 rounded-full bg-gray-100 dark:bg-gray-700`}>
+            <VideoIcon className={`w-4 h-4 text-blue-600 dark:text-blue-400`} />
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className={`text-sm font-medium truncate ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`}>
+            <h4 className={`text-sm font-medium truncate text-gray-800 dark:text-gray-200`}>
               {meeting.title || "제목 없는 회의"}
             </h4>
-            <div className={`flex items-center text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+            <div className={`flex items-center text-xs text-gray-500 dark:text-gray-400`}>
               <span>{formatDate(meeting.startTime)}</span>
               <span className="mx-1.5">·</span>
               <UsersIcon className="w-3 h-3 mr-0.5" />
@@ -1470,7 +1358,7 @@ function RecentMeetings({ theme }: { theme: "light" | "dark" }) {
   );
 }
 
-function SimplifiedKanbanBoard({ theme }: { theme: "light" | "dark" }) {
+function SimplifiedKanbanBoard({ /* theme prop 제거 */ }: { /* theme prop 타입 제거 */ }) {
   const { currentProject } = useProject();
   const { user } = useAuth();
   const [assignedTasks, setAssignedTasks] = useState<TaskWithProjectInfo[]>([]);
@@ -1518,7 +1406,7 @@ function SimplifiedKanbanBoard({ theme }: { theme: "light" | "dark" }) {
     if (!dueDate) {
       return {
         text: "마감일 미설정",
-        className: theme === 'dark' ? 'text-gray-500' : 'text-gray-400',
+        className: 'text-gray-400 dark:text-gray-500',
         icon: <ClockIcon className="w-3 h-3 mr-1" />
       };
     }
@@ -1536,28 +1424,28 @@ function SimplifiedKanbanBoard({ theme }: { theme: "light" | "dark" }) {
       // 마감일 지남
       return {
         text: `${Math.abs(diffDays)}일 지남`,
-        className: theme === 'dark' ? 'text-red-400' : 'text-red-500',
+        className: 'text-red-500 dark:text-red-400',
         icon: <AlertCircleIcon className="w-3 h-3 mr-1" />
       };
     } else if (diffDays === 0) {
       // 오늘 마감
       return {
         text: "오늘 마감",
-        className: theme === 'dark' ? 'text-orange-400' : 'text-orange-500',
+        className: 'text-orange-500 dark:text-orange-400',
         icon: <AlertCircleIcon className="w-3 h-3 mr-1" />
       };
     } else if (diffDays <= 3) {
       // 3일 이내 마감
       return {
         text: `${diffDays}일 남음`,
-        className: theme === 'dark' ? 'text-yellow-400' : 'text-yellow-500',
+        className: 'text-yellow-500 dark:text-yellow-400',
         icon: <ClockIcon className="w-3 h-3 mr-1" />
       };
     } else {
       // 3일 이상 남음
       return {
         text: `${diffDays}일 남음`,
-        className: theme === 'dark' ? 'text-green-400' : 'text-green-500',
+        className: 'text-green-500 dark:text-green-400',
         icon: <ClockIcon className="w-3 h-3 mr-1" />
       };
     }
@@ -1568,33 +1456,29 @@ function SimplifiedKanbanBoard({ theme }: { theme: "light" | "dark" }) {
     switch (status) {
       case 'todo':
         return (
-          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-            theme === 'dark' ? 'bg-gray-700 text-gray-200' : 'bg-gray-200 text-gray-800'
-          }`}>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium 
+            bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200`}>
             할 일
           </span>
         );
       case 'in-progress':
         return (
-          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-            theme === 'dark' ? 'bg-blue-700 text-blue-100' : 'bg-blue-100 text-blue-800'
-          }`}>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium 
+            bg-blue-100 text-blue-800 dark:bg-blue-700 dark:text-blue-100`}>
             진행 중
           </span>
         );
       case 'review':
         return (
-          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-            theme === 'dark' ? 'bg-yellow-700 text-yellow-100' : 'bg-yellow-100 text-yellow-800'
-          }`}>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium 
+            bg-yellow-100 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-100`}>
             검토
           </span>
         );
       case 'done':
         return (
-          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-            theme === 'dark' ? 'bg-green-700 text-green-100' : 'bg-green-100 text-green-800'
-          }`}>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium 
+            bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-100`}>
             완료
           </span>
         );
@@ -1603,9 +1487,9 @@ function SimplifiedKanbanBoard({ theme }: { theme: "light" | "dark" }) {
     }
   };
 
-  if (loading) return <div className={`flex justify-center items-center py-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}> 로딩 중...</div>;
-  if (error) return <div className={`text-center py-4 ${theme === 'dark' ? 'text-red-400' : 'text-red-500'}`}>{error}</div>;
-  if (assignedTasks.length === 0) return <div className={`text-center py-4 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>할당된 작업이 없습니다</div>;
+  if (loading) return <div className="flex justify-center items-center py-4 text-gray-500 dark:text-gray-400"> 로딩 중...</div>;
+  if (error) return <div className="text-center py-4 text-red-500 dark:text-red-400">{error}</div>;
+  if (assignedTasks.length === 0) return <div className="text-center py-4 text-gray-400 dark:text-gray-500">할당된 작업이 없습니다</div>; // 수정: 라이트모드 색상 변경
 
   return (
     <div className="space-y-1.5 overflow-y-auto pr-1 assigned-tasks-scrollbar">
@@ -1613,16 +1497,16 @@ function SimplifiedKanbanBoard({ theme }: { theme: "light" | "dark" }) {
         <div
           key={task.id}
           onClick={() => router.push(`/kanban?projectId=${task.projectId || ''}`)}
-          className={`p-2.5 rounded-md ${theme === 'dark' ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50'} transition-colors cursor-pointer border-b ${theme === 'dark' ? 'border-gray-700/50' : 'border-gray-100'}`}
+          className={`p-2.5 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer border-b border-gray-100 dark:border-gray-700/50`}
         >
           <div className="flex items-center justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <h4 className={`text-sm font-medium truncate ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`}>
+              <h4 className={`text-sm font-medium truncate text-gray-800 dark:text-gray-200`}>
                 {task.title}
               </h4>
               <div className="flex flex-wrap items-center gap-x-3 mt-0.5">
                 {task.project?.name && (
-                  <div className={`text-xs flex items-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <div className={`text-xs flex items-center text-gray-500 dark:text-gray-400`}>
                     <FolderIcon className="w-3 h-3 mr-1 flex-shrink-0" />
                     <span className="truncate">{task.project.name}</span>
                   </div>
@@ -1643,7 +1527,7 @@ function SimplifiedKanbanBoard({ theme }: { theme: "light" | "dark" }) {
             {getStatusTag(task.status as TaskStatus)}
           </div>
           {task.description && (
-            <p className={`text-xs mt-1 line-clamp-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+            <p className={`text-xs mt-1 line-clamp-1 text-gray-500 dark:text-gray-400`}>
               {task.description}
             </p>
           )}
@@ -1653,8 +1537,8 @@ function SimplifiedKanbanBoard({ theme }: { theme: "light" | "dark" }) {
   );
 }
 
-function RecentDocuments({ projectId, theme }: { projectId?: string; theme: "light" | "dark" }) {
-  const [documents, setDocuments] = useState<any[]>([]);
+function RecentDocuments({ projectId /* theme prop 제거 */ }: { projectId?: string; /* theme prop 타입 제거 */ }) {
+  const [documents, setDocuments] = useState<DocumentSummary[]>([]); // 타입 변경
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -1694,9 +1578,9 @@ function RecentDocuments({ projectId, theme }: { projectId?: string; theme: "lig
       return `${diffDay}일 전`;
   };
 
-  if (loading) return <div className={`flex justify-center items-center py-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}> 로딩 중...</div>;
-  if (error) return <div className={`text-center py-4 ${theme === 'dark' ? 'text-red-400' : 'text-red-500'}`}>{error}</div>;
-  if (documents.length === 0) return <div className={`text-center py-4 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>문서 없음</div>;
+  if (loading) return <div className="flex justify-center items-center py-4 text-gray-500 dark:text-gray-400"> 로딩 중...</div>;
+  if (error) return <div className="text-center py-4 text-red-500 dark:text-red-400">{error}</div>;
+  if (documents.length === 0) return <div className="text-center py-4 text-gray-500 dark:text-gray-400">문서 없음</div>;
 
     return (
     <div className="flex overflow-x-auto space-x-2 pb-3 recent-documents-scrollbar">
@@ -1704,26 +1588,25 @@ function RecentDocuments({ projectId, theme }: { projectId?: string; theme: "lig
         <div
           key={doc.id}
           onClick={() => router.push(`/documents/${doc.id}${projectId ? `?projectId=${projectId}` : ''}`)}
-          className={`flex-shrink-0 w-40 cursor-pointer transition-colors duration-200 border rounded-lg ${
-            theme === 'dark' 
-              ? 'bg-gray-800 border-gray-700 hover:bg-gray-750' 
-              : 'bg-white border-gray-200 hover:bg-gray-50'
-          } p-2.5 flex flex-col items-center`}
+          className={`flex-shrink-0 w-40 cursor-pointer transition-colors duration-200 border rounded-lg 
+            bg-white border-gray-200 hover:bg-gray-50 
+            dark:bg-[#2a2a2c] dark:border-gray-600 dark:hover:bg-gray-700 
+            p-2.5 flex flex-col items-center`}
         >
           {/* Icon Area */}
           <div className={`h-20 flex items-center justify-center mb-1.5`}>
-            <FileTextIcon className={`w-8 h-8 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'} transition-colors`} />
+            <FileTextIcon className={`w-8 h-8 text-gray-400 dark:text-gray-500 transition-colors`} />
           </div>
 
           {/* Title Area */}
           <div className={`w-full mb-1`}>
-            <h4 className={`text-xs font-medium truncate text-center ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`}>{doc.title || "무제 문서"}</h4>
+            <h4 className={`text-xs font-medium truncate text-center text-gray-800 dark:text-gray-200`}>{doc.title || "무제 문서"}</h4>
           </div>
 
           {/* Info Area */}
           <div className={`text-center`}>
-            <p className={`text-[10px] ${theme === 'dark' ? 'text-gray-500' : 'text-gray-600'}`}>최근 수정</p>
-            <p className={`text-[10px] ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{formatDate(doc.updatedAt || doc.createdAt)}</p>
+            <p className={`text-[10px] text-gray-600 dark:text-gray-500`}>최근 수정</p>
+            <p className={`text-[10px] text-gray-500 dark:text-gray-400`}>{formatDate(doc.updatedAt || doc.createdAt)}</p>
           </div>
            {/* Starred Icon - Optionally keep or remove */}
            {doc.isStarred && (
@@ -1737,11 +1620,12 @@ function RecentDocuments({ projectId, theme }: { projectId?: string; theme: "lig
     );
   }
 
-function UpcomingEvents({ theme }: { theme: "light" | "dark" }) {
+function UpcomingEvents({ /* theme prop 제거 */ }) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
+  // const router = useRouter(); // router 변수 제거
+  const { theme: currentTheme } = useTheme(); // Calendar 스타일 위해 currentTheme 사용
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -1793,25 +1677,26 @@ function UpcomingEvents({ theme }: { theme: "light" | "dark" }) {
     }, {} as Record<string, CalendarEvent[]>);
   };
 
-  if (loading) return <div className={`flex justify-center items-center py-8 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>로딩 중...</div>;
-  if (error) return <div className={`text-center py-8 ${theme === 'dark' ? 'text-red-400' : 'text-red-500'}`}>{error}</div>;
-  if (events.length === 0) return <div className={`text-center py-8 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>예정된 일정이 없습니다</div>;
+  if (loading) return <div className="flex justify-center items-center py-8 text-gray-500 dark:text-gray-400">로딩 중...</div>;
+  if (error) return <div className="text-center py-8 text-red-500 dark:text-red-400">{error}</div>;
+  if (events.length === 0) return <div className="text-center py-8 text-gray-500 dark:text-gray-400">예정된 일정이 없습니다</div>;
 
   const groupedEvents = groupEventsByDate(events);
+  const calendarThemeClass = currentTheme === 'dark' ? 'dark-calendar' : 'light-calendar';
 
   return (
-    <div className={`flex h-full ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} p-1`}>
-      <div className={`w-1/3 pr-6 py-2 flex flex-col items-center ${theme === 'dark' ? 'border-r border-gray-700' : 'border-r border-gray-200'}`}> 
+    <div className="flex h-full bg-white dark:bg-[#2a2a2c] p-1"> {/* 배경색 수정 */}
+      <div className="w-1/3 pr-6 py-2 flex flex-col items-center border-r border-gray-200 dark:border-gray-700"> 
         <div className="w-full max-w-[260px] mx-auto calendar-container py-2">
           <Calendar
             value={new Date()} 
             view="month"
             locale="ko-KR"
-            className={theme === 'dark' ? 'dark-calendar' : 'light-calendar'}
+            className={calendarThemeClass} // 수정된 theme 클래스 사용
             formatDay={(locale, date) => new Date(date).getDate().toString()} // 날짜만 표시
             tileClassName={({ date, view }) => { // 오늘 날짜 강조를 위한 클래스 추가 로직
               if (view === 'month' && date.toDateString() === new Date().toDateString()) {
-                return theme === 'dark' ? 'today-dark' : 'today-light';
+                return currentTheme === 'dark' ? 'today-dark' : 'today-light'; // 수정된 theme 클래스 사용
               }
               return null;
             }}
@@ -1820,21 +1705,20 @@ function UpcomingEvents({ theme }: { theme: "light" | "dark" }) {
       </div>
 
       <div className="w-2/3 pl-6 py-2 space-y-4 overflow-y-auto flex-1" style={{ maxHeight: '100%' }}>
-        {Object.keys(groupedEvents).map((dateKey, groupIndex) => (
+        {Object.keys(groupedEvents).map((dateKey) => (
           <div key={dateKey}>
-            <h4 className={`text-sm font-semibold mb-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+            <h4 className="text-sm font-semibold mb-2 text-gray-500 dark:text-gray-400">
               {formatDateForEventGroup(dateKey)}
             </h4>
     <div className="space-y-3">
-              {groupedEvents[dateKey].map((event, eventIndex) => (
+              {groupedEvents[dateKey].map((event) => (
                 <div 
                   key={event.id} 
-                  className={`flex items-start p-2 rounded-md transition-colors duration-150 ${theme === 'dark' ? 'hover:bg-gray-750' : 'hover:bg-gray-50'}`}
-                >
-                  <div className={`w-px ${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'} mr-3 self-stretch`}></div>
+                  className="flex items-start p-2 rounded-md transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-gray-750">
+                  <div className="w-px bg-gray-300 dark:bg-gray-600 mr-3 self-stretch"></div>
                   <div className="flex-1">
-                    <p className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>{event.title}</p>
-                    <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} mt-0.5`}>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{event.title}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                       {formatTime(event.startDate)} - {event.project?.name || '개인 일정'}
             </p>
           </div>
@@ -1857,40 +1741,40 @@ const CalendarStyles = () => (
       width: 100%;
       line-height: 1.2em; /* 기본 line-height 조정 */
     }
-    .light-calendar.react-calendar {
+    html:not(.dark) .light-calendar.react-calendar {
       background-color: #ffffff; /* white */
     }
-    .dark-calendar.react-calendar {
-      background-color: #1f2937; /* gray-800 */
+    html.dark .dark-calendar.react-calendar {
+      background-color: var(--background); /* #1f1f21, globals.css의 --background 변수 사용 */
     }
     .calendar-container .react-calendar__navigation button {
       min-width: 30px;
       font-size: 0.875rem; /* 14px */
       padding: 0.5em 0.3em;
     }
-    .light-calendar .react-calendar__navigation button {
+    html:not(.dark) .light-calendar .react-calendar__navigation button {
       color: #374151; /* gray-700 */
     }
-    .dark-calendar .react-calendar__navigation button {
+    html.dark .dark-calendar .react-calendar__navigation button {
       color: #d1d5db; /* gray-300 */
     }
-    .light-calendar .react-calendar__navigation button:hover,
-    .light-calendar .react-calendar__navigation button:focus {
+    html:not(.dark) .light-calendar .react-calendar__navigation button:hover,
+    html:not(.dark) .light-calendar .react-calendar__navigation button:focus {
       background-color: #f3f4f6; /* gray-100 */
     }
-    .dark-calendar .react-calendar__navigation button:hover,
-    .dark-calendar .react-calendar__navigation button:focus {
-      background-color: #374151; /* gray-700 */
+    html.dark .dark-calendar .react-calendar__navigation button:hover,
+    html.dark .dark-calendar .react-calendar__navigation button:focus {
+      background-color: #2a2a2c; /* 사용자 지정 카드 배경색과 유사하게 */
     }
     .calendar-container .react-calendar__month-view__weekdays {
       font-size: 0.7rem; /* 요일 폰트 크기 */
       font-weight: 500;
     }
-    .light-calendar .react-calendar__month-view__weekdays__weekday abbr {
+    html:not(.dark) .light-calendar .react-calendar__month-view__weekdays__weekday abbr {
       text-decoration: none;
       color: #6b7280; /* gray-500 */
     }
-    .dark-calendar .react-calendar__month-view__weekdays__weekday abbr {
+    html.dark .dark-calendar .react-calendar__month-view__weekdays__weekday abbr {
       text-decoration: none;
       color: #9ca3af; /* gray-400 */
     }
@@ -1904,55 +1788,55 @@ const CalendarStyles = () => (
       justify-content: center;
       min-height: 30px; /* 최소 높이 */
     }
-    .light-calendar .react-calendar__tile {
+    html:not(.dark) .light-calendar .react-calendar__tile {
       color: #1f2937; /* gray-800 */
     }
-    .dark-calendar .react-calendar__tile {
+    html.dark .dark-calendar .react-calendar__tile {
       color: #e5e7eb; /* gray-200 */
     }
-    .light-calendar .react-calendar__tile:enabled:hover,
-    .light-calendar .react-calendar__tile:enabled:focus {
+    html:not(.dark) .light-calendar .react-calendar__tile:enabled:hover,
+    html:not(.dark) .light-calendar .react-calendar__tile:enabled:focus {
       background-color: #e5e7eb; /* gray-200 */
     }
-    .dark-calendar .react-calendar__tile:enabled:hover,
-    .dark-calendar .react-calendar__tile:enabled:focus {
-      background-color: #4b5563; /* gray-600 */
+    html.dark .dark-calendar .react-calendar__tile:enabled:hover,
+    html.dark .dark-calendar .react-calendar__tile:enabled:focus {
+      background-color: #374151; /* gray-700, 네비게이션 버튼 기존 hover 색상 */
     }
     
     /* 오늘 날짜 스타일 */
-    .light-calendar .react-calendar__tile.today-light {
+    html:not(.dark) .light-calendar .react-calendar__tile.today-light {
       background: #eff6ff !important; /* blue-50 */
       color: #1d4ed8 !important; /* blue-700 */
       font-weight: bold;
     }
-    .dark-calendar .react-calendar__tile.today-dark {
+    html.dark .dark-calendar .react-calendar__tile.today-dark {
       background: #1e3a8a !important; /* darker blue-800/900 */
       color: #93c5fd !important; /* blue-300 */
       font-weight: bold;
     }
 
     /* 선택된 날짜 스타일 (오늘 날짜와 겹칠 때 우선순위) */
-    .light-calendar .react-calendar__tile--active,
-    .light-calendar .react-calendar__tile--active.today-light {
+    html:not(.dark) .light-calendar .react-calendar__tile--active,
+    html:not(.dark) .light-calendar .react-calendar__tile--active.today-light {
       background: #2563eb !important; /* blue-600 */
       color: white !important;
     }
-    .dark-calendar .react-calendar__tile--active,
-    .dark-calendar .react-calendar__tile--active.today-dark {
+    html.dark .dark-calendar .react-calendar__tile--active,
+    html.dark .dark-calendar .react-calendar__tile--active.today-dark {
       background: #3b82f6 !important; /* blue-500 */
       color: white !important;
     }
 
-    .light-calendar .react-calendar__tile--active:enabled:hover,
-    .light-calendar .react-calendar__tile--active:enabled:focus,
-    .light-calendar .react-calendar__tile--active.today-light:enabled:hover,
-    .light-calendar .react-calendar__tile--active.today-light:enabled:focus {
+    html:not(.dark) .light-calendar .react-calendar__tile--active:enabled:hover,
+    html:not(.dark) .light-calendar .react-calendar__tile--active:enabled:focus,
+    html:not(.dark) .light-calendar .react-calendar__tile--active.today-light:enabled:hover,
+    html:not(.dark) .light-calendar .react-calendar__tile--active.today-light:enabled:focus {
       background: #1d4ed8 !important; /* blue-700 */
     }
-    .dark-calendar .react-calendar__tile--active:enabled:hover,
-    .dark-calendar .react-calendar__tile--active:enabled:focus,
-    .dark-calendar .react-calendar__tile--active.today-dark:enabled:hover,
-    .dark-calendar .react-calendar__tile--active.today-dark:enabled:focus {
+    html.dark .dark-calendar .react-calendar__tile--active:enabled:hover,
+    html.dark .dark-calendar .react-calendar__tile--active:enabled:focus,
+    html.dark .dark-calendar .react-calendar__tile--active.today-dark:enabled:hover,
+    html.dark .dark-calendar .react-calendar__tile--active.today-dark:enabled:focus {
       background: #2563eb !important; /* blue-600 */
     }
 
@@ -1970,131 +1854,131 @@ const CalendarStyles = () => (
 const ModernScrollbarStyles = () => (
   <style jsx global>{`
     /* Firefox */
-    .dark-mode ::-webkit-scrollbar {
+    html.dark ::-webkit-scrollbar {
       width: 8px;
       height: 8px;
     }
-    .light-mode ::-webkit-scrollbar {
+    html:not(.dark) ::-webkit-scrollbar {
       width: 8px;
       height: 8px;
     }
 
     /* Webkit (Chrome, Safari, Edge) - Track */
-    .dark-mode ::-webkit-scrollbar-track {
+    html.dark ::-webkit-scrollbar-track {
       background: #1f2937; /* gray-800 */
       border-radius: 4px;
     }
-    .light-mode ::-webkit-scrollbar-track {
+    html:not(.dark) ::-webkit-scrollbar-track {
       background: #f3f4f6; /* gray-100 */
       border-radius: 4px;
     }
 
     /* Webkit (Chrome, Safari, Edge) - Thumb */
-    .dark-mode ::-webkit-scrollbar-thumb {
+    html.dark ::-webkit-scrollbar-thumb {
       background-color: #4b5563; /* gray-600 */
       border-radius: 4px;
       border: 2px solid #1f2937; /* gray-800, creates padding */
     }
-    .light-mode ::-webkit-scrollbar-thumb {
+    html:not(.dark) ::-webkit-scrollbar-thumb {
       background-color: #d1d5db; /* gray-300 */
       border-radius: 4px;
       border: 2px solid #f3f4f6; /* gray-100, creates padding */
     }
 
     /* Webkit (Chrome, Safari, Edge) - Thumb on hover */
-    .dark-mode ::-webkit-scrollbar-thumb:hover {
+    html.dark ::-webkit-scrollbar-thumb:hover {
       background-color: #6b7280; /* gray-500 */
     }
-    .light-mode ::-webkit-scrollbar-thumb:hover {
+    html:not(.dark) ::-webkit-scrollbar-thumb:hover {
       background-color: #9ca3af; /* gray-400 */
     }
 
     /* Firefox - General */
-    .dark-mode * {
+    html.dark * {
       scrollbar-width: thin;
       scrollbar-color: #4b5563 #1f2937; /* thumb track */
     }
-    .light-mode * {
+    html:not(.dark) * {
       scrollbar-width: thin;
       scrollbar-color: #d1d5db #f3f4f6; /* thumb track */
     }
 
     /* Custom scrollbar for recent documents (horizontal) */
-    .dark-mode .recent-documents-scrollbar::-webkit-scrollbar {
+    html.dark .recent-documents-scrollbar::-webkit-scrollbar {
       height: 8px;
     }
-    .light-mode .recent-documents-scrollbar::-webkit-scrollbar {
+    html:not(.dark) .recent-documents-scrollbar::-webkit-scrollbar {
       height: 8px;
     }
-    .dark-mode .recent-documents-scrollbar::-webkit-scrollbar-track {
+    html.dark .recent-documents-scrollbar::-webkit-scrollbar-track {
       background: #1f2937; /* gray-800 */
       border-radius: 4px;
     }
-    .light-mode .recent-documents-scrollbar::-webkit-scrollbar-track {
+    html:not(.dark) .recent-documents-scrollbar::-webkit-scrollbar-track {
       background: #f3f4f6; /* gray-100 */
       border-radius: 4px;
     }
-    .dark-mode .recent-documents-scrollbar::-webkit-scrollbar-thumb {
+    html.dark .recent-documents-scrollbar::-webkit-scrollbar-thumb {
       background-color: #4b5563; /* gray-600 */
       border-radius: 4px;
       border: 2px solid #1f2937; /* gray-800, creates padding */
     }
-    .light-mode .recent-documents-scrollbar::-webkit-scrollbar-thumb {
+    html:not(.dark) .recent-documents-scrollbar::-webkit-scrollbar-thumb {
       background-color: #d1d5db; /* gray-300 */
       border-radius: 4px;
       border: 2px solid #f3f4f6; /* gray-100, creates padding */
     }
-    .dark-mode .recent-documents-scrollbar::-webkit-scrollbar-thumb:hover {
+    html.dark .recent-documents-scrollbar::-webkit-scrollbar-thumb:hover {
       background-color: #6b7280; /* gray-500 */
     }
-    .light-mode .recent-documents-scrollbar::-webkit-scrollbar-thumb:hover {
+    html:not(.dark) .recent-documents-scrollbar::-webkit-scrollbar-thumb:hover {
       background-color: #9ca3af; /* gray-400 */
     }
-    .dark-mode .recent-documents-scrollbar {
+    html.dark .recent-documents-scrollbar {
       scrollbar-color: #4b5563 #1f2937; /* thumb track for Firefox */
     }
-    .light-mode .recent-documents-scrollbar {
+    html:not(.dark) .recent-documents-scrollbar {
       scrollbar-color: #d1d5db #f3f4f6; /* thumb track for Firefox */
     }
     
     /* 할당된 작업 스크롤바 스타일 */
-    .dark-mode .assigned-tasks-scrollbar::-webkit-scrollbar {
+    html.dark .assigned-tasks-scrollbar::-webkit-scrollbar {
       width: 6px;
       height: 6px;
     }
-    .light-mode .assigned-tasks-scrollbar::-webkit-scrollbar {
+    html:not(.dark) .assigned-tasks-scrollbar::-webkit-scrollbar {
       width: 6px;
       height: 6px;
     }
-    .dark-mode .assigned-tasks-scrollbar::-webkit-scrollbar-track {
+    html.dark .assigned-tasks-scrollbar::-webkit-scrollbar-track {
       background: #1f2937; /* gray-800 */
       border-radius: 3px;
     }
-    .light-mode .assigned-tasks-scrollbar::-webkit-scrollbar-track {
+    html:not(.dark) .assigned-tasks-scrollbar::-webkit-scrollbar-track {
       background: #f3f4f6; /* gray-100 */
       border-radius: 3px;
     }
-    .dark-mode .assigned-tasks-scrollbar::-webkit-scrollbar-thumb {
+    html.dark .assigned-tasks-scrollbar::-webkit-scrollbar-thumb {
       background-color: #4b5563; /* gray-600 */
       border-radius: 3px;
       border: 1px solid #1f2937; /* gray-800, creates padding */
     }
-    .light-mode .assigned-tasks-scrollbar::-webkit-scrollbar-thumb {
+    html:not(.dark) .assigned-tasks-scrollbar::-webkit-scrollbar-thumb {
       background-color: #d1d5db; /* gray-300 */
       border-radius: 3px;
       border: 1px solid #f3f4f6; /* gray-100, creates padding */
     }
-    .dark-mode .assigned-tasks-scrollbar::-webkit-scrollbar-thumb:hover {
+    html.dark .assigned-tasks-scrollbar::-webkit-scrollbar-thumb:hover {
       background-color: #6b7280; /* gray-500 */
     }
-    .light-mode .assigned-tasks-scrollbar::-webkit-scrollbar-thumb:hover {
+    html:not(.dark) .assigned-tasks-scrollbar::-webkit-scrollbar-thumb:hover {
       background-color: #9ca3af; /* gray-400 */
     }
-    .dark-mode .assigned-tasks-scrollbar {
+    html.dark .assigned-tasks-scrollbar {
       scrollbar-width: thin;
       scrollbar-color: #4b5563 #1f2937; /* thumb track for Firefox */
     }
-    .light-mode .assigned-tasks-scrollbar {
+    html:not(.dark) .assigned-tasks-scrollbar {
       scrollbar-width: thin;
       scrollbar-color: #d1d5db #f3f4f6; /* thumb track for Firefox */
     }

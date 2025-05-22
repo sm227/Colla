@@ -19,7 +19,7 @@ export default function DarkTest() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container bg-background mx-auto px-4 py-8">
         {/* 테마 토글 버튼 */}
         <div className="flex justify-end mb-8">
           <button
