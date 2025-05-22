@@ -763,7 +763,7 @@ export default function Home() {
       <ModernScrollbarStyles />
       <div className="flex h-screen bg-background text-foreground">
         <aside
-          className={`fixed inset-y-0 left-0 z-30 w-64 bg-gray-50 border-r border-gray-200 dark:bg-[#2a2a2c] dark:border-gray-700 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-30 w-64  border-r border-gray-200 bg-background dark:border-gray-700 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
             mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
           } md:relative md:flex-shrink-0 flex flex-col`}
         >
