@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,36 +7,155 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 사용자 모델 추가
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String    @id @default(uuid())
+  name        String
+  email       String    @unique
+  password    String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  projects    Project[]
+  memberships ProjectMember[]
+  comments    Comment[]
+  calendars   Calendar[]
 }
 
-// 칸반보드 관련 모델
 model Task {
   id          String    @id @default(cuid())
   title       String
   description String?
-  status      String    // "todo", "in-progress", "review", "done"
-  priority    String    // "low", "medium", "high"
+  status      String
+  priority    String
   assignee    String?
   dueDate     DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   projectId   String?
+  endDate     DateTime?
+  isAllDay    Boolean   @default(false)
+  startDate   DateTime?
+  epicId      String?   
   project     Project?  @relation(fields: [projectId], references: [id])
+  epic        Epic?     @relation(fields: [epicId], references: [id])
+  comments    Comment[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  taskId    String
+  userId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Project {
-  id          String   @id @default(cuid())
+  id          String          @id @default(cuid())
   name        String
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  userId      String?
+  documents   Document[]
+  folders     Folder[]
+  user        User?           @relation(fields: [userId], references: [id])
+  members     ProjectMember[]
   tasks       Task[]
-} 
+  epics       Epic[]
+  calendars   Calendar[]
+  meetings    Meeting[]
+}
+
+model ProjectMember {
+  id           String   @id @default(cuid())
+  userId       String
+  projectId    String
+  role         String   @default("member")
+  inviteStatus String   @default("pending")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  project      Project  @relation(fields: [projectId], references: [id])
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, projectId])
+}
+
+model Document {
+  id         String   @id @default(cuid())
+  title      String
+  content    String
+  emoji      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  projectId  String?
+  folder     String?
+  isStarred  Boolean  @default(false)
+  isReadOnly Boolean  @default(false)
+  tags       String?
+  folderId   String?
+  folderRef  Folder?  @relation(fields: [folderId], references: [id])
+  project    Project? @relation(fields: [projectId], references: [id])
+  ycontent   Bytes? // Y.js 문서 바이너리 데이터
+  password   String? // 문서 암호 보호를 위한 필드
+  isPasswordProtected Boolean @default(false) // 암호 보호 활성화 여부
+}
+
+model Folder {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  projectId   String?
+  documents   Document[]
+  project     Project?   @relation(fields: [projectId], references: [id])
+}
+
+model Calendar {
+  id          String    @id @default(cuid())
+  title       String
+  description String?   @db.Text
+  startDate   DateTime
+  endDate     DateTime?
+  isAllDay    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  projectId String?
+}
+
+model Meeting {
+  id            String    @id @default(cuid())
+  title         String?
+  startTime     DateTime  @default(now())
+  endTime       DateTime?
+  projectId     String?
+  transcript    String?   @db.Text
+  mainPoints    String?   @db.Text
+  decisions     String?   @db.Text
+  actionItems   String?   @db.Text
+  participants  Json?     // 참가자 정보를 JSON 형태로 저장 [{userId, joinTime, leaveTime}]
+  project       Project?  @relation(fields: [projectId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Epic {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  projectId   String?
+  color       String?   @default("#4F46E5")
+  project     Project?  @relation(fields: [projectId], references: [id])
+  tasks       Task[]
+}

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { stripHtmlTags } from '@/lib/utils';
 
 // 프로젝트의 모든 태스크 가져오기
 export async function GET(
@@ -14,6 +15,22 @@ export async function GET(
       orderBy: {
         createdAt: 'desc',
       },
+      // 필요한 모든 필드 선택 (startDate, endDate, isAllDay 포함)
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        status: true,
+        priority: true,
+        assignee: true,
+        dueDate: true,
+        startDate: true,
+        endDate: true,
+        isAllDay: true,
+        createdAt: true,
+        updatedAt: true,
+        projectId: true
+      }
     });
     
     return NextResponse.json(tasks);
@@ -35,7 +52,17 @@ export async function POST(
     const projectId = params.id;
     const body = await request.json();
     
-    const { title, description, status, priority, assignee, dueDate } = body;
+    const { 
+      title, 
+      description, 
+      status, 
+      priority, 
+      assignee, 
+      dueDate,
+      startDate,
+      endDate,
+      isAllDay 
+    } = body;
     
     if (!title || !status || !priority) {
       return NextResponse.json(
@@ -43,6 +70,9 @@ export async function POST(
         { status: 400 }
       );
     }
+    
+    // HTML 태그 제거
+    const cleanDescription = description ? stripHtmlTags(description) : '';
     
     // 프로젝트가 존재하는지 확인
     const project = await prisma.project.findUnique({
@@ -59,11 +89,14 @@ export async function POST(
     const task = await prisma.task.create({
       data: {
         title,
-        description,
+        description: cleanDescription,  // HTML 태그가 제거된 설명 저장
         status,
         priority,
         assignee,
         dueDate: dueDate ? new Date(dueDate) : null,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+        isAllDay: isAllDay || false,
         projectId,
       },
     });

@@ -3,6 +3,9 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { AuthProvider } from './contexts/AuthContext';
+import { ProjectProvider } from './contexts/ProjectContext';
+import { UserProvider } from './contexts/UserContext';
+import { ChatButton } from '@/components/ChatButton';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -20,7 +23,12 @@ export default function RootLayout({
     <html lang="ko">
       <body className={inter.className}>
         <AuthProvider>
-          {children}
+          <ProjectProvider>
+            <UserProvider>
+              {children}
+              <ChatButton />
+            </UserProvider>
+          </ProjectProvider>
         </AuthProvider>
       </body>
     </html>

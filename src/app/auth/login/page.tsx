@@ -11,7 +11,8 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   // 콜백 URL이 복잡한 경우 기본값으로 홈 페이지 사용
   const rawCallbackUrl = searchParams.get('callbackUrl');
-  const callbackUrl = rawCallbackUrl && !rawCallbackUrl.includes('auth') ? rawCallbackUrl : '/';
+  // 수정: 로그인 후 홈('/')으로 리디렉션하도록 설정
+  const callbackUrl = '/';
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -51,7 +52,7 @@ export default function LoginPage() {
       await login(email, password, callbackUrl);
       
       // 로그인 성공 메시지 표시
-      setSuccess("로그인 성공! 메인 페이지로 이동합니다...");
+      setSuccess("로그인 성공! 대시보드로 이동합니다...");
     } catch (err: any) {
       setError(err.message || "로그인 중 오류가 발생했습니다.");
     } finally {

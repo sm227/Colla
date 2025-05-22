@@ -50,9 +50,13 @@ export async function POST(request: NextRequest) {
       email: user.email,
     };
 
-    // 응답 생성
+    // 응답 생성 - 토큰도 함께 반환
     const response = NextResponse.json(
-      { message: '로그인 성공', user: userWithoutPassword },
+      { 
+        message: '로그인 성공', 
+        user: userWithoutPassword,
+        token: token // 클라이언트 측에서 localStorage에 저장하기 위해 토큰 포함
+      },
       { status: 200 }
     );
 
