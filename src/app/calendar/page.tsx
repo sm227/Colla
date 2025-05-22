@@ -4,13 +4,14 @@ import { useState, useEffect, useMemo, useContext, useCallback } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay, differenceInDays, getDay, addDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, HomeIcon, CalendarIcon, PlusIcon, X, MoreHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, HomeIcon, CalendarIcon, PlusIcon, X, MoreHorizontal, SunIcon, MoonIcon } from "lucide-react";
 import { useProject } from "@/app/contexts/ProjectContext";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTasks } from "@/hooks/useTasks";
 import { Task as KanbanTask, TaskStatus } from "@/components/kanban/KanbanBoard";
 import { useAuth } from "@/app/contexts/AuthContext";
+import { useTheme } from "next-themes";
 
 export interface Task {
   id: string;
@@ -65,43 +66,43 @@ interface EditEventDialog {
 }
 
 const CalendarPage: React.FC = () => {
+  // 모든 hooks를 최상단으로 이동
   const router = useRouter();
   const searchParams = useSearchParams();
   const projectId = searchParams?.get('projectId');
+  const { currentProject, projects } = useProject();
+  const { tasks: projectTasks, updateTask, fetchTasks } = useTasks(projectId || currentProject?.id);
+  const { user } = useAuth();
+
+  // useState hooks
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [calendarTasks, setCalendarTasks] = useState<CalendarTask[]>([]);
-  const { currentProject, projects } = useProject();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { tasks: projectTasks, updateTask, fetchTasks } = useTasks(projectId || currentProject?.id);
   const [sidebarTasks, setSidebarTasks] = useState<Task[]>([]);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [dropTarget, setDropTarget] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  
-  // 일정 추가 다이얼로그 상태
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addFormDate, setAddFormDate] = useState<string>('');
+  const [calendarView, setCalendarView] = useState<'month'|'week'|'day'>('month');
+  const [mounted, setMounted] = useState(false);
   const [addEventDialog, setAddEventDialog] = useState<AddEventDialog>({
     show: false,
     date: null
   });
-  
-  // 새 일정 상태
   const [newEvent, setNewEvent] = useState({
     title: '',
     description: '',
     startDate: '',
     endDate: '',
-    projectId: ''  // 프로젝트 ID 필드 추가
+    projectId: ''
   });
-  
-  // 일정 수정 다이얼로그 상태
   const [editEventDialog, setEditEventDialog] = useState<EditEventDialog>({
     show: false,
     event: null
   });
-  
-  // 편집 중인 이벤트 상태
   const [editingEvent, setEditingEvent] = useState({
     id: '',
     title: '',
@@ -110,15 +111,8 @@ const CalendarPage: React.FC = () => {
     endDate: '',
     projectId: ''
   });
-  
 
-  // 일정 추가 폼 상태
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [addFormDate, setAddFormDate] = useState<string>('');
-  
-  const { user } = useAuth();
-  
-  // 로컬 스토리지 대신 API에서 캘린더 이벤트 직접 불러오기
+  // useCallback hooks
   const fetchCalendarEvents = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -169,12 +163,6 @@ const CalendarPage: React.FC = () => {
     }
   }, [projectId]);
 
-  // 초기 데이터 로드
-  useEffect(() => {
-    fetchCalendarEvents();
-    fetchKanbanTasks();
-  }, [fetchCalendarEvents, projectId]);
-
   // 칸반 태스크를 가져오는 함수
   const fetchKanbanTasks = async () => {
     try {
@@ -204,6 +192,154 @@ const CalendarPage: React.FC = () => {
       setSidebarTasks([]);
     }
   };
+
+  // useMemo hooks
+  const { calendarDays, processedCalendarTasks } = useMemo(() => {
+    // 현재 월의 시작일과 마지막일을 구함
+    const monthStart = startOfMonth(currentDate);
+    const firstDayOfMonth = getDay(monthStart); // 0: 일요일, 1: 월요일, ...
+    
+    // 이전 달의 마지막 날짜들을 포함 (달력 첫 줄 채우기 위함)
+    const prevMonthDays = firstDayOfMonth > 0 
+      ? eachDayOfInterval({ 
+          start: addDays(monthStart, -firstDayOfMonth), 
+          end: addDays(monthStart, -1) 
+        }) 
+      : [];
+    
+    const monthEnd = endOfMonth(currentDate);
+    const currentMonthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
+    
+    // 다음 달의 시작 날짜들을 포함 (달력 마지막 줄 채우기 위함)
+    const lastDayOfMonth = getDay(monthEnd); // 0: 일요일, 1: 월요일, ...
+    const nextMonthDays = lastDayOfMonth < 6 
+      ? eachDayOfInterval({ 
+          start: addDays(monthEnd, 1), 
+          end: addDays(monthEnd, 6 - lastDayOfMonth) 
+        }) 
+      : [];
+    
+    // 달력에 표시할 모든 날짜 (이전 달 + 현재 달 + 다음 달)
+    const allCalendarDays = [...prevMonthDays, ...currentMonthDays, ...nextMonthDays];
+    
+    // 태스크 처리 로직 (tasks가 비어있으면 빈 배열 반환)
+    if (tasks.length === 0) {
+      return { calendarDays: allCalendarDays, processedCalendarTasks: [] };
+    }
+    
+    // 태스크를 겹침 없이 행별로 배치하기 위한 함수
+    const assignRowsToTasks = (tasks: CalendarTask[]): CalendarTask[] => {
+      // 태스크를 시작일 기준으로 정렬
+      const sortedTasks = [...tasks].sort((a, b) => a.startPosition - b.startPosition);
+      
+      // 각 태스크의 행을 할당
+      const assignedTasks: CalendarTask[] = [];
+      const usedRows: {[key: number]: number[]} = {}; // 각 위치에서 사용 중인 행 추적
+      
+      for (const task of sortedTasks) {
+        let row = 0;
+        let foundRow = false;
+        
+        // 태스크가 위치할 수 있는 첫 번째 빈 행 찾기
+        while (!foundRow) {
+          foundRow = true;
+          
+          // 태스크 기간 동안 이 행이 사용 가능한지 확인
+          for (let pos = task.startPosition; pos < task.startPosition + task.duration; pos++) {
+            if (usedRows[pos] && usedRows[pos].includes(row)) {
+              foundRow = false;
+              row++;
+              break;
+            }
+          }
+        }
+        
+        // 태스크에 행 할당
+        const taskWithRow = { ...task, row };
+        assignedTasks.push(taskWithRow);
+        
+        // 사용된 행 표시
+        for (let pos = task.startPosition; pos < task.startPosition + task.duration; pos++) {
+          if (!usedRows[pos]) usedRows[pos] = [];
+          usedRows[pos].push(row);
+        }
+      }
+      
+      return assignedTasks;
+    };
+
+    const preparedTasks: CalendarTask[] = [];
+    
+    tasks.forEach(task => {
+      if (!task.dueDate) return; // null 또는 undefined dueDate 건너뛰기
+      
+      // 태스크의 시작 날짜와 마감일 설정
+      // isCalendarEvent가 true인 경우는 시작일부터 마감일까지 전체 기간 표시
+      // 일반 칸반 태스크는 마감일(dueDate)에만 표시
+      const taskStartDate = task.isCalendarEvent === true ?
+                           (task.startDate ? new Date(task.startDate) : new Date(task.createdAt)) : 
+                           new Date(task.dueDate);
+      
+      const taskDue = new Date(task.dueDate);
+      
+      // 마감일이 하루의 끝시간으로 설정되어 있지 않으면 조정
+      if (taskDue.getHours() !== 23 || taskDue.getMinutes() !== 59) {
+        taskDue.setHours(23, 59, 59, 999);
+      }
+      
+      // 시작일과 마감일이 달력 범위에 포함되는 태스크만 필터링
+      const calendarStart = addDays(monthStart, -firstDayOfMonth);
+      const calendarEnd = addDays(monthEnd, 6 - lastDayOfMonth);
+      
+      // 시작일이 달력 끝보다 이전이고, 마감일이 달력 시작보다 이후인 태스크만 표시
+      if (taskStartDate <= calendarEnd && taskDue >= calendarStart) {
+        // 표시 시작 날짜 (달력 범위 내로 제한)
+        const displayStart = taskStartDate < calendarStart ? calendarStart : taskStartDate;
+        
+        // 표시 종료 날짜 (달력 범위 내로 제한)
+        const displayEnd = taskDue > calendarEnd ? calendarEnd : taskDue;
+        
+        // 시작 위치 계산 (전체 달력 날짜 배열에서의 인덱스)
+        const startPosition = differenceInDays(displayStart, calendarStart);
+        
+        // 표시 기간 계산
+        // 캘린더 일정은 시작일부터 마감일까지 전체 기간을 표시
+        // 일반 태스크는 마감일에만 표시 (기간은 1일)
+        const duration = task.isCalendarEvent === true ? 
+                        differenceInDays(displayEnd, displayStart) + 1 : 
+                        1;
+        
+        preparedTasks.push({
+          ...task,
+          startPosition,
+          duration,
+          row: 0 // 임시 행 값, 나중에 할당됨
+        });
+      }
+    });
+    
+    // 태스크에 행 할당
+    const tasksWithRows = assignRowsToTasks(preparedTasks);
+    return { calendarDays: allCalendarDays, processedCalendarTasks: tasksWithRows };
+  }, [currentDate, tasks]);
+
+  // useEffect hooks
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    setCalendarTasks(processedCalendarTasks);
+  }, [processedCalendarTasks]);
+
+  useEffect(() => {
+    fetchCalendarEvents();
+    fetchKanbanTasks();
+  }, [fetchCalendarEvents, projectId]);
+
+  if (!mounted) {
+    return null;
+  }
 
   // 일정 추가 함수
   const addCalendarEvent = async (event: any) => {
@@ -505,141 +641,6 @@ const CalendarPage: React.FC = () => {
     }
   };
 
-  // 달력 날짜와 태스크 계산을 메모이제이션
-  const { calendarDays, processedCalendarTasks } = useMemo(() => {
-    // 현재 월의 시작일과 마지막일을 구함
-    const monthStart = startOfMonth(currentDate);
-    const firstDayOfMonth = getDay(monthStart); // 0: 일요일, 1: 월요일, ...
-    
-    // 이전 달의 마지막 날짜들을 포함 (달력 첫 줄 채우기 위함)
-    const prevMonthDays = firstDayOfMonth > 0 
-      ? eachDayOfInterval({ 
-          start: addDays(monthStart, -firstDayOfMonth), 
-          end: addDays(monthStart, -1) 
-        }) 
-      : [];
-    
-    const monthEnd = endOfMonth(currentDate);
-    const currentMonthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
-    
-    // 다음 달의 시작 날짜들을 포함 (달력 마지막 줄 채우기 위함)
-    const lastDayOfMonth = getDay(monthEnd); // 0: 일요일, 1: 월요일, ...
-    const nextMonthDays = lastDayOfMonth < 6 
-      ? eachDayOfInterval({ 
-          start: addDays(monthEnd, 1), 
-          end: addDays(monthEnd, 6 - lastDayOfMonth) 
-        }) 
-      : [];
-    
-    // 달력에 표시할 모든 날짜 (이전 달 + 현재 달 + 다음 달)
-    const allCalendarDays = [...prevMonthDays, ...currentMonthDays, ...nextMonthDays];
-    
-    // 태스크 처리 로직 (tasks가 비어있으면 빈 배열 반환)
-    if (tasks.length === 0) {
-      return { calendarDays: allCalendarDays, processedCalendarTasks: [] };
-    }
-    
-    // 태스크를 겹침 없이 행별로 배치하기 위한 함수
-    const assignRowsToTasks = (tasks: CalendarTask[]): CalendarTask[] => {
-      // 태스크를 시작일 기준으로 정렬
-      const sortedTasks = [...tasks].sort((a, b) => a.startPosition - b.startPosition);
-      
-      // 각 태스크의 행을 할당
-      const assignedTasks: CalendarTask[] = [];
-      const usedRows: {[key: number]: number[]} = {}; // 각 위치에서 사용 중인 행 추적
-      
-      for (const task of sortedTasks) {
-        let row = 0;
-        let foundRow = false;
-        
-        // 태스크가 위치할 수 있는 첫 번째 빈 행 찾기
-        while (!foundRow) {
-          foundRow = true;
-          
-          // 태스크 기간 동안 이 행이 사용 가능한지 확인
-          for (let pos = task.startPosition; pos < task.startPosition + task.duration; pos++) {
-            if (usedRows[pos] && usedRows[pos].includes(row)) {
-              foundRow = false;
-              row++;
-              break;
-            }
-          }
-        }
-        
-        // 태스크에 행 할당
-        const taskWithRow = { ...task, row };
-        assignedTasks.push(taskWithRow);
-        
-        // 사용된 행 표시
-        for (let pos = task.startPosition; pos < task.startPosition + task.duration; pos++) {
-          if (!usedRows[pos]) usedRows[pos] = [];
-          usedRows[pos].push(row);
-        }
-      }
-      
-      return assignedTasks;
-    };
-
-    const preparedTasks: CalendarTask[] = [];
-    
-    tasks.forEach(task => {
-      if (!task.dueDate) return; // null 또는 undefined dueDate 건너뛰기
-      
-      // 태스크의 시작 날짜와 마감일 설정
-      // isCalendarEvent가 true인 경우는 시작일부터 마감일까지 전체 기간 표시
-      // 일반 칸반 태스크는 마감일(dueDate)에만 표시
-      const taskStartDate = task.isCalendarEvent === true ?
-                           (task.startDate ? new Date(task.startDate) : new Date(task.createdAt)) : 
-                           new Date(task.dueDate);
-      
-      const taskDue = new Date(task.dueDate);
-      
-      // 마감일이 하루의 끝시간으로 설정되어 있지 않으면 조정
-      if (taskDue.getHours() !== 23 || taskDue.getMinutes() !== 59) {
-        taskDue.setHours(23, 59, 59, 999);
-      }
-      
-      // 시작일과 마감일이 달력 범위에 포함되는 태스크만 필터링
-      const calendarStart = addDays(monthStart, -firstDayOfMonth);
-      const calendarEnd = addDays(monthEnd, 6 - lastDayOfMonth);
-      
-      // 시작일이 달력 끝보다 이전이고, 마감일이 달력 시작보다 이후인 태스크만 표시
-      if (taskStartDate <= calendarEnd && taskDue >= calendarStart) {
-        // 표시 시작 날짜 (달력 범위 내로 제한)
-        const displayStart = taskStartDate < calendarStart ? calendarStart : taskStartDate;
-        
-        // 표시 종료 날짜 (달력 범위 내로 제한)
-        const displayEnd = taskDue > calendarEnd ? calendarEnd : taskDue;
-        
-        // 시작 위치 계산 (전체 달력 날짜 배열에서의 인덱스)
-        const startPosition = differenceInDays(displayStart, calendarStart);
-        
-        // 표시 기간 계산
-        // 캘린더 일정은 시작일부터 마감일까지 전체 기간을 표시
-        // 일반 태스크는 마감일에만 표시 (기간은 1일)
-        const duration = task.isCalendarEvent === true ? 
-                        differenceInDays(displayEnd, displayStart) + 1 : 
-                        1;
-        
-        preparedTasks.push({
-          ...task,
-          startPosition,
-          duration,
-          row: 0 // 임시 행 값, 나중에 할당됨
-        });
-      }
-    });
-    
-    // 태스크에 행 할당
-    const tasksWithRows = assignRowsToTasks(preparedTasks);
-    return { calendarDays: allCalendarDays, processedCalendarTasks: tasksWithRows };
-  }, [currentDate, tasks]);
-  
-  // 계산된 태스크를 상태로 업데이트
-  useEffect(() => {
-    setCalendarTasks(processedCalendarTasks);
-  }, [processedCalendarTasks]);
-
   // 이전 달/주/일로 이동
   const handlePrev = () => {
     if (calendarView === 'month') {
@@ -775,8 +776,6 @@ const CalendarPage: React.FC = () => {
     });
   };
 
-  const [calendarView, setCalendarView] = useState<'month'|'week'|'day'>('month');
-
   // 일정 색상 추출 함수
   function getCalendarEventColor(tasks: Task[]) {
     // isCalendarEvent: true인 일정에서 색상 추출(없으면 indigo-500)
@@ -791,9 +790,9 @@ const CalendarPage: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-background text-foreground">
       {/* 좌측 패널 */}
-      <aside className="w-72 border-r bg-white flex flex-col p-4">
+      <aside className="w-72 border-r border-border bg-card text-card-foreground flex flex-col p-4">
         {/* 미니 달력 (예시: react-calendar 또는 커스텀) */}
         <div className="mb-6">
           <div className="font-bold text-lg mb-2">2025년 5월</div>
@@ -844,7 +843,7 @@ const CalendarPage: React.FC = () => {
       </aside>
       
       {/* 중앙 메인 캘린더 */}
-      <main className={`flex-1 w-full h-full flex flex-col p-0 m-0 justify-stretch items-stretch ${calendarView==='week'||calendarView==='day' ? 'overflow-y-auto' : 'overflow-hidden'}` }>
+      <main className={`flex-1 w-full h-full flex flex-col p-4 bg-background text-foreground ${calendarView==='week'||calendarView==='day' ? 'overflow-y-auto' : 'overflow-hidden'}` }>
         {/* 상단 네비게이션 */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
@@ -875,9 +874,9 @@ const CalendarPage: React.FC = () => {
         </div>
         {/* 월/주/일 달력 뷰 */}
         {calendarView === 'month' && (
-          <div className="bg-white rounded-lg shadow border overflow-hidden w-full h-full flex flex-col">
-            <div className="grid grid-cols-7 border-b text-center text-sm font-medium bg-gray-50 w-full">
-              {weekDays.map((d,i)=>(<div key={i} className={i===0?'text-red-500':i===6?'text-blue-500':'text-gray-700'}>{d}</div>))}
+          <div className="bg-card text-card-foreground rounded-lg shadow border border-border overflow-hidden w-full h-full flex flex-col">
+            <div className="grid grid-cols-7 border-b border-border text-center text-sm font-medium bg-muted text-muted-foreground w-full">
+              {weekDays.map((d,i)=>(<div key={i} className={`py-2 ${i===0?'text-red-500':i===6?'text-blue-500':'text-foreground'}`}>{d}</div>))}
             </div>
             <div className="grid grid-cols-7 flex-1 h-0 min-h-0 auto-rows-fr">
               {calendarDays.map((day, idx) => {
@@ -886,7 +885,7 @@ const CalendarPage: React.FC = () => {
                 return (
                   <div
                     key={day.toString()}
-                    className={`relative border p-2 h-full ${!isCurrentMonth?'bg-gray-50 text-gray-400':'bg-white'} ${isCurrentDay?'ring-2 ring-blue-400':''}`}
+                    className={`relative border border-border p-2 h-full ${!isCurrentMonth?'bg-muted text-muted-foreground':'bg-card text-card-foreground'} ${isCurrentDay?'ring-2 ring-primary':''}`}
                     onDoubleClick={() => {
                       setShowAddForm(true);
                       setAddFormDate(format(day, 'yyyy-MM-dd'));
@@ -921,7 +920,7 @@ const CalendarPage: React.FC = () => {
                                 : '';
                               return (
                                 <div key={task.id+''+i} 
-                                  className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}
+                                  className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-primary/10 text-primary':'bg-secondary/10 text-secondary'}`}
                                   style={{whiteSpace:'normal',maxHeight:48,overflowY:'auto',wordBreak:'break-all',marginBottom:2}}
                                   onClick={() => handleEventClick(task)}
                                 >
@@ -946,9 +945,9 @@ const CalendarPage: React.FC = () => {
           </div>
         )}
         {calendarView === 'week' && (
-          <div className="bg-white rounded-lg shadow border overflow-hidden w-full h-full flex flex-col">
-            <div className="grid grid-cols-7 border-b text-center text-sm font-medium bg-gray-50 w-full">
-              {weekDays.map((d,i)=>(<div key={i} className={i===0?'text-red-500':i===6?'text-blue-500':'text-gray-700'}>{d}</div>))}
+          <div className="bg-card text-card-foreground rounded-lg shadow border border-border overflow-hidden w-full h-full flex flex-col">
+            <div className="grid grid-cols-7 border-b border-border text-center text-sm font-medium bg-muted text-muted-foreground w-full">
+              {weekDays.map((d,i)=>(<div key={i} className={`py-2 ${i===0?'text-red-500':i===6?'text-blue-500':'text-foreground'}`}>{d}</div>))}
             </div>
             <div className="grid grid-cols-7 flex-1 h-0 min-h-0 auto-rows-fr">
               {(() => {
@@ -961,7 +960,7 @@ const CalendarPage: React.FC = () => {
                   return (
                     <div
                       key={day.toString()}
-                      className={`relative border p-2 h-full bg-white ${isCurrentDay?'ring-2 ring-blue-400':''}`}
+                      className={`relative border border-border p-2 h-full bg-card text-card-foreground ${isCurrentDay?'ring-2 ring-primary':''}`}
                       onDoubleClick={() => {
                         setShowAddForm(true);
                         setAddFormDate(format(day, 'yyyy-MM-dd'));
@@ -993,7 +992,7 @@ const CalendarPage: React.FC = () => {
                                   : '';
                                 return (
                                   <div key={task.id+''+i} 
-                                    className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}
+                                    className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-primary/10 text-primary':'bg-secondary/10 text-secondary'}`}
                                     style={{whiteSpace:'normal',maxHeight:48,overflowY:'auto',wordBreak:'break-all',marginBottom:2}}
                                     onClick={() => handleEventClick(task)}
                                   >
@@ -1014,8 +1013,8 @@ const CalendarPage: React.FC = () => {
           </div>
         )}
         {calendarView === 'day' && (
-          <div className="bg-white rounded-lg shadow border overflow-hidden w-full h-full flex flex-col">
-            <div className="border-b text-center text-sm font-medium bg-gray-50 py-2">
+          <div className="bg-card text-card-foreground rounded-lg shadow border border-border overflow-hidden w-full h-full flex flex-col">
+            <div className="border-b border-border text-center text-sm font-medium bg-muted text-muted-foreground py-2">
               {format(selectedDate || currentDate, 'yyyy년 MM월 dd일 (E)', {locale:ko})}
             </div>
             <div className="p-8 min-h-[300px]">
@@ -1037,7 +1036,7 @@ const CalendarPage: React.FC = () => {
                           : '';
                         return (
                           <div key={task.id+''+i} 
-                            className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}
+                            className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-primary/10 text-primary':'bg-secondary/10 text-secondary'}`}
                             style={{whiteSpace:'normal',maxHeight:48,overflowY:'auto',wordBreak:'break-all',marginBottom:2}}
                             onClick={() => handleEventClick(task)}
                           >
@@ -1056,7 +1055,7 @@ const CalendarPage: React.FC = () => {
       </main>
 
       {/* 우측 패널 */}
-      <aside className="w-80 border-l bg-white flex flex-col p-4 overflow-y-auto">
+      <aside className="w-80 border-l border-border bg-card text-card-foreground flex flex-col p-4 overflow-y-auto">
         {/* 일정 추가 폼: showAddForm이 true일 때만 표시 */}
         {showAddForm && (
           <div className="mb-6 border-b pb-4">
@@ -1215,54 +1214,57 @@ const CalendarPage: React.FC = () => {
       {/* 예약되지 않은 업무 사이드바 (드래그 앤 드롭) */}
       {isSidebarOpen && (
         <div 
-          className="fixed top-0 bottom-0 right-0 w-80 bg-white shadow-lg border-l border-gray-200 p-4 transition-transform duration-300 z-20 mt-0"
+          className="fixed top-0 bottom-0 right-0 w-80 bg-card text-card-foreground shadow-lg border-l border-border p-4 transition-transform duration-300 z-20 mt-0"
           style={{marginTop:0}}
           onDragOver={(e) => {
             e.preventDefault();
-            e.currentTarget.classList.add('bg-gray-50');
+            e.currentTarget.classList.add('bg-muted'); // 드래그 오버 시 배경색 변경
           }}
           onDragLeave={(e) => {
-            e.currentTarget.classList.remove('bg-gray-50');
+            e.currentTarget.classList.remove('bg-muted');
           }}
           onDrop={(e) => {
-            e.currentTarget.classList.remove('bg-gray-50');
+            e.currentTarget.classList.remove('bg-muted');
             handleDropToSidebar(e);
           }}
         >
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium">예약되지 않은 업무</h3>
+            <h3 className="text-lg font-medium text-foreground">예약되지 않은 업무</h3>
             <Button variant="ghost" size="sm" onClick={() => setIsSidebarOpen(false)}>
               <X className="h-4 w-4" />
             </Button>
           </div>
           <div className="space-y-2">
             {sidebarTasks.length === 0 ? (
-              <div className="text-gray-500 text-center py-4">
+              <div className="text-muted-foreground text-center py-4">
                 예약되지 않은 업무가 없습니다
               </div>
             ) : (
               sidebarTasks.map(task => {
-                const borderColor = 'border-blue-300';
-                const bgColor = 'bg-blue-50';
-                const statusBg = 'bg-blue-100';
-                const statusText = 'text-blue-700';
+                // 테마에 따른 색상 변수 (예시, 실제 테마 변수 사용 권장)
+                const borderColor = 'border-primary/50'; // 테마의 primary 색상을 연하게
+                const bgColor = 'bg-primary/10';       // 테마의 primary 색상을 더 연하게
+                const statusBg = 'bg-secondary/20';    // 테마의 secondary 색상을 연하게
+                const statusText = 'text-secondary-foreground';    // 테마의 secondary foreground 색상으로 변경
+                const priorityText = 'text-muted-foreground'; // 우선순위 텍스트 색상
+
                 return (
                   <div
                     key={task.id}
-                    className={`${bgColor} border ${borderColor} rounded-md p-3 shadow-sm cursor-pointer`}
+                    className={`${bgColor} border ${borderColor} rounded-md p-3 shadow-sm cursor-pointer text-foreground`}
                     draggable
                     onDragStart={handleDragStart(task)}
                     onDragEnd={handleDragEnd}
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-medium text-sm">{task.title}</h4>
+                      <h4 className="font-medium text-sm text-foreground">{task.title}</h4>
                       <span className={`text-xs px-2 py-1 rounded-full ${statusBg} ${statusText}`}>
                         {task.status === 'todo' ? '할 일' : 
                          task.status === 'in-progress' ? '진행 중' : 
                          task.status === 'done' ? '완료' : '검토'}
                       </span>
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className={`text-xs ${priorityText}`}>
                       {task.priority === 'high' ? '높은 우선순위' : 
                        task.priority === 'medium' ? '중간 우선순위' : '낮은 우선순위'}
                     </div>
