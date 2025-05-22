@@ -6,6 +6,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ProjectProvider } from './contexts/ProjectContext';
 import { UserProvider } from './contexts/UserContext';
 import { ChatButton } from '@/components/ChatButton';
+import { ThemeProvider } from 'next-themes';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -25,7 +26,9 @@ export default function RootLayout({
         <AuthProvider>
           <ProjectProvider>
             <UserProvider>
-              {children}
+              <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+                {children}
+              </ThemeProvider>
               <ChatButton />
             </UserProvider>
           </ProjectProvider>

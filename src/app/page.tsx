@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useTheme } from "next-themes";
 import { v4 as uuidv4 } from "uuid";
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
@@ -120,6 +121,11 @@ type CalendarEvent = {
     id: string;
     name: string;
   };
+};
+
+// theme prop 타입 정의 추가
+type ThemeProps = {
+  theme: "light" | "dark";
 };
 
 // 실제 프로젝트 초대 알림을 가져오는 함수
@@ -446,24 +452,30 @@ export default function Home() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   
-  // 테마 상태 관련 (중복 선언 수정)
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    if (typeof window !== 'undefined') {
-      return (localStorage.getItem('theme') as 'light' | 'dark') || "dark";
-    }
-    return "dark";
-  });
+  // 테마 관련 코드 수정
+  const { theme: currentTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  // theme 값 계산
+  const theme = (currentTheme || 'dark') as 'light' | 'dark';
+
+  // next-themes hydration 처리를 위한 mounted 상태 추가
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
-  const [isDocumentsSubmenuOpen, setIsDocumentsSubmenuOpen] = useState(false); // 문서 하위 메뉴 상태 추가
-  const [roomId, setRoomId] = useState(""); // roomId 상태 추가
-  
-  // 기존 코드의 중복된 theme 상태 선언 제거
-  // const savedTheme = typeof window !== 'undefined' ? 
-  //   (localStorage.getItem('theme') as 'light' | 'dark') : null;
-  // const [theme, setTheme] = useState<"light" | "dark">(savedTheme || "dark");
-  
+  const [isDocumentsSubmenuOpen, setIsDocumentsSubmenuOpen] = useState(false);
+  const [roomId, setRoomId] = useState("");
+
+  // 기존의 theme 저장 useEffect 제거 (next-themes가 자동으로 처리)
+
+  const toggleTheme = () => {
+    setTheme(theme === 'light' ? 'dark' : 'light');
+  };
+
   const {
     projects,
     hasProjects,
@@ -499,10 +511,6 @@ export default function Home() {
       }
     }
   }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
-  };
 
   const loadNotifications = async (isPanelOpening?: boolean) => {
     if (user) { 
@@ -631,6 +639,11 @@ export default function Home() {
     return date.toLocaleDateString("ko-KR");
   };
   
+  // hydration mismatch 방지
+  if (!mounted) {
+    return null;
+  }
+
   if (authLoading || projectLoading || tasksLoading) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'}`}>
