@@ -1714,7 +1714,7 @@ function UpcomingEvents({ /* theme prop 제거 */ }) {
               {groupedEvents[dateKey].map((event) => (
                 <div 
                   key={event.id} 
-                  className="flex items-start p-2 rounded-md transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-gray-750">
+                  className="flex items-start p-2 rounded-md transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-gray-700">
                   <div className="w-px bg-gray-300 dark:bg-gray-600 mr-3 self-stretch"></div>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{event.title}</p>
