@@ -35,7 +35,7 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
   // console.log("KanbanBoard 렌더링 - projectId:", projectId);
   
   const { tasks, loading, error, addTask, updateTaskStatus, updateTask, deleteTask, fetchTasks } = useTasks(projectId);
-  const [tasksState, setTasksState] = useState<Task[]>(tasks);
+  const [tasksState, setTasksState] = useState<Task[]>([]);
   
   // 작업 상세 다이얼로그 관련 상태 추가
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -49,14 +49,29 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
     } else {
       console.log("KanbanBoard - 특정 프로젝트 작업 표시:", projectId);
     }
+    // projectId가 변경되면 UI를 즉시 비우고 로딩 상태로 전환
+    setTasksState([]);
     fetchTasks();
-  }, [projectId]);
+  }, [projectId, fetchTasks]);
   
-  // tasks가 변경될 때만 tasksState 업데이트
-  
+  // tasks가 변경될 때 tasksState 업데이트 및 프로젝트별 필터링
   useEffect(() => {
-    setTasksState(tasks);
-  }, [tasks]);
+    if (tasks.length > 0) {
+      // 프로젝트 ID가 있을 경우 해당 프로젝트의 작업만 필터링
+      if (projectId) {
+        const filteredTasks = tasks.filter(task => task.projectId === projectId);
+        console.log(`프로젝트 ID ${projectId}에 해당하는 작업 ${filteredTasks.length}개 필터링됨`);
+        setTasksState(filteredTasks);
+      } else {
+        // 프로젝트 ID가 없으면 모든 작업 표시
+        console.log(`전체 작업 ${tasks.length}개 로드됨`);
+        setTasksState(tasks);
+      }
+    } else {
+      // 작업이 없는 경우 빈 배열로 설정
+      setTasksState([]);
+    }
+  }, [tasks, projectId]);
 
   // 상태별로 태스크 필터링 - tasksState 사용으로 변경
   const todoTasks = tasksState.filter((task) => task.status === "todo");
@@ -153,6 +168,11 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
         <h2 className={`text-xl font-semibold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>
           {projectId ? "프로젝트 작업" : "모든 작업"}
         </h2>
+        {projectId && tasksState.length > 0 && (
+          <span className={`ml-2 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+            ({tasksState.length}개)
+          </span>
+        )}
       </div>
 
       {loading ? (
@@ -237,4 +257,4 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
       )}
     </div>
   );
-} 
+}

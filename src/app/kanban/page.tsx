@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { useProject } from "@/app/contexts/ProjectContext";
 import Link from "next/link";
-import { HomeIcon, ArrowLeftIcon, Trello, PlusIcon, FolderIcon, ChevronDownIcon, ClockIcon, CalendarIcon } from "lucide-react";
+import { HomeIcon, ArrowLeftIcon, Trello, PlusIcon, FolderIcon, ChevronDownIcon, ClockIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function KanbanPage() {
@@ -16,15 +16,18 @@ export default function KanbanPage() {
   const { projects } = useProject();
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   
-  // 로컬 스토리지에서 테마 설정 불러와서 초기값으로 사용
-  const savedTheme = typeof window !== 'undefined' ? 
-    (localStorage.getItem('theme') as 'light' | 'dark') : null;
-  const [theme, setTheme] = useState<"light" | "dark">(savedTheme || "dark");
-  
-  // 테마 설정을 위한 효과
+  // theme 관련 코드 수정 시작
+  const getInitialTheme = () => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("theme") as "light" | "dark") || "light";
+    }
+    return "light";
+  };
+  const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme());
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // document.body의 클래스를 변경하여 전체 스타일 적용 가능
+      localStorage.setItem('theme', theme);
       if (theme === 'dark') {
         document.documentElement.classList.add('dark-mode');
       } else {
@@ -32,6 +35,7 @@ export default function KanbanPage() {
       }
     }
   }, [theme]);
+  // theme 관련 코드 수정 끝
 
   // 드롭다운 메뉴 외부 클릭 시 닫히도록 이벤트 핸들러 등록
   useEffect(() => {
@@ -225,7 +229,7 @@ export default function KanbanPage() {
               href={selectedProjectId ? `/kanban?projectId=${selectedProjectId}` : '/kanban'}
               className={`flex items-center space-x-2 py-3 px-4 ${theme === 'dark' ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'} border-b-2`}
             >
-              <Trello className="w-5 h-5" />
+              <Trello className={`w-5 h-5 ${theme === 'dark' ? 'text-white' : ''}`} />
               <span>칸반보드</span>
             </Link>
             
@@ -233,16 +237,8 @@ export default function KanbanPage() {
               href={selectedProjectId ? `/timeline?projectId=${selectedProjectId}` : '/timeline'}
               className={`flex items-center space-x-2 py-3 px-4 border-b-2 border-transparent hover:${theme === 'dark' ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'} transition-colors mr-4`}
             >
-              <ClockIcon className="w-5 h-5" />
+              <ClockIcon className={`w-5 h-5 ${theme === 'dark' ? 'text-white' : ''}`} />
               <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>타임라인</span>
-            </Link>
-
-            <Link
-              href={selectedProjectId ? `/calendar?projectId=${selectedProjectId}` : '/calendar'}
-              className={`flex items-center space-x-2 py-3 px-4 border-b-2 border-transparent hover:${theme === 'dark' ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'} transition-colors`}
-            >
-              <CalendarIcon className="w-5 h-5" />
-              <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>캘린더</span>
             </Link>
           </div>
         </div>

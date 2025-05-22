@@ -10,8 +10,7 @@ import {
   PlusIcon, 
   FolderIcon, 
   ChevronDownIcon, 
-  TrelloIcon,
-  CalendarIcon
+  TrelloIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProject } from "@/app/contexts/ProjectContext";
@@ -25,24 +24,18 @@ export default function TimelinePage() {
   const { projects } = useProject();
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   
-  // 로컬 스토리지에서 테마 설정 불러와서 초기값으로 사용
-  const [theme, setTheme] = useState<"light" | "dark">("light"); // 기본값을 light로 변경
-
-  // 페이지 초기 로드 시 localStorage에서 테마 불러오기
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' || 'light';
-      setTheme(savedTheme);
+  // theme 관련 코드 수정 시작
+  const getInitialTheme = () => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("theme") as "light" | "dark") || "light";
     }
-  }, []);
-  
-  // 테마 설정을 위한 효과
+    return "light";
+  };
+  const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme());
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // 테마 변경 시 로컬 스토리지에 저장
       localStorage.setItem('theme', theme);
-      
-      // document.body의 클래스를 변경하여 전체 스타일 적용 가능
       if (theme === 'dark') {
         document.documentElement.classList.add('dark-mode');
       } else {
@@ -50,7 +43,8 @@ export default function TimelinePage() {
       }
     }
   }, [theme]);
-
+  // theme 관련 코드 수정 끝
+  
   // 드롭다운 메뉴 외부 클릭 시 닫히도록 이벤트 핸들러 등록
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -205,7 +199,7 @@ export default function TimelinePage() {
               href={selectedProjectId ? `/kanban?projectId=${selectedProjectId}` : '/kanban'}
               className="flex items-center space-x-2 py-3 px-4 border-b-2 border-transparent hover:text-blue-600 hover:border-blue-600 transition-colors mr-4"
             >
-              <TrelloIcon className="w-5 h-5" />
+              <TrelloIcon className={`w-5 h-5 ${theme === 'dark' ? 'text-white' : ''}`} />
               <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>칸반보드</span>
             </Link>
             
@@ -213,16 +207,8 @@ export default function TimelinePage() {
               href={selectedProjectId ? `/timeline?projectId=${selectedProjectId}` : '/timeline'}
               className="flex items-center space-x-2 py-3 px-4 text-blue-600 border-blue-600 border-b-2"
             >
-              <ClockIcon className="w-5 h-5" />
+              <ClockIcon className={`w-5 h-5 ${theme === 'dark' ? 'text-white' : ''}`} />
               <span>타임라인</span>
-            </Link>
-
-            <Link
-              href={selectedProjectId ? `/calendar?projectId=${selectedProjectId}` : '/calendar'}
-              className="flex items-center space-x-2 py-3 px-4 border-b-2 border-transparent hover:text-blue-600 hover:border-blue-600 transition-colors"
-            >
-              <CalendarIcon className="w-5 h-5" />
-              <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>캘린더</span>
             </Link>
           </div>
         </div>
