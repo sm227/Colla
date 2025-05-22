@@ -748,6 +748,7 @@ export default function Home() {
   return (
     <>
       <CalendarStyles />
+      <ModernScrollbarStyles />
       <div className={`flex h-screen ${theme === 'dark' ? 'bg-gray-900 text-gray-100' : 'bg-white text-gray-900'}`}>
         <aside
           className={`fixed inset-y-0 left-0 z-30 w-64 ${
@@ -957,7 +958,7 @@ export default function Home() {
                   </div>
                     </div>
                     
-              <div className="flex-grow overflow-y-auto p-4 space-y-3">
+              <div className="flex-grow overflow-y-auto p-4">
                     {notificationLoading && (
                       <div className="flex justify-center items-center py-10">
                   <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${theme === 'dark' ? 'border-blue-500' : 'border-blue-600'}`}></div>
@@ -981,7 +982,7 @@ export default function Home() {
                   notifications.map((notification) => (
                           <div 
                             key={notification.id} 
-                      className={`p-4 rounded-lg flex flex-col transition-colors duration-150 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} border-b last:border-b-0`}
+                      className={`p-4 mb-1 rounded-lg flex flex-col transition-colors duration-150 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
                       onClick={() => {
                       if (notification.type !== 'invitation') {
                           router.push(notification.link);
@@ -1059,134 +1060,106 @@ export default function Home() {
                     )}
               </div>
                     
-              <div className={`p-4 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} text-center`}>
-                      <Link 
-                  href="/notifications" 
-                  onClick={() => {
-                      setShowNotificationPanel(false);
-                  }}
-                  className={`text-sm font-medium ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}
-                  >
-                  모든 알림 보기 페이지로
-                      </Link>
-                  </div>
+              {/* "모든 알림 보기 페이지로" 링크 제거 */}
                 </div>
               )}
 
         <div className={`flex-1 flex flex-col overflow-hidden ${showNotificationPanel ? 'pl-80 md:pl-96' : ''} transition-all duration-300 ease-in-out`}>
-          <header className={`h-16 flex items-center justify-between px-6 border-b ${
-            theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200' 
-          } shadow-sm`}>
-            <div className="flex items-center">
-                <button
-                className="md:hidden mr-4 -ml-2 p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700"
-                onClick={() => setMobileSidebarOpen(true)}
-              >
-                <MenuIcon className="w-6 h-6" />
-                </button>
-              <h1 className="text-xl font-semibold">{currentProject?.name || "대시보드"}</h1>
-              </div>
-            {/* <div className="flex items-center space-x-3">
-              <button
-                onClick={createNewMeeting}
-                  className={`flex items-center justify-center gap-2 text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
-                  theme === 'dark'
-                      ? 'bg-blue-700 hover:bg-blue-600 text-white'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
-                }`}
-              >
-                <VideoIcon className="w-4 h-4" />새 회의
-              </button>
-                  <button
-                className={`flex items-center justify-center gap-2 text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
-                  theme === 'dark'
-                    ? 'bg-green-600 hover:bg-green-500 text-white'
-                    : 'bg-green-500 hover:bg-green-600 text-white'
-                }`}
-                onClick={() => alert('새 작업/문서 생성 기능 구현 예정')}
-              >
-                <PlusIcon className="w-4 h-4" /> 만들기
-                  </button>
-            </div> */}
-          </header>
-
+          {/* 상단 헤더 제거 */}
           <main className={`flex flex-col flex-1 p-6 lg:p-8 overflow-y-auto bg-opacity-50 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
             <div className="mb-8">
               <h2 className="text-3xl font-bold mb-2">안녕하세요, {user.name}님!</h2>
               <p className={`text-lg ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                
-                </p>
-          </div>
+                {currentProject ? `${currentProject.name} 에 대한 요약을 확인하세요.` : '프로젝트를 선택하면 요약 정보를 확인할 수 있습니다.'}
+              </p>
+            </div>
 
-            <div className="grid grid-cols-1 min-[1400px]:grid-cols-12 min-[1400px]:grid-rows-[auto_1fr] gap-8 flex-1">
-              {/* 1. 빠른 실행 (Mobile: 1st, Desktop: Top-Left, Col Span 6) */}
-              <DashboardWidget
-                title="빠른 실행"
-                theme={theme}
-                className="order-1 min-[1400px]:order-1 min-[1400px]:col-span-6"
-              >
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <QuickActionButton icon={<PlusIcon />} text="새 작업 만들기" onClick={() => setShowTaskModal(true)} theme={theme} large />
-                  <QuickActionButton icon={<FileTextIcon />} text="새 문서 만들기" onClick={() => router.push(currentProject ? `/documents/new?projectId=${currentProject.id}` : '/documents/new')} theme={theme} large />
-                  <form onSubmit={joinMeeting} className="sm:col-span-2 flex gap-3 items-center">
-                    <input
-                      type="text"
-                      value={roomId}
-                      onChange={(e) => setRoomId(e.target.value)}
-                      placeholder="회의 코드로 바로 참여"
-                      className={`flex-1 px-4 py-3 text-base rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none ${theme === 'dark' ? 'border border-gray-700 bg-gray-700 text-gray-200 placeholder-gray-500' : 'border border-gray-300 bg-white text-gray-700 placeholder-gray-400'}`}
-                    />
-                    <button
-                      type="submit"
-                      className={`px-5 py-3 text-base font-medium rounded-lg transition-colors ${theme === 'dark' ? 'bg-blue-700 hover:bg-blue-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+            <div className="flex flex-col gap-8 flex-1"> {/* 변경: flex-col로 전환 */}
+              {/* 상단 행 Wrapper: flex-grow 비율 4 */}
+              <div className="min-[1400px]:flex-[4] grid grid-cols-1 min-[1400px]:grid-cols-12 gap-8">
+                {/* 프로젝트 진행 상황 */}
+                <DashboardWidget
+                  title="프로젝트 진행 상황"
+                  theme={theme}
+                  // className="order-2 min-[1400px]:order-1 min-[1400px]:col-span-6 h-[250px]"
+                  className="min-[1400px]:col-span-6 h-full" // 변경: order 제거, h-full
+                >
+                  <div className={`flex flex-col h-full items-center justify-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <BarChart3Icon className="w-10 h-10 mb-2 opacity-50" />
+                    <p className="text-center">구현예정</p>
+                    <p className="text-center text-sm mt-1">
+                      그래프는 여기
+                    </p>
+                  </div>
+                </DashboardWidget>
+
+                {/* 나에게 할당된 작업 */}
+                <DashboardWidget
+                  title="나에게 할당된 작업"
+                  viewAllLink="/kanban"
+                  theme={theme}
+                  // className="order-3 min-[1400px]:order-1 min-[1400px]:col-span-6 h-[250px]"
+                  className="min-[1400px]:col-span-6 h-full" // 변경: order 제거, h-full
+                  actionButton={
+                    <button 
+                      onClick={() => setShowTaskModal(true)} 
+                      className={`p-1.5 rounded-md ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'}`}
+                      title="새 작업 만들기"
                     >
-                      회의 참여
+                      <PlusIcon className={`w-4 h-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} />
                     </button>
-                  </form>
+                  }
+                >
+                  <SimplifiedKanbanBoard theme={theme} />
+                </DashboardWidget>
+              </div>
+
+              {/* 하단 행 Wrapper: flex-grow 비율 6 */}
+              <div className="min-[1400px]:flex-[6] grid grid-cols-1 min-[1400px]:grid-cols-12 gap-8">
+                {/* 다가오는 일정 */}
+                <DashboardWidget
+                  title="다가오는 일정"
+                  viewAllLink="/calendar"
+                  theme={theme}
+                  // className="order-4 min-[1400px]:order-2 min-[1400px]:col-span-6 h-full"
+                  className="min-[1400px]:col-span-6 h-full" // 변경: order 제거
+                >
+                  <UpcomingEvents theme={theme} />
+                </DashboardWidget>
+
+                {/* 최근 문서 & 최근 회의 컨테이너 */}
+                {/* <div className="order-5 min-[1400px]:order-3 min-[1400px]:col-span-6 flex flex-col gap-8 h-full"> */}
+                <div className="min-[1400px]:col-span-6 flex flex-col gap-8 h-full"> {/* 변경: order 제거 */}
+                  {/* 4a. 최근 문서 */}
+                  <DashboardWidget
+                    title="최근 문서"
+                    viewAllLink={currentProject ? `/documents?projectId=${currentProject.id}` : "/documents"}
+                    theme={theme}
+                    // className="flex-1 h-[350px]"
+                    className="flex-1" // 변경: h-[350px] 제거
+                    actionButton={
+                      <button 
+                        onClick={() => router.push(currentProject ? `/documents/new?projectId=${currentProject.id}` : '/documents/new')} 
+                        className={`p-1.5 rounded-md ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'}`}
+                        title="새 문서 만들기"
+                      >
+                        <FileTextIcon className={`w-4 h-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} />
+                      </button>
+                    }
+                  >
+                    <RecentDocuments projectId={currentProject?.id} theme={theme} />
+                  </DashboardWidget>
+
+                  {/* 4b. 최근 회의 */}
+                  <DashboardWidget
+                    title="최근 회의"
+                    viewAllLink="/meeting/records"
+                    theme={theme}
+                    className="flex-1" // 유지
+                  >
+                    <RecentMeetings theme={theme} />
+                  </DashboardWidget>
                 </div>
-              </DashboardWidget>
-
-              {/* 2. 나에게 할당된 작업 (Mobile: 2nd, Desktop: Top-Right, Col Span 6) */}
-              <DashboardWidget
-                title="나에게 할당된 작업"
-                viewAllLink="/kanban"
-                theme={theme}
-                className="order-2 min-[1400px]:order-2 min-[1400px]:col-span-6"
-              >
-                <SimplifiedKanbanBoard theme={theme} />
-              </DashboardWidget>
-
-              {/* 3. 다가오는 일정 (Mobile: 3rd, Desktop: Bottom-Left, Col Span 6) */}
-              <DashboardWidget
-                title="다가오는 일정"
-                viewAllLink="/calendar"
-                theme={theme}
-                className="order-3 min-[1400px]:order-3 min-[1400px]:col-span-6 h-full"
-              >
-                <UpcomingEvents theme={theme} />
-              </DashboardWidget>
-
-              {/* 4. 최근 문서 & 최근 회의 컨테이너 (Mobile: 4th & 5th sequentially, Desktop: Bottom-Right, Col Span 6) */}
-              <div className="order-4 min-[1400px]:order-4 min-[1400px]:col-span-6 flex flex-col gap-8 h-full">
-                {/* 4a. 최근 문서 */}
-                <DashboardWidget
-                  title="최근 문서"
-                  viewAllLink={currentProject ? `/documents?projectId=${currentProject.id}` : "/documents"}
-                  theme={theme}
-                  className="flex-1"
-                >
-                  <RecentDocuments projectId={currentProject?.id} theme={theme} />
-                </DashboardWidget>
-
-                {/* 4b. 최근 회의 */}
-                <DashboardWidget
-                  title="최근 회의"
-                  viewAllLink="/meeting/records"
-                  theme={theme}
-                  className="flex-1"
-                >
-                  <RecentMeetings theme={theme} />
-                </DashboardWidget>
               </div>
             </div>
           </main>
@@ -1263,25 +1236,30 @@ function DashboardWidget({
   children, 
   className = "",
   viewAllLink,
-  theme
+  theme,
+  actionButton
 }: {
   title: string;
   children: React.ReactNode; 
   className?: string;
   viewAllLink?: string;
   theme: "light" | "dark";
+  actionButton?: React.ReactNode; // 타입 정의 확인
 }) {
   return (
     <div className={`rounded-xl shadow-sm ${theme === 'dark' ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'} p-6 flex flex-col ${className}`}>
       <div className="flex justify-between items-center mb-5">
-        <h3 className={`text-xl font-semibold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>{title}</h3>
+        <div className="flex items-center">
+          <h3 className={`text-xl font-semibold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>{title}</h3>
+          {actionButton && <div className="ml-2">{actionButton}</div>} 
+        </div>
         {viewAllLink && (
           <Link href={viewAllLink} className={`text-base font-medium ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}>
             모두 보기
           </Link>
         )}
         </div>
-      <div className="flex-1 overflow-y-auto">{children}</div>
+      <div className="flex-1 overflow-y-auto pr-2">{children}</div>
     </div>
   );
 }
@@ -1414,6 +1392,7 @@ function SimplifiedKanbanBoard({ theme }: { theme: "light" | "dark" }) {
   const [assignedTasks, setAssignedTasks] = useState<TaskWithProjectInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchAssignedTasks = async () => {
@@ -1430,7 +1409,14 @@ function SimplifiedKanbanBoard({ theme }: { theme: "light" | "dark" }) {
         }
         
         const data = await response.json();
-        setAssignedTasks(data as TaskWithProjectInfo[]);
+        
+        // 현재 프로젝트의 작업만 필터링
+        let filteredTasks = data as TaskWithProjectInfo[];
+        if (currentProject?.id) {
+          filteredTasks = filteredTasks.filter(task => task.projectId === currentProject.id);
+        }
+        
+        setAssignedTasks(filteredTasks);
       } catch (err) {
         console.error('할당된 작업 로딩 중 오류:', err);
         setError('할당된 작업을 불러오는데 실패했습니다');
@@ -1441,52 +1427,144 @@ function SimplifiedKanbanBoard({ theme }: { theme: "light" | "dark" }) {
     };
     
     fetchAssignedTasks();
-  }, [user]);
+  }, [user, currentProject?.id]);
+
+  // 마감일 관련 함수 추가
+  const getDueDateInfo = (dueDate: string | Date | null | undefined) => {
+    if (!dueDate) {
+      return {
+        text: "마감일 미설정",
+        className: theme === 'dark' ? 'text-gray-500' : 'text-gray-400',
+        icon: <ClockIcon className="w-3 h-3 mr-1" />
+      };
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // 오늘 날짜의 시작 시간으로 설정
+    
+    const dueDateObj = new Date(dueDate);
+    dueDateObj.setHours(0, 0, 0, 0); // 마감일의 시작 시간으로 설정
+    
+    const diffTime = dueDateObj.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) {
+      // 마감일 지남
+      return {
+        text: `${Math.abs(diffDays)}일 지남`,
+        className: theme === 'dark' ? 'text-red-400' : 'text-red-500',
+        icon: <AlertCircleIcon className="w-3 h-3 mr-1" />
+      };
+    } else if (diffDays === 0) {
+      // 오늘 마감
+      return {
+        text: "오늘 마감",
+        className: theme === 'dark' ? 'text-orange-400' : 'text-orange-500',
+        icon: <AlertCircleIcon className="w-3 h-3 mr-1" />
+      };
+    } else if (diffDays <= 3) {
+      // 3일 이내 마감
+      return {
+        text: `${diffDays}일 남음`,
+        className: theme === 'dark' ? 'text-yellow-400' : 'text-yellow-500',
+        icon: <ClockIcon className="w-3 h-3 mr-1" />
+      };
+    } else {
+      // 3일 이상 남음
+      return {
+        text: `${diffDays}일 남음`,
+        className: theme === 'dark' ? 'text-green-400' : 'text-green-500',
+        icon: <ClockIcon className="w-3 h-3 mr-1" />
+      };
+    }
+  };
+
+  // 상태에 따른 태그 스타일 정의
+  const getStatusTag = (status: TaskStatus) => {
+    switch (status) {
+      case 'todo':
+        return (
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+            theme === 'dark' ? 'bg-gray-700 text-gray-200' : 'bg-gray-200 text-gray-800'
+          }`}>
+            할 일
+          </span>
+        );
+      case 'in-progress':
+        return (
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+            theme === 'dark' ? 'bg-blue-700 text-blue-100' : 'bg-blue-100 text-blue-800'
+          }`}>
+            진행 중
+          </span>
+        );
+      case 'review':
+        return (
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+            theme === 'dark' ? 'bg-yellow-700 text-yellow-100' : 'bg-yellow-100 text-yellow-800'
+          }`}>
+            검토
+          </span>
+        );
+      case 'done':
+        return (
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+            theme === 'dark' ? 'bg-green-700 text-green-100' : 'bg-green-100 text-green-800'
+          }`}>
+            완료
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
 
   if (loading) return <div className={`flex justify-center items-center py-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}> 로딩 중...</div>;
   if (error) return <div className={`text-center py-4 ${theme === 'dark' ? 'text-red-400' : 'text-red-500'}`}>{error}</div>;
   if (assignedTasks.length === 0) return <div className={`text-center py-4 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>할당된 작업이 없습니다</div>;
 
-  const todoTasks = assignedTasks.filter((task) => task.status === "todo").slice(0, 3);
-  const inProgressTasks = assignedTasks.filter((task) => task.status === "in-progress").slice(0, 3);
-  const reviewTasks = assignedTasks.filter((task) => task.status === "review").slice(0, 2);
-  const doneTasks = assignedTasks.filter((task) => task.status === "done").slice(0, 2);
-
-  const SimplifiedColumn = ({ title, statusColor, tasks }: { title: string; statusColor: string; tasks: TaskWithProjectInfo[]}) => (
-    <div className="flex-1">
-      <h4 className={`text-sm font-semibold mb-2 flex items-center ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-        <span className={`w-2.5 h-2.5 ${statusColor} rounded-full mr-2`}></span>
-        {title} ({tasks.length})
-      </h4>
-      <div className="space-y-2">
-        {tasks.length > 0 ? tasks.map(task => (
-            <div
-              key={task.id}
-            className={`p-2 rounded-md text-xs ${theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'}`}
-            title={task.project?.name ? `프로젝트: ${task.project.name}` : '개인 작업'}
-          >
-            {task.title}
-            {task.project?.name && (
-              <div className={`mt-1 text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                {task.project.name}
-          </div>
-        )}
-          </div>
-        )) : <p className={`text-xs ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>작업 없음</p>}
-      </div>
-    </div>
-  );
-
   return (
-    <div className="flex space-x-3">
-      <SimplifiedColumn title="할 일" statusColor="bg-gray-400" tasks={todoTasks} />
-      <SimplifiedColumn title="진행 중" statusColor="bg-blue-400" tasks={inProgressTasks} />
-      <div className="flex-1">
-        <div className="mb-3">
-          <SimplifiedColumn title="검토" statusColor="bg-yellow-400" tasks={reviewTasks} />
+    <div className="space-y-1.5 overflow-y-auto pr-1 assigned-tasks-scrollbar">
+      {assignedTasks.map((task) => (
+        <div
+          key={task.id}
+          onClick={() => router.push(`/kanban?projectId=${task.projectId || ''}`)}
+          className={`p-2.5 rounded-md ${theme === 'dark' ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50'} transition-colors cursor-pointer border-b ${theme === 'dark' ? 'border-gray-700/50' : 'border-gray-100'}`}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <h4 className={`text-sm font-medium truncate ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`}>
+                {task.title}
+              </h4>
+              <div className="flex flex-wrap items-center gap-x-3 mt-0.5">
+                {task.project?.name && (
+                  <div className={`text-xs flex items-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <FolderIcon className="w-3 h-3 mr-1 flex-shrink-0" />
+                    <span className="truncate">{task.project.name}</span>
+                  </div>
+                )}
+                
+                {/* 마감일 정보 추가 */}
+                {(() => {
+                  const dueInfo = getDueDateInfo(task.dueDate === null ? undefined : task.dueDate);
+                  return (
+                    <div className={`text-xs flex items-center ${dueInfo.className}`}>
+                      {dueInfo.icon}
+                      <span>{dueInfo.text}</span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+            {getStatusTag(task.status as TaskStatus)}
+          </div>
+          {task.description && (
+            <p className={`text-xs mt-1 line-clamp-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              {task.description}
+            </p>
+          )}
         </div>
-        <SimplifiedColumn title="완료" statusColor="bg-green-400" tasks={doneTasks} />
-      </div>
+      ))}
     </div>
   );
 }
@@ -1501,7 +1579,7 @@ function RecentDocuments({ projectId, theme }: { projectId?: string; theme: "lig
     const fetchDocuments = async () => {
       try {
         setLoading(true);
-        const url = projectId ? `/api/documents?projectId=${projectId}&limit=3` : '/api/documents?limit=3'; 
+        const url = projectId ? `/api/documents?projectId=${projectId}&limit=15` : '/api/documents?limit=15'; 
         const response = await fetch(url);
         if (!response.ok) throw new Error('문서 로딩 실패');
         const data = await response.json();
@@ -1537,23 +1615,38 @@ function RecentDocuments({ projectId, theme }: { projectId?: string; theme: "lig
   if (documents.length === 0) return <div className={`text-center py-4 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>문서 없음</div>;
 
     return (
-    <div className="space-y-2">
+    <div className="flex overflow-x-auto space-x-2 pb-3 recent-documents-scrollbar">
       {documents.map((doc) => (
         <div
           key={doc.id}
           onClick={() => router.push(`/documents/${doc.id}${projectId ? `?projectId=${projectId}` : ''}`)}
-          className={`flex items-center p-2.5 rounded-lg cursor-pointer transition-colors ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+          className={`flex-shrink-0 w-40 cursor-pointer transition-colors duration-200 border rounded-lg ${
+            theme === 'dark' 
+              ? 'bg-gray-800 border-gray-700 hover:bg-gray-750' 
+              : 'bg-white border-gray-200 hover:bg-gray-50'
+          } p-2.5 flex flex-col items-center`}
         >
-          <div className={`mr-2.5 p-1 rounded-md ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
-            {doc.emoji ? <span className="text-lg">{doc.emoji}</span> : <FileTextIcon className={`w-4 h-4 ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`} />}
+          {/* Icon Area */}
+          <div className={`h-20 flex items-center justify-center mb-1.5`}>
+            <FileTextIcon className={`w-8 h-8 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'} transition-colors`} />
           </div>
-          <div className="flex-1 min-w-0">
-            <h4 className={`text-sm font-medium truncate ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`}>{doc.title || "무제 문서"}</h4>
-            <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-              {formatDate(doc.updatedAt || doc.createdAt)}
-              {doc.isStarred && <StarIcon className="w-3 h-3 inline-block ml-1.5 text-yellow-500" />}
-            </p>
+
+          {/* Title Area */}
+          <div className={`w-full mb-1`}>
+            <h4 className={`text-xs font-medium truncate text-center ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'}`}>{doc.title || "무제 문서"}</h4>
           </div>
+
+          {/* Info Area */}
+          <div className={`text-center`}>
+            <p className={`text-[10px] ${theme === 'dark' ? 'text-gray-500' : 'text-gray-600'}`}>최근 수정</p>
+            <p className={`text-[10px] ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{formatDate(doc.updatedAt || doc.createdAt)}</p>
+          </div>
+           {/* Starred Icon - Optionally keep or remove */}
+           {doc.isStarred && (
+            <div className="absolute top-2 right-2">
+              <StarIcon className="w-3 h-3 text-yellow-500" />
+            </div>
+          )}
         </div>
       ))}
       </div>
@@ -1786,6 +1879,140 @@ const CalendarStyles = () => (
     .calendar-container .react-calendar__decade-view .react-calendar__tile,
     .calendar-container .react-calendar__century-view .react-calendar__tile {
         padding: 1em 0.5em; /* 년/월 보기 패딩 조정 */
+    }
+  `}</style>
+);
+
+const ModernScrollbarStyles = () => (
+  <style jsx global>{`
+    /* Firefox */
+    .dark-mode ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    .light-mode ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    /* Webkit (Chrome, Safari, Edge) - Track */
+    .dark-mode ::-webkit-scrollbar-track {
+      background: #1f2937; /* gray-800 */
+      border-radius: 4px;
+    }
+    .light-mode ::-webkit-scrollbar-track {
+      background: #f3f4f6; /* gray-100 */
+      border-radius: 4px;
+    }
+
+    /* Webkit (Chrome, Safari, Edge) - Thumb */
+    .dark-mode ::-webkit-scrollbar-thumb {
+      background-color: #4b5563; /* gray-600 */
+      border-radius: 4px;
+      border: 2px solid #1f2937; /* gray-800, creates padding */
+    }
+    .light-mode ::-webkit-scrollbar-thumb {
+      background-color: #d1d5db; /* gray-300 */
+      border-radius: 4px;
+      border: 2px solid #f3f4f6; /* gray-100, creates padding */
+    }
+
+    /* Webkit (Chrome, Safari, Edge) - Thumb on hover */
+    .dark-mode ::-webkit-scrollbar-thumb:hover {
+      background-color: #6b7280; /* gray-500 */
+    }
+    .light-mode ::-webkit-scrollbar-thumb:hover {
+      background-color: #9ca3af; /* gray-400 */
+    }
+
+    /* Firefox - General */
+    .dark-mode * {
+      scrollbar-width: thin;
+      scrollbar-color: #4b5563 #1f2937; /* thumb track */
+    }
+    .light-mode * {
+      scrollbar-width: thin;
+      scrollbar-color: #d1d5db #f3f4f6; /* thumb track */
+    }
+
+    /* Custom scrollbar for recent documents (horizontal) */
+    .dark-mode .recent-documents-scrollbar::-webkit-scrollbar {
+      height: 8px;
+    }
+    .light-mode .recent-documents-scrollbar::-webkit-scrollbar {
+      height: 8px;
+    }
+    .dark-mode .recent-documents-scrollbar::-webkit-scrollbar-track {
+      background: #1f2937; /* gray-800 */
+      border-radius: 4px;
+    }
+    .light-mode .recent-documents-scrollbar::-webkit-scrollbar-track {
+      background: #f3f4f6; /* gray-100 */
+      border-radius: 4px;
+    }
+    .dark-mode .recent-documents-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #4b5563; /* gray-600 */
+      border-radius: 4px;
+      border: 2px solid #1f2937; /* gray-800, creates padding */
+    }
+    .light-mode .recent-documents-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #d1d5db; /* gray-300 */
+      border-radius: 4px;
+      border: 2px solid #f3f4f6; /* gray-100, creates padding */
+    }
+    .dark-mode .recent-documents-scrollbar::-webkit-scrollbar-thumb:hover {
+      background-color: #6b7280; /* gray-500 */
+    }
+    .light-mode .recent-documents-scrollbar::-webkit-scrollbar-thumb:hover {
+      background-color: #9ca3af; /* gray-400 */
+    }
+    .dark-mode .recent-documents-scrollbar {
+      scrollbar-color: #4b5563 #1f2937; /* thumb track for Firefox */
+    }
+    .light-mode .recent-documents-scrollbar {
+      scrollbar-color: #d1d5db #f3f4f6; /* thumb track for Firefox */
+    }
+    
+    /* 할당된 작업 스크롤바 스타일 */
+    .dark-mode .assigned-tasks-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .light-mode .assigned-tasks-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .dark-mode .assigned-tasks-scrollbar::-webkit-scrollbar-track {
+      background: #1f2937; /* gray-800 */
+      border-radius: 3px;
+    }
+    .light-mode .assigned-tasks-scrollbar::-webkit-scrollbar-track {
+      background: #f3f4f6; /* gray-100 */
+      border-radius: 3px;
+    }
+    .dark-mode .assigned-tasks-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #4b5563; /* gray-600 */
+      border-radius: 3px;
+      border: 1px solid #1f2937; /* gray-800, creates padding */
+    }
+    .light-mode .assigned-tasks-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #d1d5db; /* gray-300 */
+      border-radius: 3px;
+      border: 1px solid #f3f4f6; /* gray-100, creates padding */
+    }
+    .dark-mode .assigned-tasks-scrollbar::-webkit-scrollbar-thumb:hover {
+      background-color: #6b7280; /* gray-500 */
+    }
+    .light-mode .assigned-tasks-scrollbar::-webkit-scrollbar-thumb:hover {
+      background-color: #9ca3af; /* gray-400 */
+    }
+    .dark-mode .assigned-tasks-scrollbar {
+      scrollbar-width: thin;
+      scrollbar-color: #4b5563 #1f2937; /* thumb track for Firefox */
+    }
+    .light-mode .assigned-tasks-scrollbar {
+      scrollbar-width: thin;
+      scrollbar-color: #d1d5db #f3f4f6; /* thumb track for Firefox */
     }
   `}</style>
 );
