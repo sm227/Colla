@@ -844,7 +844,7 @@ const CalendarPage: React.FC = () => {
       </aside>
       
       {/* 중앙 메인 캘린더 */}
-      <main className="flex-1 flex flex-col px-8 py-6 overflow-y-auto">
+      <main className="flex-1 w-full h-full flex flex-col p-0 m-0 overflow-hidden justify-stretch items-stretch">
         {/* 상단 네비게이션 */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
@@ -875,11 +875,11 @@ const CalendarPage: React.FC = () => {
         </div>
         {/* 월/주/일 달력 뷰 */}
         {calendarView === 'month' && (
-          <div className="bg-white rounded-lg shadow border overflow-hidden">
-            <div className="grid grid-cols-7 border-b text-center text-sm font-medium bg-gray-50">
+          <div className="bg-white rounded-lg shadow border overflow-hidden w-full h-full flex flex-col">
+            <div className="grid grid-cols-7 border-b text-center text-sm font-medium bg-gray-50 w-full">
               {weekDays.map((d,i)=>(<div key={i} className={i===0?'text-red-500':i===6?'text-blue-500':'text-gray-700'}>{d}</div>))}
             </div>
-            <div className="grid grid-cols-7 auto-rows-[100px]">
+            <div className="grid grid-cols-7 flex-1 h-0 min-h-0 auto-rows-fr">
               {calendarDays.map((day, idx) => {
                 const isCurrentMonth = isSameMonth(day, currentDate);
                 const isCurrentDay = isToday(day);
@@ -902,31 +902,42 @@ const CalendarPage: React.FC = () => {
                   >
                     <div className="absolute top-2 left-2 text-xs font-semibold">{format(day,'d')}</div>
                     {/* 일정 표시 */}
-                    <div className="mt-6 space-y-1"
-                      style={{maxHeight: '80px', overflowY: 'auto', paddingRight: 2, scrollbarWidth: 'thin'}}
-                    >
-                      {calendarTasks.filter(t=>{
-                        const dateToCheck = t.startDate || t.dueDate || undefined;
-                        return dateToCheck && isSameDay(dateToCheck, day);
-                      }).map((task,i)=>{
-                        // 시간 포맷
-                        const start = task.startDate ? new Date(task.startDate) : undefined;
-                        const end = task.endDate ? new Date(task.endDate) : undefined;
-                        const timeStr = (start && end)
-                          ? `${start.getHours().toString().padStart(2,'0')}:${start.getMinutes().toString().padStart(2,'0')}~${end.getHours().toString().padStart(2,'0')}:${end.getMinutes().toString().padStart(2,'0')}`
-                          : '';
+                    <div className="mt-6 space-y-1 relative h-full">
+                      {(() => {
+                        const events = calendarTasks.filter(t=>{
+                          const dateToCheck = t.startDate || t.dueDate || undefined;
+                          return dateToCheck && isSameDay(dateToCheck, day);
+                        });
+                        const showEvents = events.slice(0,2);
+                        const moreCount = events.length - 2;
                         return (
-                          <div key={task.id+''+i} 
-                            className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}
-                            style={{whiteSpace:'normal',wordBreak:'break-all',marginBottom:2,cursor:'pointer'}}
-                            title={task.description || ''}
-                            onClick={() => handleEventClick(task)}
-                          >
-                            <div>{task.title}</div>
-                            {timeStr && <div className="text-[10px] text-gray-500 mt-0.5">{timeStr}</div>}
-                          </div>
-                        )
-                      })}
+                          <>
+                            {showEvents.map((task,i)=>{
+                              // 시간 포맷
+                              const start = task.startDate ? new Date(task.startDate) : undefined;
+                              const end = task.endDate ? new Date(task.endDate) : undefined;
+                              const timeStr = (start && end)
+                                ? `${start.getHours().toString().padStart(2,'0')}:${start.getMinutes().toString().padStart(2,'0')}~${end.getHours().toString().padStart(2,'0')}:${end.getMinutes().toString().padStart(2,'0')}`
+                                : '';
+                              return (
+                                <div key={task.id+''+i} 
+                                  className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}
+                                  style={{whiteSpace:'normal',maxHeight:48,overflowY:'auto',wordBreak:'break-all',marginBottom:2}}
+                                  onClick={() => handleEventClick(task)}
+                                >
+                                  <div>{task.title}</div>
+                                  {timeStr && <div className="text-[10px] text-gray-500 mt-0.5">{timeStr}</div>}
+                                </div>
+                              )
+                            })}
+                            {moreCount > 0 && (
+                              <div className="text-xs text-blue-500 cursor-pointer select-none" style={{marginTop:2}}>
+                                +{moreCount}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 )
@@ -935,11 +946,11 @@ const CalendarPage: React.FC = () => {
           </div>
         )}
         {calendarView === 'week' && (
-          <div className="bg-white rounded-lg shadow border overflow-hidden">
-            <div className="grid grid-cols-7 border-b text-center text-sm font-medium bg-gray-50">
+          <div className="bg-white rounded-lg shadow border overflow-hidden w-full h-full flex flex-col">
+            <div className="grid grid-cols-7 border-b text-center text-sm font-medium bg-gray-50 w-full">
               {weekDays.map((d,i)=>(<div key={i} className={i===0?'text-red-500':i===6?'text-blue-500':'text-gray-700'}>{d}</div>))}
             </div>
-            <div className="grid grid-cols-7 auto-rows-[120px]">
+            <div className="grid grid-cols-7 flex-1 h-0 min-h-0 auto-rows-fr">
               {(() => {
                 // 현재 날짜가 속한 주의 일요일~토요일 구하기
                 const curr = selectedDate || currentDate;
@@ -965,30 +976,42 @@ const CalendarPage: React.FC = () => {
                       onDrop={handleDrop(day)}
                     >
                       <div className="absolute top-2 left-2 text-xs font-semibold">{format(day,'d')}</div>
-                      <div className="mt-6 space-y-1"
-                        style={{maxHeight: '100px', overflowY: 'auto', paddingRight: 2, scrollbarWidth: 'thin'}}
-                      >
-                        {calendarTasks.filter(t=>{
-                          const dateToCheck = t.startDate || t.dueDate || undefined;
-                          return dateToCheck && isSameDay(dateToCheck, day);
-                        }).map((task,i)=>{
-                          const start = task.startDate ? new Date(task.startDate) : undefined;
-                          const end = task.endDate ? new Date(task.endDate) : undefined;
-                          const timeStr = (start && end)
-                            ? `${start.getHours().toString().padStart(2,'0')}:${start.getMinutes().toString().padStart(2,'0')}~${end.getHours().toString().padStart(2,'0')}:${end.getMinutes().toString().padStart(2,'0')}`
-                            : '';
+                      <div className="mt-6 space-y-1 relative h-full">
+                        {(() => {
+                          const events = calendarTasks.filter(t=>{
+                            const dateToCheck = t.startDate || t.dueDate || undefined;
+                            return dateToCheck && isSameDay(dateToCheck, day);
+                          });
+                          const showEvents = events.slice(0,2);
+                          const moreCount = events.length - 2;
                           return (
-                            <div key={task.id+''+i} 
-                              className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}
-                              style={{whiteSpace:'normal',wordBreak:'break-all',marginBottom:2,cursor:'pointer'}}
-                              title={task.description || ''}
-                              onClick={() => handleEventClick(task)}
-                            >
-                              <div>{task.title}</div>
-                              {timeStr && <div className="text-[10px] text-gray-500 mt-0.5">{timeStr}</div>}
-                            </div>
-                          )
-                        })}
+                            <>
+                              {showEvents.map((task,i)=>{
+                                // 시간 포맷
+                                const start = task.startDate ? new Date(task.startDate) : undefined;
+                                const end = task.endDate ? new Date(task.endDate) : undefined;
+                                const timeStr = (start && end)
+                                  ? `${start.getHours().toString().padStart(2,'0')}:${start.getMinutes().toString().padStart(2,'0')}~${end.getHours().toString().padStart(2,'0')}:${end.getMinutes().toString().padStart(2,'0')}`
+                                  : '';
+                                return (
+                                  <div key={task.id+''+i} 
+                                    className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}
+                                    style={{whiteSpace:'normal',maxHeight:48,overflowY:'auto',wordBreak:'break-all',marginBottom:2}}
+                                    onClick={() => handleEventClick(task)}
+                                  >
+                                    <div>{task.title}</div>
+                                    {timeStr && <div className="text-[10px] text-gray-500 mt-0.5">{timeStr}</div>}
+                                  </div>
+                                )
+                              })}
+                              {moreCount > 0 && (
+                                <div className="text-xs text-blue-500 cursor-pointer select-none" style={{marginTop:2}}>
+                                  +{moreCount} 더보기
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   )
@@ -998,36 +1021,48 @@ const CalendarPage: React.FC = () => {
           </div>
         )}
         {calendarView === 'day' && (
-          <div className="bg-white rounded-lg shadow border overflow-hidden">
+          <div className="bg-white rounded-lg shadow border overflow-hidden w-full h-full flex flex-col">
             <div className="border-b text-center text-sm font-medium bg-gray-50 py-2">
               {format(selectedDate || currentDate, 'yyyy년 MM월 dd일 (E)', {locale:ko})}
             </div>
             <div className="p-8 min-h-[300px]">
               <div className="font-bold mb-2">{format(selectedDate || currentDate, 'd일')}</div>
-              <div className="space-y-2"
-                style={{maxHeight: '180px', overflowY: 'auto', paddingRight: 2, scrollbarWidth: 'thin'}}
-              >
-                {calendarTasks.filter(t=>{
-                  const dateToCheck = t.startDate || t.dueDate || undefined;
-                  return dateToCheck && isSameDay(dateToCheck, selectedDate || currentDate);
-                }).map((task,i)=>{
-                  const start = task.startDate ? new Date(task.startDate) : undefined;
-                  const end = task.endDate ? new Date(task.endDate) : undefined;
-                  const timeStr = (start && end)
-                    ? `${start.getHours().toString().padStart(2,'0')}:${start.getMinutes().toString().padStart(2,'0')}~${end.getHours().toString().padStart(2,'0')}:${end.getMinutes().toString().padStart(2,'0')}`
-                    : '';
+              <div className="space-y-2 relative h-full">
+                {(() => {
+                  const events = calendarTasks.filter(t=>{
+                    const dateToCheck = t.startDate || t.dueDate || undefined;
+                    return dateToCheck && isSameDay(dateToCheck, selectedDate || currentDate);
+                  });
+                  const showEvents = events.slice(0,2);
+                  const moreCount = events.length - 2;
                   return (
-                    <div key={task.id+''+i} 
-                      className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}
-                      style={{whiteSpace:'normal',wordBreak:'break-all',marginBottom:2,cursor:'pointer'}}
-                      title={task.description || ''}
-                      onClick={() => handleEventClick(task)}
-                    >
-                      <div>{task.title}</div>
-                      {timeStr && <div className="text-[10px] text-gray-500 mt-0.5">{timeStr}</div>}
-                    </div>
-                  )
-                })}
+                    <>
+                      {showEvents.map((task,i)=>{
+                        // 시간 포맷
+                        const start = task.startDate ? new Date(task.startDate) : undefined;
+                        const end = task.endDate ? new Date(task.endDate) : undefined;
+                        const timeStr = (start && end)
+                          ? `${start.getHours().toString().padStart(2,'0')}:${start.getMinutes().toString().padStart(2,'0')}~${end.getHours().toString().padStart(2,'0')}:${end.getMinutes().toString().padStart(2,'0')}`
+                          : '';
+                        return (
+                          <div key={task.id+''+i} 
+                            className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-indigo-100 text-indigo-700':'bg-blue-100 text-blue-700'}`}
+                            style={{whiteSpace:'normal',maxHeight:48,overflowY:'auto',wordBreak:'break-all',marginBottom:2}}
+                            onClick={() => handleEventClick(task)}
+                          >
+                            <div>{task.title}</div>
+                            {timeStr && <div className="text-[10px] text-gray-500 mt-0.5">{timeStr}</div>}
+                          </div>
+                        )
+                      })}
+                      {moreCount > 0 && (
+                        <div className="text-xs text-blue-500 cursor-pointer select-none" style={{marginTop:2}}>
+                          +{moreCount} 더보기
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -1255,5 +1290,17 @@ const CalendarPage: React.FC = () => {
     </div>
   );
 }
+
+// 스크롤바 숨김용 글로벌 스타일
+// eslint-disable-next-line react/no-unknown-property
+<style jsx global>{`
+  .hide-scrollbar {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE 10+ */
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome/Safari/Webkit */
+  }
+`}</style>
 
 export default CalendarPage;
