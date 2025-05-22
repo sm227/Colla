@@ -162,88 +162,20 @@ export function KanbanColumn({
 
   // 컬럼 헤더 색상 설정
   const getColorClasses = () => {
-    // 다크 모드에서는 다른 색상을 사용
+    // 다크 모드에서는 모두 동일한 헤더 배경(어두운 회색)
     if (theme === 'dark') {
-      switch (color) {
-        case 'blue':
-          return {
-            bg: 'bg-blue-900 bg-opacity-30',
-            text: 'text-blue-300',
-            indicator: 'bg-blue-500'
-          };
-        case 'green':
-          return {
-            bg: 'bg-green-900 bg-opacity-30',
-            text: 'text-green-300',
-            indicator: 'bg-green-500'
-          };
-        case 'yellow':
-          return {
-            bg: 'bg-yellow-900 bg-opacity-30',
-            text: 'text-yellow-300',
-            indicator: 'bg-yellow-500'
-          };
-        case 'purple':
-          return {
-            bg: 'bg-purple-900 bg-opacity-30',
-            text: 'text-purple-300',
-            indicator: 'bg-purple-500'
-          };
-        case 'red':
-          return {
-            bg: 'bg-red-900 bg-opacity-30',
-            text: 'text-red-300',
-            indicator: 'bg-red-500'
-          };
-        case 'gray':
-        default:
-          return {
-            bg: 'bg-gray-800',
-            text: 'text-gray-300',
-            indicator: 'bg-gray-500'
-          };
-      }
+      return {
+        bg: 'bg-[#353538]',
+        text: 'text-gray-300',
+        indicator: color === 'blue' ? 'bg-blue-500' : color === 'green' ? 'bg-green-500' : color === 'yellow' ? 'bg-yellow-500' : color === 'purple' ? 'bg-purple-500' : color === 'red' ? 'bg-red-500' : 'bg-gray-500'
+      };
     } else {
-      // 라이트 모드 색상 (기존 코드)
-      switch (color) {
-        case 'blue':
-          return {
-            bg: 'bg-blue-100',
-            text: 'text-blue-800',
-            indicator: 'bg-blue-500'
-          };
-        case 'green':
-          return {
-            bg: 'bg-green-100',
-            text: 'text-green-800',
-            indicator: 'bg-green-500'
-          };
-        case 'yellow':
-          return {
-            bg: 'bg-yellow-100',
-            text: 'text-yellow-800',
-            indicator: 'bg-yellow-500'
-          };
-        case 'purple':
-          return {
-            bg: 'bg-purple-100',
-            text: 'text-purple-800',
-            indicator: 'bg-purple-500'
-          };
-        case 'red':
-          return {
-            bg: 'bg-red-100',
-            text: 'text-red-800',
-            indicator: 'bg-red-500'
-          };
-        case 'gray':
-        default:
-          return {
-            bg: 'bg-gray-100',
-            text: 'text-gray-800',
-            indicator: 'bg-gray-500'
-          };
-      }
+      // 라이트 모드에서는 모두 흰색 헤더
+      return {
+        bg: 'bg-white',
+        text: 'text-gray-800',
+        indicator: color === 'blue' ? 'bg-blue-500' : color === 'green' ? 'bg-green-500' : color === 'yellow' ? 'bg-yellow-500' : color === 'purple' ? 'bg-purple-500' : color === 'red' ? 'bg-red-500' : 'bg-gray-500'
+      };
     }
   };
 
@@ -271,7 +203,7 @@ export function KanbanColumn({
         </div>
       </div>
       
-      <div className="flex flex-col gap-2 p-3 flex-grow">
+      <div className="flex flex-col gap-1 p-3 flex-grow">
         {/* 작업 목록 */}
         {tasks.map((task) => (
           <div key={task.id} onClick={() => onTaskClick(task)}>
