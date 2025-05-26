@@ -251,6 +251,484 @@ const fetchTaskNotifications = async (): Promise<Notification[]> => {
   }
 };
 
+// 작업 상태 분포 차트 컴포넌트
+function TaskStatusChart({ projectId }: { projectId?: string }) {
+  const [taskStats, setTaskStats] = useState({
+    todo: 0,
+    inProgress: 0,
+    done: 0,
+    total: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [chartType, setChartType] = useState<1 | 2>(1); // 차트 타입 상태 추가
+  const [hoveredSection, setHoveredSection] = useState<string | null>(null); // 호버 상태 추가
+
+  useEffect(() => {
+    const fetchTaskStats = async () => {
+      if (!projectId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/projects/${projectId}/tasks`);
+        if (!response.ok) throw new Error('작업 통계를 불러오는데 실패했습니다');
+        
+        const tasks = await response.json();
+        
+        const stats = {
+          todo: tasks.filter((task: any) => task.status === 'todo').length,
+          inProgress: tasks.filter((task: any) => task.status === 'in-progress').length,
+          done: tasks.filter((task: any) => task.status === 'done' || task.status === 'review').length,
+          total: tasks.length
+        };
+        
+        setTaskStats(stats);
+        setError(null);
+      } catch (err) {
+        setError('작업 통계를 불러오는데 실패했습니다');
+        setTaskStats({ todo: 0, inProgress: 0, done: 0, total: 0 });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTaskStats();
+  }, [projectId]);
+
+  // 바 차트 SVG 생성
+  const createBarChart = () => {
+    const { todo, inProgress, done, total } = taskStats;
+    
+    if (total === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
+          <div className="w-80 h-48 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-lg flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-4xl font-bold">0</div>
+              <div className="text-base">총 업무 항목</div>
+            </div>
+          </div>
+          <div className="mt-6 text-center">
+            <p className="text-base">작업이 없습니다</p>
+          </div>
+        </div>
+      );
+    }
+
+    const maxValue = Math.max(todo, inProgress, done);
+    const barHeight = 200;
+    const barWidth = 60;
+    const spacing = 40;
+    
+    const todoHeight = maxValue > 0 ? (todo / maxValue) * barHeight : 0;
+    const inProgressHeight = maxValue > 0 ? (inProgress / maxValue) * barHeight : 0;
+    const doneHeight = maxValue > 0 ? (done / maxValue) * barHeight : 0;
+
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="flex items-end justify-center space-x-12 w-full">
+          {/* 바 차트 */}
+          <div className="flex items-end space-x-8">
+            {/* 해야 할 일 바 */}
+            <div className="flex flex-col items-center">
+              <div className="relative">
+                <div 
+                  className="bg-pink-500 rounded-t-lg transition-all duration-500 flex items-end justify-center"
+                  style={{ 
+                    width: `${barWidth}px`, 
+                    height: `${Math.max(todoHeight, 20)}px` 
+                  }}
+                >
+                  {todo > 0 && (
+                    <span className="text-white font-bold text-sm mb-2">{todo}</span>
+                  )}
+                </div>
+              </div>
+              <div className="mt-3 text-center">
+                <div className="text-sm font-medium text-gray-700 dark:text-gray-300">해야 할 일</div>
+              </div>
+            </div>
+
+            {/* 진행 중 바 */}
+            <div className="flex flex-col items-center">
+              <div className="relative">
+                <div 
+                  className="bg-blue-500 rounded-t-lg transition-all duration-500 flex items-end justify-center"
+                  style={{ 
+                    width: `${barWidth}px`, 
+                    height: `${Math.max(inProgressHeight, 20)}px` 
+                  }}
+                >
+                  {inProgress > 0 && (
+                    <span className="text-white font-bold text-sm mb-2">{inProgress}</span>
+                  )}
+                </div>
+              </div>
+              <div className="mt-3 text-center">
+                <div className="text-sm font-medium text-gray-700 dark:text-gray-300">진행 중</div>
+              </div>
+            </div>
+
+            {/* 완료 바 */}
+            <div className="flex flex-col items-center">
+              <div className="relative">
+                <div 
+                  className="bg-orange-500 rounded-t-lg transition-all duration-500 flex items-end justify-center"
+                  style={{ 
+                    width: `${barWidth}px`, 
+                    height: `${Math.max(doneHeight, 20)}px` 
+                  }}
+                >
+                  {done > 0 && (
+                    <span className="text-white font-bold text-sm mb-2">{done}</span>
+                  )}
+                </div>
+              </div>
+              <div className="mt-3 text-center">
+                <div className="text-sm font-medium text-gray-700 dark:text-gray-300">완료</div>
+              </div>
+            </div>
+          </div>
+
+          {/* 총계 표시 */}
+          <div className="flex flex-col items-center justify-center ml-8">
+            <div className="text-4xl font-bold text-gray-900 dark:text-gray-100">{total}</div>
+            <div className="text-base text-gray-500 dark:text-gray-400">총 업무 항목</div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // 도넛 차트 SVG 생성
+  const createDonutChart = () => {
+    const { todo, inProgress, done, total } = taskStats;
+    
+    if (total === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
+          <div className="w-44 h-44 rounded-full border-12 border-gray-200 dark:border-gray-600 flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-4xl font-bold">0</div>
+              <div className="text-base">총 업무 항목</div>
+            </div>
+          </div>
+          <div className="mt-6 text-center">
+            <p className="text-base">작업이 없습니다</p>
+          </div>
+        </div>
+      );
+    }
+
+    const radius = 90;
+    const strokeWidth = 24;
+    const normalizedRadius = radius - strokeWidth * 0.5;
+    const circumference = normalizedRadius * 2 * Math.PI;
+    
+    // 각 상태별 비율 계산
+    const todoPercent = (todo / total) * 100;
+    const inProgressPercent = (inProgress / total) * 100;
+    const donePercent = (done / total) * 100;
+    
+    // 각 섹션의 stroke-dasharray 계산
+    const todoStroke = (todoPercent / 100) * circumference;
+    const inProgressStroke = (inProgressPercent / 100) * circumference;
+    const doneStroke = (donePercent / 100) * circumference;
+    
+    // 각 섹션의 시작 위치 계산 (회전)
+    const todoOffset = 0;
+    const inProgressOffset = todoStroke;
+    const doneOffset = todoStroke + inProgressStroke;
+
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="flex items-center justify-center space-x-8 w-full">
+          {/* 도넛 차트 */}
+          <div className="relative flex-shrink-0">
+            <svg 
+              width="200" 
+              height="200" 
+              className="transform -rotate-90"
+              viewBox="0 0 220 220"
+            >
+              {/* 배경 원 */}
+              <circle
+                cx="110"
+                cy="110"
+                r={normalizedRadius}
+                stroke="#e5e7eb"
+                strokeWidth={strokeWidth}
+                fill="transparent"
+                className="dark:stroke-gray-600"
+              />
+              
+              {/* 해야 할 일 (분홍색) */}
+              {todo > 0 && (
+                <circle
+                  cx="110"
+                  cy="110"
+                  r={normalizedRadius}
+                  stroke="#ec4899"
+                  strokeWidth={strokeWidth}
+                  fill="transparent"
+                  strokeDasharray={`${todoStroke} ${circumference}`}
+                  strokeDashoffset={-todoOffset}
+                  strokeLinecap="round"
+                  className="transition-all duration-300 cursor-pointer hover:brightness-110"
+                  onMouseEnter={() => setHoveredSection('todo')}
+                  onMouseLeave={() => setHoveredSection(null)}
+                />
+              )}
+              
+              {/* 진행 중 (파란색) */}
+              {inProgress > 0 && (
+                <circle
+                  cx="110"
+                  cy="110"
+                  r={normalizedRadius}
+                  stroke="#3b82f6"
+                  strokeWidth={strokeWidth}
+                  fill="transparent"
+                  strokeDasharray={`${inProgressStroke} ${circumference}`}
+                  strokeDashoffset={-inProgressOffset}
+                  strokeLinecap="round"
+                  className="transition-all duration-300 cursor-pointer hover:brightness-110"
+                  onMouseEnter={() => setHoveredSection('inProgress')}
+                  onMouseLeave={() => setHoveredSection(null)}
+                />
+              )}
+              
+              {/* 완료 (주황색) */}
+              {done > 0 && (
+                <circle
+                  cx="110"
+                  cy="110"
+                  r={normalizedRadius}
+                  stroke="#f97316"
+                  strokeWidth={strokeWidth}
+                  fill="transparent"
+                  strokeDasharray={`${doneStroke} ${circumference}`}
+                  strokeDashoffset={-doneOffset}
+                  strokeLinecap="round"
+                  className="transition-all duration-300 cursor-pointer hover:brightness-110"
+                  onMouseEnter={() => setHoveredSection('done')}
+                  onMouseLeave={() => setHoveredSection(null)}
+                />
+              )}
+            </svg>
+            
+            {/* 중앙 텍스트 */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              {hoveredSection ? (
+                <>
+                  <div className="text-4xl font-bold text-gray-900 dark:text-gray-100">
+                    {hoveredSection === 'todo' && `${Math.round((todo / total) * 100)}%`}
+                    {hoveredSection === 'inProgress' && `${Math.round((inProgress / total) * 100)}%`}
+                    {hoveredSection === 'done' && `${Math.round((done / total) * 100)}%`}
+                  </div>
+                  <div className="text-base text-gray-500 dark:text-gray-400">
+                    {hoveredSection === 'todo' && '해야 할 일'}
+                    {hoveredSection === 'inProgress' && '진행 중'}
+                    {hoveredSection === 'done' && '완료'}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-4xl font-bold text-gray-900 dark:text-gray-100">{total}</div>
+                  <div className="text-base text-gray-500 dark:text-gray-400">총 업무 항목</div>
+                </>
+              )}
+            </div>
+          </div>
+          
+          {/* 범례 */}
+          <div className="space-y-4">
+            <div 
+              className="flex items-center cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 p-2 rounded-md"
+              onMouseEnter={() => setHoveredSection('todo')}
+              onMouseLeave={() => setHoveredSection(null)}
+            >
+              <div className="w-5 h-5 rounded-full bg-pink-500 mr-4"></div>
+              <span className="text-base text-gray-700 dark:text-gray-300">
+                해야 할 일: {todo}
+              </span>
+            </div>
+            <div 
+              className="flex items-center cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 p-2 rounded-md"
+              onMouseEnter={() => setHoveredSection('inProgress')}
+              onMouseLeave={() => setHoveredSection(null)}
+            >
+              <div className="w-5 h-5 rounded-full bg-blue-500 mr-4"></div>
+              <span className="text-base text-gray-700 dark:text-gray-300">
+                진행 중: {inProgress}
+              </span>
+            </div>
+            <div 
+              className="flex items-center cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 p-2 rounded-md"
+              onMouseEnter={() => setHoveredSection('done')}
+              onMouseLeave={() => setHoveredSection(null)}
+            >
+              <div className="w-5 h-5 rounded-full bg-orange-500 mr-4"></div>
+              <span className="text-base text-gray-700 dark:text-gray-300">
+                완료: {done}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col h-full">
+        {/* 차트 전환 버튼 */}
+        <div className="flex justify-center mb-4">
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setChartType(1)}
+              className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                chartType === 1
+                  ? 'bg-blue-500 dark:bg-blue-400 scale-125'
+                  : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
+              }`}
+            />
+            <button
+              onClick={() => setChartType(2)}
+              className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                chartType === 2
+                  ? 'bg-blue-500 dark:bg-blue-400 scale-125'
+                  : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
+              }`}
+            />
+          </div>
+        </div>
+        
+        {/* 로딩 상태 */}
+        <div className="flex-1 flex justify-center items-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-500"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col h-full">
+        {/* 차트 전환 버튼 */}
+        <div className="flex justify-center mb-4">
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setChartType(1)}
+              className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                chartType === 1
+                  ? 'bg-blue-500 dark:bg-blue-400 scale-125'
+                  : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
+              }`}
+            />
+            <button
+              onClick={() => setChartType(2)}
+              className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                chartType === 2
+                  ? 'bg-blue-500 dark:bg-blue-400 scale-125'
+                  : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
+              }`}
+            />
+          </div>
+        </div>
+        
+        {/* 에러 상태 */}
+        <div className="flex-1 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
+          <BarChart3Icon className="w-10 h-10 mb-2 opacity-50" />
+          <p className="text-center text-sm">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!projectId) {
+    return (
+      <div className="flex flex-col h-full">
+        {/* 차트 전환 버튼 */}
+        <div className="flex justify-center mb-4">
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setChartType(1)}
+              className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                chartType === 1
+                  ? 'bg-blue-500 dark:bg-blue-400 scale-125'
+                  : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
+              }`}
+            />
+            <button
+              onClick={() => setChartType(2)}
+              className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                chartType === 2
+                  ? 'bg-blue-500 dark:bg-blue-400 scale-125'
+                  : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
+              }`}
+            />
+          </div>
+        </div>
+        
+        {/* 빈 상태 메시지 */}
+        <div className="flex-1 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
+          <BarChart3Icon className="w-10 h-10 mb-2 opacity-50" />
+          <p className="text-center">프로젝트를 선택하면</p>
+          <p className="text-center text-sm mt-1">작업 진행 상황을 확인할 수 있습니다</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* 차트 전환 버튼 */}
+      <div className="flex justify-center mb-4">
+        <div className="flex space-x-2">
+          <button
+            onClick={() => setChartType(1)}
+            className={`w-2 h-2 rounded-full transition-all duration-300 ${
+              chartType === 1
+                ? 'bg-blue-500 dark:bg-blue-400 scale-125'
+                : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
+            }`}
+          />
+          <button
+            onClick={() => setChartType(2)}
+            className={`w-2 h-2 rounded-full transition-all duration-300 ${
+              chartType === 2
+                ? 'bg-blue-500 dark:bg-blue-400 scale-125'
+                : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
+            }`}
+          />
+        </div>
+      </div>
+      
+      {/* 차트 영역 */}
+      <div className="flex-1 relative overflow-hidden min-h-[300px]">
+        <div className={`absolute inset-0 w-full h-full transition-all duration-500 ease-in-out transform ${
+          chartType === 1 ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+        }`}>
+          <div className="w-full h-full">
+            {createDonutChart()}
+          </div>
+        </div>
+        <div className={`absolute inset-0 w-full h-full transition-all duration-500 ease-in-out transform ${
+          chartType === 2 ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'
+        }`}>
+          <div className="w-full h-full">
+            {createBarChart()}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // 작업 생성 모달 컴포넌트
 function TaskCreateModal({ 
   isOpen, 
@@ -479,7 +957,6 @@ export default function Home() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
-  const [isDocumentsSubmenuOpen, setIsDocumentsSubmenuOpen] = useState(false);
   // const [roomId, /* setRoomId */] = useState(""); // roomId 및 setRoomId 주석 처리
 
   // 기존의 theme 저장 useEffect 제거 (next-themes가 자동으로 처리)
@@ -849,82 +1326,40 @@ export default function Home() {
                   icon={<FileTextIcon className="w-5 h-5" />}
                   text="문서"
                   href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
-                  active={pathname?.startsWith("/documents") || isDocumentsSubmenuOpen}
-                  onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                    e.preventDefault();
-                    setIsDocumentsSubmenuOpen(!isDocumentsSubmenuOpen); // 하위메뉴 토글
-                    if (currentProject?.id) {
-                      fetch(`/api/projects/${currentProject.id}`)
-                        .then((response) => {
-                          if (response.ok) {
-                            router.push(`/documents?projectId=${currentProject.id}`);
-                          } else {
-                            alert("선택된 프로젝트에 접근할 수 없습니다. 일반 문서 목록으로 이동합니다.");
-                            router.push("/documents");
-                          }
-                        })
-                        .catch(() => router.push("/documents"));
-                    } else {
-                      router.push("/documents");
-                    }
-                  }}
+                  active={pathname?.startsWith("/documents")}
                   theme={theme}
                   small
                 />
                 
                 {/* 문서 하위 메뉴 추가 */}
-                {isDocumentsSubmenuOpen && (
-                  <div 
-                    className={`pl-4 pt-1 space-y-1 ml-2.5 transition-all duration-300 ease-in-out ${
-                      isDocumentsSubmenuOpen ? 'max-h-[20rem] opacity-100' : 'max-h-0 opacity-0'
-                    }`}
-                  >
-                    <div className="transform transition-all duration-300 ease-in-out" 
-                         style={{ 
-                           opacity: isDocumentsSubmenuOpen ? 1 : 0, 
-                           transform: isDocumentsSubmenuOpen ? 'translateY(0)' : 'translateY(-10px)',
-                           transition: 'opacity 300ms ease-in-out, transform 300ms ease-in-out'
-                         }}>
-                      <SidebarLink
-                        icon={<FileTextIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
-                        text="모든 문서"
-                        href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
-                        active={pathname?.startsWith("/documents")}
-                        theme={theme}
-                        small
-                      />
-                    </div>
+                {pathname?.startsWith("/documents") && (
+                  <div className="pl-4 pt-1 space-y-1 ml-2.5">
+                    <SidebarLink
+                      icon={<FileTextIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
+                      text="모든 문서"
+                      href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
+                      active={pathname?.startsWith("/documents") && !searchParams?.has("favorites") && !pathname?.includes("/new")}
+                      theme={theme}
+                      small
+                    />
                     
-                    <div className="transform transition-all duration-300 ease-in-out" 
-                         style={{ 
-                           opacity: isDocumentsSubmenuOpen ? 1 : 0, 
-                           transform: isDocumentsSubmenuOpen ? 'translateY(0)' : 'translateY(-10px)',
-                           transition: 'opacity 300ms ease-in-out 100ms, transform 300ms ease-in-out 100ms'
-                         }}>
-                      <SidebarLink
-                        icon={<StarIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
-                        text="즐겨찾기"
-                        href={currentProject?.id ? `/documents?projectId=${currentProject.id}&favorites=true` : "/documents?favorites=true"}
-                        active={pathname?.startsWith("/documents") && searchParams?.has("favorites")}
-                        theme={theme}
-                        small
-                      />
-                    </div>
+                    <SidebarLink
+                      icon={<StarIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
+                      text="즐겨찾기"
+                      href={currentProject?.id ? `/documents?projectId=${currentProject.id}&favorites=true` : "/documents?favorites=true"}
+                      active={pathname?.startsWith("/documents") && searchParams?.has("favorites")}
+                      theme={theme}
+                      small
+                    />
                     
-                    <div className="transform transition-all duration-300 ease-in-out" 
-                         style={{ 
-                           opacity: isDocumentsSubmenuOpen ? 1 : 0, 
-                           transform: isDocumentsSubmenuOpen ? 'translateY(0)' : 'translateY(-10px)',
-                           transition: 'opacity 300ms ease-in-out 200ms, transform 300ms ease-in-out 200ms'
-                         }}>
-                      <SidebarLink
-                        icon={<PlusIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
-                        text="새 문서 작성"
-                        href={currentProject?.id ? `/documents/new?projectId=${currentProject.id}` : "/documents/new"}
-                        theme={theme}
-                        small
-                      />
-                    </div>
+                    <SidebarLink
+                      icon={<PlusIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
+                      text="새 문서 작성"
+                      href={currentProject?.id ? `/documents/new?projectId=${currentProject.id}` : "/documents/new"}
+                      active={pathname?.includes("/documents/new")}
+                      theme={theme}
+                      small
+                    />
                   </div>
                 )}
                 
@@ -941,6 +1376,14 @@ export default function Home() {
                   text="화상 회의"
                   href="/meeting"
                   active={pathname?.startsWith("/meeting")}
+                  theme={theme}
+                  small
+                />
+                <SidebarLink
+                  icon={<BarChart3Icon className="w-5 h-5" />}
+                  text="보고서"
+                  href="/reports"
+                  active={pathname?.startsWith("/reports")}
                   theme={theme}
                   small
                 />
@@ -1141,23 +1584,17 @@ export default function Home() {
                 {/* 프로젝트 진행 상황 */}
                 <DashboardWidget
                   title="프로젝트 진행 상황"
-                  // className="order-2 min-[1400px]:order-1 min-[1400px]:col-span-6 h-[250px]"
-                  className="min-[1400px]:col-span-6 h-full" // 변경: order 제거, h-full
+                  viewAllLink="/reports"
+                  className="min-[1400px]:col-span-6 h-[400px]"
                 >
-                  <div className="flex flex-col h-full items-center justify-center text-gray-500 dark:text-gray-400">
-                    <BarChart3Icon className="w-10 h-10 mb-2 opacity-50" />
-                    <p className="text-center">구현예정</p>
-                    <p className="text-center text-sm mt-1">
-                      그래프는 여기
-                    </p>
-                  </div>
+                  <TaskStatusChart projectId={currentProject?.id} />
                 </DashboardWidget>
 
                 {/* 나에게 할당된 작업 */}
                 <DashboardWidget
                   title="나에게 할당된 작업"
                   viewAllLink="/kanban"
-                  className="min-[1400px]:col-span-6 h-[300px]" // h-full을 h-[300px]로 변경
+                  className="min-[1400px]:col-span-6 h-[400px]" // 5개 작업이 보이도록 높이 증가
                   actionButton={
                     <button 
                       onClick={() => setShowTaskModal(true)} 
@@ -1167,6 +1604,7 @@ export default function Home() {
                       <PlusIcon className="w-4 h-4 text-gray-700 dark:text-gray-300" />
                     </button>
                   }
+                  withScroll={true}
                 >
                   <SimplifiedKanbanBoard /> {/* theme prop 제거 */}
                 </DashboardWidget>
@@ -1288,13 +1726,15 @@ function DashboardWidget({
   children, 
   className = "",
   viewAllLink,
-  actionButton
+  actionButton,
+  withScroll = false
 }: {
   title: string;
   children: React.ReactNode; 
   className?: string;
   viewAllLink?: string;
   actionButton?: React.ReactNode;
+  withScroll?: boolean;
 }) {
   return (
     <div className={`rounded-xl shadow-sm bg-white border border-gray-200 dark:bg-[#2a2a2c] dark:border-gray-700 p-6 flex flex-col ${className}`}>
@@ -1309,7 +1749,7 @@ function DashboardWidget({
           </Link>
         )}
         </div>
-      <div className="flex-1 overflow-y-auto pr-2">{children}</div>
+      <div className={withScroll ? "flex-1 overflow-y-auto pr-2" : "flex-1"}>{children}</div>
     </div>
   );
 }
@@ -1645,6 +2085,8 @@ function RecentDocuments({ projectId /* theme prop 제거 */ }: { projectId?: st
       </div>
     );
   }
+
+
 
 function UpcomingEvents({ /* theme prop 제거 */ }) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
