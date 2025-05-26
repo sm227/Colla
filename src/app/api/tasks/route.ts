@@ -21,6 +21,8 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const projectId = url.searchParams.get("projectId");
     const epicId = url.searchParams.get("epicId");
+    const noCalendarEvents = url.searchParams.get("noCalendarEvents");
+    const hasDueDate = url.searchParams.get("hasDueDate");
     
     // 필터링 조건 구성
     const where: any = {};
@@ -30,6 +32,18 @@ export async function GET(req: NextRequest) {
     
     if (epicId) {
       where.epicId = epicId;
+    }
+    
+    // noCalendarEvents가 true인 경우: dueDate가 null인 태스크만 (예약되지 않은 업무)
+    if (noCalendarEvents === 'true') {
+      where.dueDate = null;
+    }
+    
+    // hasDueDate가 true인 경우: dueDate가 있는 태스크만 (캘린더에 표시할 태스크)
+    if (hasDueDate === 'true') {
+      where.dueDate = {
+        not: null
+      };
     }
     
     // 모든 작업 조회 (개발 편의를 위해 사용자 체크 없이)

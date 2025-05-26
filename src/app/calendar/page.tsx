@@ -73,6 +73,7 @@ const CalendarPage: React.FC = () => {
   const { currentProject, projects } = useProject();
   const { tasks: projectTasks, updateTask, fetchTasks } = useTasks(projectId || currentProject?.id);
   const { user } = useAuth();
+  const { theme } = useTheme();
 
   // useState hooks
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -111,6 +112,8 @@ const CalendarPage: React.FC = () => {
     endDate: '',
     projectId: ''
   });
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
 
   // useCallback hooks
   const fetchCalendarEvents = useCallback(async () => {
@@ -141,17 +144,19 @@ const CalendarPage: React.FC = () => {
         isCalendarEvent: true
       }));
       
-      // 마감일이 있는 칸반 태스크 포맷팅
+      // 마감일이 있는 칸반 태스크 포맷팅 (dueDate 기준으로 표시)
       const taskEvents = tasksData
-        .map((task: any) => ({
-          ...task,
-          id: task.id.toString(),
-          startDate: task.startDate ? new Date(task.startDate) : new Date(task.createdAt),
-          endDate: task.endDate ? new Date(task.endDate) : undefined,
-          dueDate: task.dueDate ? new Date(task.dueDate) : null,
-          createdAt: new Date(task.createdAt),
-          isCalendarEvent: false
-        }));
+        .map((task: any) => {
+          return {
+            ...task,
+            id: task.id.toString(),
+            startDate: undefined, // 칸반 태스크는 startDate 없음
+            endDate: task.dueDate ? new Date(task.dueDate) : undefined,
+            dueDate: task.dueDate ? new Date(task.dueDate) : null,
+            createdAt: new Date(task.createdAt),
+            isCalendarEvent: false
+          };
+        });
       
       // 모든 이벤트 합치기
       setTasks([...calendarEvents, ...taskEvents]);
@@ -164,18 +169,24 @@ const CalendarPage: React.FC = () => {
   }, [projectId]);
 
   // 칸반 태스크를 가져오는 함수
-  const fetchKanbanTasks = async () => {
+  const fetchKanbanTasks = useCallback(async () => {
     try {
-      const response = await fetch('/api/tasks?noCalendarEvents=true');
+      // 프로젝트별 태스크 가져오기
+      const url = projectId 
+        ? `/api/tasks?noCalendarEvents=true&projectId=${projectId}` 
+        : '/api/tasks?noCalendarEvents=true';
+      
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error('칸반 태스크를 가져오는데 실패했습니다');
       }
       const data = await response.json();
       
-      // 캘린더에 표시되지 않은 칸반 태스크만 사이드바에 표시
-      // 마감일이 없는 태스크만 사이드바에 표시
+      // 마감일이 없는 태스크만 필터링 (API에서 이미 필터링되지만 추가 확인)
       const kanbanTasks = data
-        .filter((task: any) => !task.dueDate) // 마감일이 없는 태스크만 필터링
+        .filter((task: any) => {
+          return !task.dueDate;
+        })
         .map((task: any) => ({
           ...task,
           id: task.id.toString(),
@@ -191,10 +202,10 @@ const CalendarPage: React.FC = () => {
       console.error('칸반 태스크 가져오기 오류:', error);
       setSidebarTasks([]);
     }
-  };
+  }, [projectId]);
 
   // useMemo hooks
-  const { calendarDays, processedCalendarTasks } = useMemo(() => {
+  const { calendarDays, processedCalendarTasks, tasksByDate } = useMemo(() => {
     // 현재 월의 시작일과 마지막일을 구함
     const monthStart = startOfMonth(currentDate);
     const firstDayOfMonth = getDay(monthStart); // 0: 일요일, 1: 월요일, ...
@@ -222,9 +233,29 @@ const CalendarPage: React.FC = () => {
     // 달력에 표시할 모든 날짜 (이전 달 + 현재 달 + 다음 달)
     const allCalendarDays = [...prevMonthDays, ...currentMonthDays, ...nextMonthDays];
     
+    // 날짜별 태스크 매핑 미리 계산
+    const tasksByDateMap = new Map<string, Task[]>();
+    
+    tasks.forEach(task => {
+      if (!task.dueDate) return;
+      
+      // 태스크가 표시될 날짜 계산
+      const dateToCheck = task.isCalendarEvent ? 
+        (task.startDate || task.dueDate) : 
+        task.dueDate;
+      
+      if (dateToCheck) {
+        const dateKey = format(dateToCheck, 'yyyy-MM-dd');
+        if (!tasksByDateMap.has(dateKey)) {
+          tasksByDateMap.set(dateKey, []);
+        }
+        tasksByDateMap.get(dateKey)!.push(task);
+      }
+    });
+    
     // 태스크 처리 로직 (tasks가 비어있으면 빈 배열 반환)
     if (tasks.length === 0) {
-      return { calendarDays: allCalendarDays, processedCalendarTasks: [] };
+      return { calendarDays: allCalendarDays, processedCalendarTasks: [], tasksByDate: tasksByDateMap };
     }
     
     // 태스크를 겹침 없이 행별로 배치하기 위한 함수
@@ -320,7 +351,7 @@ const CalendarPage: React.FC = () => {
     
     // 태스크에 행 할당
     const tasksWithRows = assignRowsToTasks(preparedTasks);
-    return { calendarDays: allCalendarDays, processedCalendarTasks: tasksWithRows };
+    return { calendarDays: allCalendarDays, processedCalendarTasks: tasksWithRows, tasksByDate: tasksByDateMap };
   }, [currentDate, tasks]);
 
   // useEffect hooks
@@ -335,7 +366,7 @@ const CalendarPage: React.FC = () => {
   useEffect(() => {
     fetchCalendarEvents();
     fetchKanbanTasks();
-  }, [fetchCalendarEvents, projectId]);
+  }, [fetchCalendarEvents, fetchKanbanTasks, projectId]);
 
   if (!mounted) {
     return null;
@@ -529,7 +560,7 @@ const CalendarPage: React.FC = () => {
       const updatedLocalTask: Task = {
         ...draggedTask,
         // 캘린더 일정은 시작일과 종료일 모두 설정, 태스크는 마감일만 설정
-        startDate: draggedTask.isCalendarEvent ? startDate : endDate,
+        startDate: draggedTask.isCalendarEvent ? startDate : undefined, // 칸반 태스크는 startDate 없음
         endDate: endDate,
         dueDate: endDate,
         isCalendarEvent: draggedTask.isCalendarEvent
@@ -571,7 +602,7 @@ const CalendarPage: React.FC = () => {
           description: draggedTask.description,
           status: draggedTask.status as TaskStatus,
           priority: draggedTask.priority as "low" | "medium" | "high",
-          startDate: endDate,
+          startDate: undefined, // 칸반 태스크는 startDate를 설정하지 않음
           dueDate: endDate,
           projectId: draggedTask.projectId
         });
@@ -763,30 +794,58 @@ const CalendarPage: React.FC = () => {
 
   // 일정 클릭 핸들러 함수
   const handleEventClick = (event: Task) => {
-    if (!event.isCalendarEvent) return;
-    setEditEventDialog({ show: true, event });
-    setShowAddForm(false);
-    setEditingEvent({
-      id: event.id,
-      title: event.title,
-      description: event.description || '',
-      startDate: event.startDate ? format(new Date(event.startDate), 'yyyy-MM-dd') : '',
-      endDate: event.dueDate ? format(new Date(event.dueDate), 'yyyy-MM-dd') : '',
-      projectId: event.projectId || ''
-    });
+    if (event.isCalendarEvent) {
+      // 캘린더 일정인 경우 기존 로직
+      setEditEventDialog({ show: true, event });
+      setShowAddForm(false);
+      setShowTaskDetail(false);
+      setEditingEvent({
+        id: event.id,
+        title: event.title,
+        description: event.description || '',
+        startDate: event.startDate ? format(new Date(event.startDate), 'yyyy-MM-dd') : '',
+        endDate: event.dueDate ? format(new Date(event.dueDate), 'yyyy-MM-dd') : '',
+        projectId: event.projectId || ''
+      });
+    } else {
+      // 칸반 태스크인 경우 태스크 상세 정보 표시
+      setSelectedTask(event);
+      setShowTaskDetail(true);
+      setShowAddForm(false);
+      setEditEventDialog({ show: false, event: null });
+    }
   };
 
-  // 일정 색상 추출 함수
-  function getCalendarEventColor(tasks: Task[]) {
-    // isCalendarEvent: true인 일정에서 색상 추출(없으면 indigo-500)
-    const calendarEvent = tasks.find(t => t.isCalendarEvent);
-    // color 필드가 있다면 calendarEvent.color 사용
-    return calendarEvent ? '#6366f1' : '#6366f1'; // indigo-500
+  // 캘린더 일정 색상 함수 (테마별 색상 적용)
+  function getCalendarEventColor() {
+    if (theme === 'dark') {
+      return '#8b5cf6'; // 다크모드: 보라색 (violet-500)
+    }
+    return '#6366f1'; // 라이트모드: 인디고색 (indigo-500)
   }
-  function getProjectTaskColor(tasks: Task[]) {
-    // isCalendarEvent: false인 태스크에서 색상 추출(없으면 blue-500)
-    const projectTask = tasks.find(t => !t.isCalendarEvent);
-    return projectTask ? '#3b82f6' : '#3b82f6'; // blue-500
+
+  // 칸반 태스크 색상 함수 (테마별 색상 적용)
+  function getKanbanTaskColor() {
+    if (theme === 'dark') {
+      return '#06b6d4'; // 다크모드: 시안색 (cyan-500)
+    }
+    return '#3b82f6'; // 라이트모드: 파란색 (blue-500)
+  }
+
+  // 캘린더 일정 스타일 클래스 함수
+  function getCalendarEventClasses() {
+    if (theme === 'dark') {
+      return 'bg-violet-500/20 text-violet-300 border-violet-500/30';
+    }
+    return 'bg-indigo-500/10 text-indigo-700 border-indigo-500/20';
+  }
+
+  // 칸반 태스크 스타일 클래스 함수
+  function getKanbanTaskClasses() {
+    if (theme === 'dark') {
+      return 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30';
+    }
+    return 'bg-blue-500/10 text-blue-700 border-blue-500/20';
   }
 
   return (
@@ -822,14 +881,14 @@ const CalendarPage: React.FC = () => {
           <div className="flex items-center gap-2 mb-1">
             <span
               className="w-2 h-2 rounded-full inline-block"
-              style={{ backgroundColor: getCalendarEventColor(tasks) }}
+              style={{ backgroundColor: getCalendarEventColor() }}
             />
             나의 일정
           </div>
           <div className="flex items-center gap-2 mb-1">
             <span
               className="w-2 h-2 rounded-full inline-block"
-              style={{ backgroundColor: getProjectTaskColor(tasks) }}
+              style={{ backgroundColor: getKanbanTaskColor() }}
             />
             프로젝트 일정
           </div>
@@ -843,7 +902,9 @@ const CalendarPage: React.FC = () => {
       </aside>
       
       {/* 중앙 메인 캘린더 */}
-      <main className={`flex-1 w-full h-full flex flex-col p-4 bg-background text-foreground ${calendarView==='week'||calendarView==='day' ? 'overflow-y-auto' : 'overflow-hidden'}` }>
+      <main 
+        className={`flex-1 w-full h-full flex flex-col p-4 bg-background text-foreground ${calendarView==='week'||calendarView==='day' ? 'overflow-y-auto' : 'overflow-hidden'}` }
+      >
         {/* 상단 네비게이션 */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
@@ -903,10 +964,8 @@ const CalendarPage: React.FC = () => {
                     {/* 일정 표시 */}
                     <div className="mt-6 space-y-1 relative h-full">
                       {(() => {
-                        const events = calendarTasks.filter(t=>{
-                          const dateToCheck = t.startDate || t.dueDate || undefined;
-                          return dateToCheck && isSameDay(dateToCheck, day);
-                        });
+                        const dateKey = format(day, 'yyyy-MM-dd');
+                        const events = tasksByDate.get(dateKey) || [];
                         const showEvents = events.slice(0,2);
                         const moreCount = events.length - 2;
                         return (
@@ -920,9 +979,13 @@ const CalendarPage: React.FC = () => {
                                 : '';
                               return (
                                 <div key={task.id+''+i} 
-                                  className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-primary/10 text-primary':'bg-secondary/10 text-secondary'}`}
+                                  className={`truncate px-2 py-0.5 rounded text-xs font-medium cursor-move ${task.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()}`}
                                   style={{whiteSpace:'normal',maxHeight:48,overflowY:'auto',wordBreak:'break-all',marginBottom:2}}
                                   onClick={() => handleEventClick(task)}
+                                  draggable={!task.isCalendarEvent} // 칸반 태스크만 드래그 가능
+                                  onDragStart={!task.isCalendarEvent ? handleDragStart(task) : undefined}
+                                  onDragEnd={!task.isCalendarEvent ? handleDragEnd : undefined}
+                                  title={!task.isCalendarEvent ? "드래그하여 일정 변경" : "클릭하여 수정"}
                                 >
                                   <div>{task.title}</div>
                                   {timeStr && <div className="text-[10px] text-gray-500 mt-0.5">{timeStr}</div>}
@@ -977,10 +1040,8 @@ const CalendarPage: React.FC = () => {
                       <div className="absolute top-2 left-2 text-xs font-semibold">{format(day,'d')}</div>
                       <div className="mt-6 space-y-1 relative">
                         {(() => {
-                          const events = calendarTasks.filter(t=>{
-                            const dateToCheck = t.startDate || t.dueDate || undefined;
-                            return dateToCheck && isSameDay(dateToCheck, day);
-                          });
+                          const dateKey = format(day, 'yyyy-MM-dd');
+                          const events = tasksByDate.get(dateKey) || [];
                           return (
                             <>
                               {events.map((task,i)=>{
@@ -992,9 +1053,13 @@ const CalendarPage: React.FC = () => {
                                   : '';
                                 return (
                                   <div key={task.id+''+i} 
-                                    className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-primary/10 text-primary':'bg-secondary/10 text-secondary'}`}
+                                    className={`truncate px-2 py-0.5 rounded text-xs font-medium cursor-move ${task.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()}`}
                                     style={{whiteSpace:'normal',maxHeight:48,overflowY:'auto',wordBreak:'break-all',marginBottom:2}}
                                     onClick={() => handleEventClick(task)}
+                                    draggable={!task.isCalendarEvent} // 칸반 태스크만 드래그 가능
+                                    onDragStart={!task.isCalendarEvent ? handleDragStart(task) : undefined}
+                                    onDragEnd={!task.isCalendarEvent ? handleDragEnd : undefined}
+                                    title={!task.isCalendarEvent ? "드래그하여 일정 변경" : "클릭하여 수정"}
                                   >
                                     <div>{task.title}</div>
                                     {timeStr && <div className="text-[10px] text-gray-500 mt-0.5">{timeStr}</div>}
@@ -1021,10 +1086,8 @@ const CalendarPage: React.FC = () => {
               <div className="font-bold mb-2">{format(selectedDate || currentDate, 'd일')}</div>
               <div className="space-y-2 relative">
                 {(() => {
-                  const events = calendarTasks.filter(t=>{
-                    const dateToCheck = t.startDate || t.dueDate || undefined;
-                    return dateToCheck && isSameDay(dateToCheck, selectedDate || currentDate);
-                  });
+                  const dateKey = format(selectedDate || currentDate, 'yyyy-MM-dd');
+                  const events = tasksByDate.get(dateKey) || [];
                   return (
                     <>
                       {events.map((task,i)=>{
@@ -1036,9 +1099,13 @@ const CalendarPage: React.FC = () => {
                           : '';
                         return (
                           <div key={task.id+''+i} 
-                            className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-primary/10 text-primary':'bg-secondary/10 text-secondary'}`}
+                            className={`truncate px-2 py-0.5 rounded text-xs font-medium cursor-move ${task.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()}`}
                             style={{whiteSpace:'normal',maxHeight:48,overflowY:'auto',wordBreak:'break-all',marginBottom:2}}
                             onClick={() => handleEventClick(task)}
+                            draggable={!task.isCalendarEvent} // 칸반 태스크만 드래그 가능
+                            onDragStart={!task.isCalendarEvent ? handleDragStart(task) : undefined}
+                            onDragEnd={!task.isCalendarEvent ? handleDragEnd : undefined}
+                            title={!task.isCalendarEvent ? "드래그하여 일정 변경" : "클릭하여 수정"}
                           >
                             <div>{task.title}</div>
                             {timeStr && <div className="text-[10px] text-gray-500 mt-0.5">{timeStr}</div>}
@@ -1188,6 +1255,88 @@ const CalendarPage: React.FC = () => {
             </div>
           </div>
         )}
+        {/* 태스크 상세 정보: showTaskDetail이 true일 때만 표시 */}
+        {showTaskDetail && selectedTask && (
+          <div className="mb-6 border-b pb-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-lg">태스크 상세 정보</h3>
+              <Button variant="ghost" size="sm" onClick={() => {
+                setShowTaskDetail(false);
+                setSelectedTask(null);
+              }}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-4">
+              {/* 제목 */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">제목</label>
+                <div className="mt-1 text-base font-semibold">{selectedTask.title}</div>
+              </div>
+              
+              {/* 설명 */}
+              {selectedTask.description && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">설명</label>
+                  <div className="mt-1 text-sm text-foreground whitespace-pre-wrap">{selectedTask.description}</div>
+                </div>
+              )}
+              
+              {/* 상태 */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">상태</label>
+                <div className="mt-1">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
+                  }`}>
+                    {selectedTask.status === 'todo' ? '할 일' : 
+                     selectedTask.status === 'in-progress' ? '진행 중' : 
+                     selectedTask.status === 'done' ? '완료' : '검토'}
+                  </span>
+                </div>
+              </div>
+              
+              {/* 우선순위 */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">우선순위</label>
+                <div className="mt-1">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    selectedTask.priority === 'high' ? 
+                      (theme === 'dark' ? 'bg-red-900/20 text-red-400' : 'bg-red-100 text-red-700') :
+                    selectedTask.priority === 'medium' ? 
+                      (theme === 'dark' ? 'bg-yellow-900/20 text-yellow-400' : 'bg-yellow-100 text-yellow-700') :
+                      (theme === 'dark' ? 'bg-green-900/20 text-green-400' : 'bg-green-100 text-green-700')
+                  }`}>
+                    {selectedTask.priority === 'high' ? '높은 우선순위' : 
+                     selectedTask.priority === 'medium' ? '중간 우선순위' : '낮은 우선순위'}
+                  </span>
+                </div>
+              </div>
+              
+              {/* 마감일 */}
+              {selectedTask.dueDate && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">마감일</label>
+                  <div className="mt-1 text-sm">{format(new Date(selectedTask.dueDate), 'yyyy년 MM월 dd일 (E)', { locale: ko })}</div>
+                </div>
+              )}
+              
+              {/* 생성일 */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">생성일</label>
+                <div className="mt-1 text-sm">{format(new Date(selectedTask.createdAt), 'yyyy년 MM월 dd일 (E)', { locale: ko })}</div>
+              </div>
+              
+              {/* 프로젝트 */}
+              {selectedTask.project && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">프로젝트</label>
+                  <div className="mt-1 text-sm">{selectedTask.project.name}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {/* 기존 우측 안내/예정된 회의/단축키 안내 */}
         <div className="mb-6">
           <div className="font-bold text-lg mb-2">예정된 회의</div>
@@ -1234,6 +1383,14 @@ const CalendarPage: React.FC = () => {
               <X className="h-4 w-4" />
             </Button>
           </div>
+          
+          {/* 드래그 안내 메시지 */}
+          <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
+            <p className="text-xs text-muted-foreground">
+              💡 업무를 클릭하여 상세 정보를 보거나, 캘린더의 날짜로 드래그하여 일정을 설정하세요
+            </p>
+          </div>
+          
           <div className="space-y-2">
             {sidebarTasks.length === 0 ? (
               <div className="text-muted-foreground text-center py-4">
@@ -1241,23 +1398,29 @@ const CalendarPage: React.FC = () => {
               </div>
             ) : (
               sidebarTasks.map(task => {
-                // 테마에 따른 색상 변수 (예시, 실제 테마 변수 사용 권장)
-                const borderColor = 'border-primary/50'; // 테마의 primary 색상을 연하게
-                const bgColor = 'bg-primary/10';       // 테마의 primary 색상을 더 연하게
-                const statusBg = 'bg-secondary/20';    // 테마의 secondary 색상을 연하게
-                const statusText = 'text-secondary-foreground';    // 테마의 secondary foreground 색상으로 변경
-                const priorityText = 'text-muted-foreground'; // 우선순위 텍스트 색상
+                // 테마에 따른 칸반 태스크 색상 적용
+                const taskClasses = getKanbanTaskClasses();
+                const statusBg = theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100';
+                const statusText = theme === 'dark' ? 'text-gray-300' : 'text-gray-700';
+                const priorityText = 'text-muted-foreground';
 
                 return (
                   <div
                     key={task.id}
-                    className={`${bgColor} border ${borderColor} rounded-md p-3 shadow-sm cursor-pointer text-foreground`}
+                    className={`${taskClasses} rounded-md p-3 shadow-sm cursor-move border transition-all duration-200 hover:shadow-md`}
                     draggable
                     onDragStart={handleDragStart(task)}
                     onDragEnd={handleDragEnd}
+                    onClick={(e) => {
+                      // 드래그 시작 후 클릭 이벤트가 발생하지 않도록 방지
+                      if (!e.defaultPrevented) {
+                        handleEventClick(task);
+                      }
+                    }}
+                    title="클릭하여 상세 정보 보기 또는 캘린더로 드래그하여 일정 설정"
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-medium text-sm text-foreground">{task.title}</h4>
+                      <h4 className="font-medium text-sm">{task.title}</h4>
                       <span className={`text-xs px-2 py-1 rounded-full ${statusBg} ${statusText}`}>
                         {task.status === 'todo' ? '할 일' : 
                          task.status === 'in-progress' ? '진행 중' : 
