@@ -73,6 +73,7 @@ const CalendarPage: React.FC = () => {
   const { currentProject, projects } = useProject();
   const { tasks: projectTasks, updateTask, fetchTasks } = useTasks(projectId || currentProject?.id);
   const { user } = useAuth();
+  const { theme } = useTheme();
 
   // useState hooks
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -111,6 +112,8 @@ const CalendarPage: React.FC = () => {
     endDate: '',
     projectId: ''
   });
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
 
   // useCallback hooks
   const fetchCalendarEvents = useCallback(async () => {
@@ -141,17 +144,19 @@ const CalendarPage: React.FC = () => {
         isCalendarEvent: true
       }));
       
-      // 마감일이 있는 칸반 태스크 포맷팅
+      // 마감일이 있는 칸반 태스크 포맷팅 (dueDate 기준으로 표시)
       const taskEvents = tasksData
-        .map((task: any) => ({
-          ...task,
-          id: task.id.toString(),
-          startDate: task.startDate ? new Date(task.startDate) : new Date(task.createdAt),
-          endDate: task.endDate ? new Date(task.endDate) : undefined,
-          dueDate: task.dueDate ? new Date(task.dueDate) : null,
-          createdAt: new Date(task.createdAt),
-          isCalendarEvent: false
-        }));
+        .map((task: any) => {
+          return {
+            ...task,
+            id: task.id.toString(),
+            startDate: undefined, // 칸반 태스크는 startDate 없음
+            endDate: task.dueDate ? new Date(task.dueDate) : undefined,
+            dueDate: task.dueDate ? new Date(task.dueDate) : null,
+            createdAt: new Date(task.createdAt),
+            isCalendarEvent: false
+          };
+        });
       
       // 모든 이벤트 합치기
       setTasks([...calendarEvents, ...taskEvents]);
@@ -164,18 +169,24 @@ const CalendarPage: React.FC = () => {
   }, [projectId]);
 
   // 칸반 태스크를 가져오는 함수
-  const fetchKanbanTasks = async () => {
+  const fetchKanbanTasks = useCallback(async () => {
     try {
-      const response = await fetch('/api/tasks?noCalendarEvents=true');
+      // 프로젝트별 태스크 가져오기
+      const url = projectId 
+        ? `/api/tasks?noCalendarEvents=true&projectId=${projectId}` 
+        : '/api/tasks?noCalendarEvents=true';
+      
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error('칸반 태스크를 가져오는데 실패했습니다');
       }
       const data = await response.json();
       
-      // 캘린더에 표시되지 않은 칸반 태스크만 사이드바에 표시
-      // 마감일이 없는 태스크만 사이드바에 표시
+      // 마감일이 없는 태스크만 필터링 (API에서 이미 필터링되지만 추가 확인)
       const kanbanTasks = data
-        .filter((task: any) => !task.dueDate) // 마감일이 없는 태스크만 필터링
+        .filter((task: any) => {
+          return !task.dueDate;
+        })
         .map((task: any) => ({
           ...task,
           id: task.id.toString(),
@@ -191,10 +202,10 @@ const CalendarPage: React.FC = () => {
       console.error('칸반 태스크 가져오기 오류:', error);
       setSidebarTasks([]);
     }
-  };
+  }, [projectId]);
 
   // useMemo hooks
-  const { calendarDays, processedCalendarTasks } = useMemo(() => {
+  const { calendarDays, processedCalendarTasks, tasksByDate } = useMemo(() => {
     // 현재 월의 시작일과 마지막일을 구함
     const monthStart = startOfMonth(currentDate);
     const firstDayOfMonth = getDay(monthStart); // 0: 일요일, 1: 월요일, ...
@@ -222,9 +233,29 @@ const CalendarPage: React.FC = () => {
     // 달력에 표시할 모든 날짜 (이전 달 + 현재 달 + 다음 달)
     const allCalendarDays = [...prevMonthDays, ...currentMonthDays, ...nextMonthDays];
     
+    // 날짜별 태스크 매핑 미리 계산
+    const tasksByDateMap = new Map<string, Task[]>();
+    
+    tasks.forEach(task => {
+      if (!task.dueDate) return;
+      
+      // 태스크가 표시될 날짜 계산
+      const dateToCheck = task.isCalendarEvent ? 
+        (task.startDate || task.dueDate) : 
+        task.dueDate;
+      
+      if (dateToCheck) {
+        const dateKey = format(dateToCheck, 'yyyy-MM-dd');
+        if (!tasksByDateMap.has(dateKey)) {
+          tasksByDateMap.set(dateKey, []);
+        }
+        tasksByDateMap.get(dateKey)!.push(task);
+      }
+    });
+    
     // 태스크 처리 로직 (tasks가 비어있으면 빈 배열 반환)
     if (tasks.length === 0) {
-      return { calendarDays: allCalendarDays, processedCalendarTasks: [] };
+      return { calendarDays: allCalendarDays, processedCalendarTasks: [], tasksByDate: tasksByDateMap };
     }
     
     // 태스크를 겹침 없이 행별로 배치하기 위한 함수
@@ -320,7 +351,7 @@ const CalendarPage: React.FC = () => {
     
     // 태스크에 행 할당
     const tasksWithRows = assignRowsToTasks(preparedTasks);
-    return { calendarDays: allCalendarDays, processedCalendarTasks: tasksWithRows };
+    return { calendarDays: allCalendarDays, processedCalendarTasks: tasksWithRows, tasksByDate: tasksByDateMap };
   }, [currentDate, tasks]);
 
   // useEffect hooks
@@ -335,7 +366,45 @@ const CalendarPage: React.FC = () => {
   useEffect(() => {
     fetchCalendarEvents();
     fetchKanbanTasks();
-  }, [fetchCalendarEvents, projectId]);
+  }, [fetchCalendarEvents, fetchKanbanTasks, projectId]);
+
+  // 일별 뷰에서 현재 시간으로 스크롤
+  useEffect(() => {
+    if (calendarView === 'day' && isToday(selectedDate || currentDate)) {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const scrollPosition = Math.max(0, (currentHour * 64) + (currentMinute * 64 / 60) - 200); // 현재 시간보다 조금 위로
+      
+      // 스크롤 컨테이너 찾기
+      const scrollContainer = document.querySelector('.day-view-scroll');
+      if (scrollContainer) {
+        scrollContainer.scrollTo({
+          top: scrollPosition,
+          behavior: 'smooth'
+        });
+      }
+    }
+  }, [calendarView, selectedDate, currentDate]);
+
+  // 주별 뷰에서 현재 시간으로 스크롤
+  useEffect(() => {
+    if (calendarView === 'week') {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const scrollPosition = Math.max(0, (currentHour * 64) + (currentMinute * 64 / 60) - 200); // 현재 시간보다 조금 위로
+      
+      // 스크롤 컨테이너 찾기
+      const scrollContainer = document.querySelector('.week-view-scroll');
+      if (scrollContainer) {
+        scrollContainer.scrollTo({
+          top: scrollPosition,
+          behavior: 'smooth'
+        });
+      }
+    }
+  }, [calendarView, selectedDate, currentDate]);
 
   if (!mounted) {
     return null;
@@ -529,7 +598,7 @@ const CalendarPage: React.FC = () => {
       const updatedLocalTask: Task = {
         ...draggedTask,
         // 캘린더 일정은 시작일과 종료일 모두 설정, 태스크는 마감일만 설정
-        startDate: draggedTask.isCalendarEvent ? startDate : endDate,
+        startDate: draggedTask.isCalendarEvent ? startDate : undefined, // 칸반 태스크는 startDate 없음
         endDate: endDate,
         dueDate: endDate,
         isCalendarEvent: draggedTask.isCalendarEvent
@@ -571,7 +640,7 @@ const CalendarPage: React.FC = () => {
           description: draggedTask.description,
           status: draggedTask.status as TaskStatus,
           priority: draggedTask.priority as "low" | "medium" | "high",
-          startDate: endDate,
+          startDate: undefined, // 칸반 태스크는 startDate를 설정하지 않음
           dueDate: endDate,
           projectId: draggedTask.projectId
         });
@@ -585,7 +654,7 @@ const CalendarPage: React.FC = () => {
       alert('일정 업데이트 중 오류가 발생했습니다. 새로고침 후 다시 시도해 주세요.');
     }
   };
-
+  
   // 사이드바로 태스크 드롭 (dueDate 초기화)
   const handleDropToSidebar = async (e: React.DragEvent) => {
     e.preventDefault();
@@ -763,30 +832,58 @@ const CalendarPage: React.FC = () => {
 
   // 일정 클릭 핸들러 함수
   const handleEventClick = (event: Task) => {
-    if (!event.isCalendarEvent) return;
-    setEditEventDialog({ show: true, event });
-    setShowAddForm(false);
-    setEditingEvent({
-      id: event.id,
-      title: event.title,
-      description: event.description || '',
-      startDate: event.startDate ? format(new Date(event.startDate), 'yyyy-MM-dd') : '',
-      endDate: event.dueDate ? format(new Date(event.dueDate), 'yyyy-MM-dd') : '',
-      projectId: event.projectId || ''
-    });
+    if (event.isCalendarEvent) {
+      // 캘린더 일정인 경우 기존 로직
+      setEditEventDialog({ show: true, event });
+      setShowAddForm(false);
+      setShowTaskDetail(false);
+      setEditingEvent({
+        id: event.id,
+        title: event.title,
+        description: event.description || '',
+        startDate: event.startDate ? format(new Date(event.startDate), 'yyyy-MM-dd') : '',
+        endDate: event.dueDate ? format(new Date(event.dueDate), 'yyyy-MM-dd') : '',
+        projectId: event.projectId || ''
+      });
+    } else {
+      // 칸반 태스크인 경우 태스크 상세 정보 표시
+      setSelectedTask(event);
+      setShowTaskDetail(true);
+      setShowAddForm(false);
+      setEditEventDialog({ show: false, event: null });
+    }
   };
 
-  // 일정 색상 추출 함수
-  function getCalendarEventColor(tasks: Task[]) {
-    // isCalendarEvent: true인 일정에서 색상 추출(없으면 indigo-500)
-    const calendarEvent = tasks.find(t => t.isCalendarEvent);
-    // color 필드가 있다면 calendarEvent.color 사용
-    return calendarEvent ? '#6366f1' : '#6366f1'; // indigo-500
+  // 캘린더 일정 색상 함수 (테마별 색상 적용)
+  function getCalendarEventColor() {
+    if (theme === 'dark') {
+      return '#8b5cf6'; // 다크모드: 보라색 (violet-500)
+    }
+    return '#6366f1'; // 라이트모드: 인디고색 (indigo-500)
   }
-  function getProjectTaskColor(tasks: Task[]) {
-    // isCalendarEvent: false인 태스크에서 색상 추출(없으면 blue-500)
-    const projectTask = tasks.find(t => !t.isCalendarEvent);
-    return projectTask ? '#3b82f6' : '#3b82f6'; // blue-500
+
+  // 칸반 태스크 색상 함수 (테마별 색상 적용)
+  function getKanbanTaskColor() {
+    if (theme === 'dark') {
+      return '#06b6d4'; // 다크모드: 시안색 (cyan-500)
+    }
+    return '#3b82f6'; // 라이트모드: 파란색 (blue-500)
+  }
+
+  // 캘린더 일정 스타일 클래스 함수
+  function getCalendarEventClasses() {
+    if (theme === 'dark') {
+      return 'bg-violet-500/20 text-violet-300 border-violet-500/30';
+    }
+    return 'bg-indigo-500/10 text-indigo-700 border-indigo-500/20';
+  }
+
+  // 칸반 태스크 스타일 클래스 함수
+  function getKanbanTaskClasses() {
+    if (theme === 'dark') {
+      return 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30';
+    }
+    return 'bg-blue-500/10 text-blue-700 border-blue-500/20';
   }
 
   return (
@@ -822,14 +919,14 @@ const CalendarPage: React.FC = () => {
           <div className="flex items-center gap-2 mb-1">
             <span
               className="w-2 h-2 rounded-full inline-block"
-              style={{ backgroundColor: getCalendarEventColor(tasks) }}
+              style={{ backgroundColor: getCalendarEventColor() }}
             />
             나의 일정
           </div>
           <div className="flex items-center gap-2 mb-1">
             <span
               className="w-2 h-2 rounded-full inline-block"
-              style={{ backgroundColor: getProjectTaskColor(tasks) }}
+              style={{ backgroundColor: getKanbanTaskColor() }}
             />
             프로젝트 일정
           </div>
@@ -843,7 +940,9 @@ const CalendarPage: React.FC = () => {
       </aside>
       
       {/* 중앙 메인 캘린더 */}
-      <main className={`flex-1 w-full h-full flex flex-col p-4 bg-background text-foreground ${calendarView==='week'||calendarView==='day' ? 'overflow-y-auto' : 'overflow-hidden'}` }>
+      <main 
+        className={`flex-1 w-full h-full flex flex-col p-4 bg-background text-foreground ${calendarView==='week'||calendarView==='day' ? 'overflow-y-auto' : 'overflow-hidden'}` }
+      >
         {/* 상단 네비게이션 */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
@@ -903,10 +1002,8 @@ const CalendarPage: React.FC = () => {
                     {/* 일정 표시 */}
                     <div className="mt-6 space-y-1 relative h-full">
                       {(() => {
-                        const events = calendarTasks.filter(t=>{
-                          const dateToCheck = t.startDate || t.dueDate || undefined;
-                          return dateToCheck && isSameDay(dateToCheck, day);
-                        });
+                        const dateKey = format(day, 'yyyy-MM-dd');
+                        const events = tasksByDate.get(dateKey) || [];
                         const showEvents = events.slice(0,2);
                         const moreCount = events.length - 2;
                         return (
@@ -920,9 +1017,13 @@ const CalendarPage: React.FC = () => {
                                 : '';
                               return (
                                 <div key={task.id+''+i} 
-                                  className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-primary/10 text-primary':'bg-secondary/10 text-secondary'}`}
+                                  className={`truncate px-2 py-0.5 rounded text-xs font-medium cursor-move ${task.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()}`}
                                   style={{whiteSpace:'normal',maxHeight:48,overflowY:'auto',wordBreak:'break-all',marginBottom:2}}
                                   onClick={() => handleEventClick(task)}
+                                  draggable={!task.isCalendarEvent} // 칸반 태스크만 드래그 가능
+                                  onDragStart={!task.isCalendarEvent ? handleDragStart(task) : undefined}
+                                  onDragEnd={!task.isCalendarEvent ? handleDragEnd : undefined}
+                                  title={!task.isCalendarEvent ? "드래그하여 일정 변경" : "클릭하여 수정"}
                                 >
                                   <div>{task.title}</div>
                                   {timeStr && <div className="text-[10px] text-gray-500 mt-0.5">{timeStr}</div>}
@@ -946,69 +1047,412 @@ const CalendarPage: React.FC = () => {
         )}
         {calendarView === 'week' && (
           <div className="bg-card text-card-foreground rounded-lg shadow border border-border overflow-hidden w-full h-full flex flex-col">
-            <div className="grid grid-cols-7 border-b border-border text-center text-sm font-medium bg-muted text-muted-foreground w-full">
-              {weekDays.map((d,i)=>(<div key={i} className={`py-2 ${i===0?'text-red-500':i===6?'text-blue-500':'text-foreground'}`}>{d}</div>))}
-            </div>
-            <div className="grid grid-cols-7 flex-1 h-0 min-h-0 auto-rows-fr">
+            {/* 주별 뷰 헤더 */}
+            <div className="flex border-b border-border bg-muted text-muted-foreground">
+              {/* 시간 열 헤더 */}
+              <div className="w-16 border-r border-border py-2 text-center text-sm font-medium">
+                시간
+              </div>
+              {/* 요일 헤더 */}
               {(() => {
-                // 현재 날짜가 속한 주의 일요일~토요일 구하기
                 const curr = selectedDate || currentDate;
                 const weekStart = addDays(curr, -getDay(curr));
-                return Array.from({length:7}).map((_,i)=>{
+                
+                // 각 날짜별 최대 겹치는 일정 수 계산 (헤더용)
+                const getMaxColumnsForDay = (day: Date) => {
+                  const dateKey = format(day, 'yyyy-MM-dd');
+                  const events = tasksByDate.get(dateKey) || [];
+                  
+                  if (events.length === 0) return 1;
+                  
+                  const eventsWithTime = events.map(task => {
+                    const start = task.startDate ? new Date(task.startDate) : undefined;
+                    const end = task.endDate ? new Date(task.endDate) : undefined;
+                    
+                    let startMinute = 0;
+                    let endMinute = 1440;
+                    
+                    if (start && end) {
+                      startMinute = start.getHours() * 60 + start.getMinutes();
+                      endMinute = end.getHours() * 60 + end.getMinutes();
+                    }
+                    
+                    return { ...task, startMinute, endMinute };
+                  });
+                  
+                  const timePoints: number[] = [];
+                  eventsWithTime.forEach(event => {
+                    timePoints.push(event.startMinute);
+                    timePoints.push(event.endMinute);
+                  });
+                  
+                  let maxOverlapping = 0;
+                  timePoints.forEach(timePoint => {
+                    const overlappingCount = eventsWithTime.filter(event => 
+                      event.startMinute <= timePoint && event.endMinute >= timePoint
+                    ).length;
+                    maxOverlapping = Math.max(maxOverlapping, overlappingCount);
+                  });
+                  
+                  return Math.max(1, maxOverlapping);
+                };
+                
+                return Array.from({length: 7}).map((_, i) => {
                   const day = addDays(weekStart, i);
                   const isCurrentDay = isToday(day);
+                  const maxColumns = getMaxColumnsForDay(day);
+                  
+                  // 헤더는 항상 동일한 너비 유지
+                  const headerStyle = {};
+                  
                   return (
-                    <div
-                      key={day.toString()}
-                      className={`relative border border-border p-2 h-full bg-card text-card-foreground ${isCurrentDay?'ring-2 ring-primary':''}`}
-                      onDoubleClick={() => {
-                        setShowAddForm(true);
-                        setAddFormDate(format(day, 'yyyy-MM-dd'));
-                        setNewEvent({ ...newEvent, startDate: format(day, 'yyyy-MM-dd') });
-                        setEditEventDialog({ show: false, event: null });
-                      }}
-                      onClick={()=>{
-                        setSelectedDate(day);
-                      }}
-                      onDragOver={handleDragOver(day)}
-                      onDragLeave={handleDragLeave}
-                      onDrop={handleDrop(day)}
+                    <div 
+                      key={i} 
+                      className={`flex-1 py-2 text-center text-sm font-medium border-r border-border last:border-r-0 ${
+                        i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-foreground'
+                      } ${isCurrentDay ? 'bg-primary/10' : ''}`}
+                      style={headerStyle}
                     >
-                      <div className="absolute top-2 left-2 text-xs font-semibold">{format(day,'d')}</div>
-                      <div className="mt-6 space-y-1 relative">
+                      <div className="font-semibold">{weekDays[i]}</div>
+                      <div className={`text-lg ${isCurrentDay ? 'text-primary font-bold' : ''}`}>
+                        {format(day, 'd')}
+                      </div>
+                      {maxColumns > 1 && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {maxColumns}개 일정
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+            
+            {/* 주별 뷰 본문 */}
+            <div className="flex-1 overflow-y-auto week-view-scroll">
+              <div className="flex">
+                {/* 시간 표시 열 */}
+                <div className="w-16 border-r border-border bg-muted/30">
+                  {Array.from({length: 24}).map((_, hour) => (
+                    <div key={hour} className="h-16 border-b border-border flex items-start justify-center pt-1">
+                      <span className="text-xs text-muted-foreground">
+                        {hour.toString().padStart(2, '0')}:00
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* 7일 컬럼 */}
+                {(() => {
+                  const curr = selectedDate || currentDate;
+                  const weekStart = addDays(curr, -getDay(curr));
+                  
+                  // 각 날짜별 최대 겹치는 일정 수 계산 (본문과 동일한 로직 사용)
+                  const getMaxColumnsForDay = (day: Date) => {
+                    const dateKey = format(day, 'yyyy-MM-dd');
+                    const events = tasksByDate.get(dateKey) || [];
+                    
+                    if (events.length === 0) return 1;
+                    
+                    // 본문과 동일한 로직으로 이벤트 처리
+                    const eventsWithPosition = events.map((task, i) => {
+                      const start = task.startDate ? new Date(task.startDate) : undefined;
+                      const end = task.endDate ? new Date(task.endDate) : undefined;
+                      
+                      let startMinute = 0;
+                      let endMinute = 1440;
+                      
+                      if (start && end) {
+                        const startHour = start.getHours();
+                        const startMin = start.getMinutes();
+                        startMinute = startHour * 60 + startMin;
+                        
+                        const endHour = end.getHours();
+                        const endMin = end.getMinutes();
+                        endMinute = endHour * 60 + endMin;
+                      } else if (task.dueDate) {
+                        startMinute = 0;
+                        endMinute = 30;
+                      }
+                      
+                      return {
+                        ...task,
+                        originalIndex: i,
+                        startMinute,
+                        endMinute,
+                        column: 0,
+                        totalColumns: 1
+                      };
+                    });
+                    
+                    // 시간 순으로 정렬
+                    const sortedEvents = [...eventsWithPosition].sort((a, b) => {
+                      if (a.startMinute !== b.startMinute) {
+                        return a.startMinute - b.startMinute;
+                      }
+                      return a.endMinute - b.endMinute;
+                    });
+                    
+                    // 본문과 동일한 겹침 처리 알고리즘
+                    const finalEvents: any[] = [];
+                    
+                    for (let i = 0; i < sortedEvents.length; i++) {
+                      const currentEvent = sortedEvents[i];
+                      
+                      const conflictingEvents = finalEvents.filter(placedEvent => {
+                        return (currentEvent.startMinute <= placedEvent.endMinute && 
+                                currentEvent.endMinute >= placedEvent.startMinute);
+                      });
+                      
+                      const usedColumns = new Set(conflictingEvents.map(event => event.column));
+                      
+                      let column = 0;
+                      while (usedColumns.has(column)) {
+                        column++;
+                      }
+                      
+                      const eventWithColumn = {
+                        ...currentEvent,
+                        column,
+                        totalColumns: 1
+                      };
+                      
+                      finalEvents.push(eventWithColumn);
+                    }
+                    
+                    const maxColumns = finalEvents.length > 0 ? Math.max(...finalEvents.map(event => event.column)) + 1 : 1;
+                    return maxColumns;
+                  };
+                  
+                  return Array.from({length: 7}).map((_, dayIndex) => {
+                    const day = addDays(weekStart, dayIndex);
+                    const isCurrentDay = isToday(day);
+                    const maxColumns = getMaxColumnsForDay(day);
+                    
+                    // 컬럼 너비는 항상 동일하게 유지
+                    const columnStyle = {};
+                    
+                    return (
+                      <div 
+                        key={dayIndex} 
+                        className={`flex-1 relative border-r border-border last:border-r-0 ${
+                          isCurrentDay ? 'bg-primary/5' : ''
+                        }`}
+                        style={columnStyle}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = 'move';
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (draggedTask && !draggedTask.isCalendarEvent) {
+                            handleDrop(day)(e);
+                          }
+                        }}
+                      >
+                        {/* 시간 격자 */}
+                        {Array.from({length: 24}).map((_, hour) => (
+                          <div 
+                            key={hour} 
+                            className="h-16 border-b border-border hover:bg-muted/20 transition-colors"
+                            onDoubleClick={() => {
+                              const dateTimeString = format(day, 'yyyy-MM-dd') + `T${hour.toString().padStart(2, '0')}:00`;
+                              setShowAddForm(true);
+                              setAddFormDate(format(day, 'yyyy-MM-dd'));
+                              setNewEvent({ 
+                                ...newEvent, 
+                                startDate: dateTimeString,
+                                endDate: format(day, 'yyyy-MM-dd') + `T${(hour + 1).toString().padStart(2, '0')}:00`
+                              });
+                              setEditEventDialog({ show: false, event: null });
+                              setShowTaskDetail(false);
+                            }}
+                          />
+                        ))}
+                        
+                        {/* 해당 날짜의 일정들 */}
                         {(() => {
-                          const events = calendarTasks.filter(t=>{
-                            const dateToCheck = t.startDate || t.dueDate || undefined;
-                            return dateToCheck && isSameDay(dateToCheck, day);
+                          const dateKey = format(day, 'yyyy-MM-dd');
+                          const events = tasksByDate.get(dateKey) || [];
+                          
+                          // 시간대별로 일정들을 그룹화하고 겹침 처리
+                          const processedEvents = (() => {
+                            if (events.length === 0) return [];
+                            
+                            const eventsWithPosition = events.map((task, i) => {
+                              const start = task.startDate ? new Date(task.startDate) : undefined;
+                              const end = task.endDate ? new Date(task.endDate) : undefined;
+                              
+                              let topPosition = 0;
+                              let height = 64;
+                              let startMinute = 0;
+                              let endMinute = 1440; // 하루 끝
+                              
+                              if (start && end) {
+                                const startHour = start.getHours();
+                                const startMin = start.getMinutes();
+                                startMinute = startHour * 60 + startMin;
+                                topPosition = (startHour * 64) + (startMin * 64 / 60);
+                                
+                                const endHour = end.getHours();
+                                const endMin = end.getMinutes();
+                                endMinute = endHour * 60 + endMin;
+                                
+                                const durationMinutes = endMinute - startMinute;
+                                height = Math.max(24, (durationMinutes / 60) * 64);
+                                
+                                console.log(`일정 "${task.title}": ${startHour}:${startMin.toString().padStart(2,'0')} - ${endHour}:${endMin.toString().padStart(2,'0')} (${startMinute}-${endMinute}분)`);
+                              } else if (task.dueDate) {
+                                topPosition = 4;
+                                height = 20;
+                                startMinute = 0;
+                                endMinute = 30; // 30분 정도로 설정
+                              }
+                              
+                              return {
+                                ...task,
+                                originalIndex: i,
+                                topPosition,
+                                height,
+                                startMinute,
+                                endMinute,
+                                column: 0,
+                                totalColumns: 1
+                              };
+                            });
+                            
+                            // 시간 순으로 정렬
+                            const sortedEvents = [...eventsWithPosition].sort((a, b) => {
+                              if (a.startMinute !== b.startMinute) {
+                                return a.startMinute - b.startMinute;
+                              }
+                              return a.endMinute - b.endMinute;
+                            });
+                            
+                            // 겹치는 그룹들을 찾고 컬럼 할당 (개선된 알고리즘)
+                            const finalEvents: any[] = [];
+                            
+                            // 간단한 겹침 처리 알고리즘으로 변경
+                            
+                            // 시간 순으로 정렬된 이벤트들을 순차적으로 처리
+                            for (let i = 0; i < sortedEvents.length; i++) {
+                              const currentEvent = sortedEvents[i];
+                              
+                              // 현재 이벤트와 겹치는 이미 배치된 이벤트들 찾기
+                              const conflictingEvents = finalEvents.filter(placedEvent => {
+                                // 겹침 조건을 더 엄격하게: 시작시간이 같거나 시간대가 겹치는 경우
+                                return (currentEvent.startMinute <= placedEvent.endMinute && 
+                                        currentEvent.endMinute >= placedEvent.startMinute);
+                              });
+                              
+                              // 사용 중인 컬럼 번호들 수집
+                              const usedColumns = new Set(conflictingEvents.map(event => event.column));
+                              
+                              // 사용되지 않은 가장 작은 컬럼 번호 찾기
+                              let column = 0;
+                              while (usedColumns.has(column)) {
+                                column++;
+                              }
+                              
+                              // 이벤트에 컬럼 정보 할당
+                              const eventWithColumn = {
+                                ...currentEvent,
+                                column,
+                                totalColumns: 1 // 임시로 1로 설정, 나중에 업데이트
+                              };
+                              
+                              finalEvents.push(eventWithColumn);
+                            }
+                            
+                            // 모든 이벤트의 totalColumns를 최대 컬럼 수로 업데이트
+                            const maxColumns = finalEvents.length > 0 ? Math.max(...finalEvents.map(event => event.column)) + 1 : 1;
+                            finalEvents.forEach(event => {
+                              event.totalColumns = maxColumns;
+                            });
+                            
+                            // 디버깅 로그
+                            if (finalEvents.length > 1) {
+                              console.log('주별뷰 겹침 처리 결과:', finalEvents.map(e => ({
+                                title: e.title,
+                                column: e.column,
+                                totalColumns: e.totalColumns,
+                                startMinute: e.startMinute,
+                                endMinute: e.endMinute
+                              })));
+                            }
+                            
+                            return finalEvents;
+                          })();
+                          
+                          return processedEvents.map((processedTask) => {
+                            const { column, totalColumns, topPosition, height } = processedTask;
+                            
+                            // 디버깅용 로그
+                            if (totalColumns > 1) {
+                              console.log(`일정 "${processedTask.title}": column=${column}, totalColumns=${totalColumns}`);
+                            }
+                            
+                            // 컬럼 너비 계산 (겹치는 일정이 있으면 나누어서 표시)
+                            const columnWidth = totalColumns > 1 ? `${90 / totalColumns}%` : '90%';
+                            const leftOffset = totalColumns > 1 ? `${(column * 90) / totalColumns + 5}%` : '5%';
+                            
+                            const start = processedTask.startDate ? new Date(processedTask.startDate) : undefined;
+                            const end = processedTask.endDate ? new Date(processedTask.endDate) : undefined;
+                            
+                            const timeStr = (start && end)
+                              ? `${start.getHours().toString().padStart(2,'0')}:${start.getMinutes().toString().padStart(2,'0')}`
+                              : processedTask.dueDate ? '마감' : '';
+                            
+                            return (
+                              <div
+                                key={processedTask.id + '' + processedTask.originalIndex}
+                                className={`absolute rounded px-1 py-0.5 text-xs font-medium cursor-pointer border-2 shadow-sm ${processedTask.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()}`}
+                                style={{
+                                  top: `${topPosition}px`,
+                                  height: `${height}px`,
+                                  left: leftOffset,
+                                  width: columnWidth,
+                                  zIndex: 10 + column,
+                                  minHeight: '20px',
+                                  overflow: 'hidden',
+                                  marginRight: totalColumns > 1 ? '2px' : '0px'
+                                }}
+                                onClick={() => handleEventClick(processedTask)}
+                                draggable={!processedTask.isCalendarEvent}
+                                onDragStart={!processedTask.isCalendarEvent ? handleDragStart(processedTask) : undefined}
+                                onDragEnd={!processedTask.isCalendarEvent ? handleDragEnd : undefined}
+                                title={!processedTask.isCalendarEvent ? "드래그하여 일정 변경" : "클릭하여 수정"}
+                              >
+                                <div className="font-semibold truncate text-[10px]">{processedTask.title}</div>
+                                {timeStr && height > 24 && (
+                                  <div className="text-[9px] opacity-75">{timeStr}</div>
+                                )}
+                              </div>
+                            );
                           });
+                        })()}
+                        
+                        {/* 현재 시간 표시선 (오늘인 경우에만) */}
+                        {isCurrentDay && (() => {
+                          const now = new Date();
+                          const currentHour = now.getHours();
+                          const currentMinute = now.getMinutes();
+                          const currentTimePosition = (currentHour * 64) + (currentMinute * 64 / 60);
+                          
                           return (
-                            <>
-                              {events.map((task,i)=>{
-                                // 시간 포맷
-                                const start = task.startDate ? new Date(task.startDate) : undefined;
-                                const end = task.endDate ? new Date(task.endDate) : undefined;
-                                const timeStr = (start && end)
-                                  ? `${start.getHours().toString().padStart(2,'0')}:${start.getMinutes().toString().padStart(2,'0')}~${end.getHours().toString().padStart(2,'0')}:${end.getMinutes().toString().padStart(2,'0')}`
-                                  : '';
-                                return (
-                                  <div key={task.id+''+i} 
-                                    className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-primary/10 text-primary':'bg-secondary/10 text-secondary'}`}
-                                    style={{whiteSpace:'normal',maxHeight:48,overflowY:'auto',wordBreak:'break-all',marginBottom:2}}
-                                    onClick={() => handleEventClick(task)}
-                                  >
-                                    <div>{task.title}</div>
-                                    {timeStr && <div className="text-[10px] text-gray-500 mt-0.5">{timeStr}</div>}
-                                  </div>
-                                )
-                              })}
-                            </>
+                            <div
+                              className="absolute left-0 right-0 border-t-2 border-red-500 z-20"
+                              style={{ top: `${currentTimePosition}px` }}
+                            >
+                              <div className="absolute -left-1 -top-1 w-2 h-2 bg-red-500 rounded-full"></div>
+                            </div>
                           );
                         })()}
                       </div>
-                    </div>
-                  )
-                })
-              })()}
+                    );
+                  });
+                })()}
+              </div>
             </div>
           </div>
         )}
@@ -1017,35 +1461,284 @@ const CalendarPage: React.FC = () => {
             <div className="border-b border-border text-center text-sm font-medium bg-muted text-muted-foreground py-2">
               {format(selectedDate || currentDate, 'yyyy년 MM월 dd일 (E)', {locale:ko})}
             </div>
-            <div className="p-8 min-h-[300px]">
-              <div className="font-bold mb-2">{format(selectedDate || currentDate, 'd일')}</div>
-              <div className="space-y-2 relative">
+            <div className="flex-1 overflow-y-auto day-view-scroll">
+              {/* 시간대별 일정 표시 */}
+              <div className="flex">
+                {/* 시간 표시 열 */}
+                <div className="w-16 border-r border-border bg-muted/30">
+                  {Array.from({length: 24}).map((_, hour) => (
+                    <div key={hour} className="h-16 border-b border-border flex items-start justify-center pt-1">
+                      <span className="text-xs text-muted-foreground">
+                        {hour.toString().padStart(2, '0')}:00
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* 일정 표시 영역 */}
                 {(() => {
-                  const events = calendarTasks.filter(t=>{
-                    const dateToCheck = t.startDate || t.dueDate || undefined;
-                    return dateToCheck && isSameDay(dateToCheck, selectedDate || currentDate);
-                  });
+                  // 현재 날짜의 최대 겹치는 일정 수 계산
+                  const dateKey = format(selectedDate || currentDate, 'yyyy-MM-dd');
+                  const events = tasksByDate.get(dateKey) || [];
+                  
+                  let maxColumns = 1;
+                  if (events.length > 0) {
+                    const eventsWithTime = events.map(task => {
+                      const start = task.startDate ? new Date(task.startDate) : undefined;
+                      const end = task.endDate ? new Date(task.endDate) : undefined;
+                      
+                      let startMinute = 0;
+                      let endMinute = 1440;
+                      
+                      if (start && end) {
+                        startMinute = start.getHours() * 60 + start.getMinutes();
+                        endMinute = startMinute + (end.getTime() - start.getTime()) / (1000 * 60);
+                      }
+                      
+                      return { ...task, startMinute, endMinute };
+                    });
+                    
+                    const timePoints: number[] = [];
+                    eventsWithTime.forEach(event => {
+                      timePoints.push(event.startMinute);
+                      timePoints.push(event.endMinute);
+                    });
+                    
+                    let maxOverlapping = 0;
+                    timePoints.forEach(timePoint => {
+                      const overlappingCount = eventsWithTime.filter(event => 
+                        event.startMinute <= timePoint && event.endMinute > timePoint
+                      ).length;
+                      maxOverlapping = Math.max(maxOverlapping, overlappingCount);
+                    });
+                    
+                    maxColumns = Math.max(1, maxOverlapping);
+                  }
+                  
+                  // 일별뷰 컨테이너 너비는 고정
+                  const containerStyle = {};
+                  
                   return (
-                    <>
-                      {events.map((task,i)=>{
-                        // 시간 포맷
+                    <div 
+                      className="flex-1 relative"
+                      style={containerStyle}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (draggedTask && !draggedTask.isCalendarEvent) {
+                          handleDrop(selectedDate || currentDate)(e);
+                        }
+                      }}
+                    >
+                  {/* 시간 격자 */}
+                  {Array.from({length: 24}).map((_, hour) => (
+                    <div 
+                      key={hour} 
+                      className="h-16 border-b border-border hover:bg-muted/20 transition-colors"
+                      onDoubleClick={() => {
+                        const clickedDate = selectedDate || currentDate;
+                        const dateTimeString = format(clickedDate, 'yyyy-MM-dd') + `T${hour.toString().padStart(2, '0')}:00`;
+                        setShowAddForm(true);
+                        setAddFormDate(format(clickedDate, 'yyyy-MM-dd'));
+                        setNewEvent({ 
+                          ...newEvent, 
+                          startDate: dateTimeString,
+                          endDate: format(clickedDate, 'yyyy-MM-dd') + `T${(hour + 1).toString().padStart(2, '0')}:00`
+                        });
+                        setEditEventDialog({ show: false, event: null });
+                        setShowTaskDetail(false);
+                      }}
+                    />
+                  ))}
+                  
+                  {/* 일정 표시 */}
+                  {(() => {
+                    const dateKey = format(selectedDate || currentDate, 'yyyy-MM-dd');
+                    const events = tasksByDate.get(dateKey) || [];
+                    
+                    // 시간대별로 일정들을 그룹화하고 겹침 처리
+                    const processedEvents = (() => {
+                      if (events.length === 0) return [];
+                      
+                      const eventsWithPosition = events.map((task, i) => {
                         const start = task.startDate ? new Date(task.startDate) : undefined;
                         const end = task.endDate ? new Date(task.endDate) : undefined;
-                        const timeStr = (start && end)
-                          ? `${start.getHours().toString().padStart(2,'0')}:${start.getMinutes().toString().padStart(2,'0')}~${end.getHours().toString().padStart(2,'0')}:${end.getMinutes().toString().padStart(2,'0')}`
-                          : '';
-                        return (
-                          <div key={task.id+''+i} 
-                            className={`truncate px-2 py-0.5 rounded text-xs font-medium ${task.isCalendarEvent?'bg-primary/10 text-primary':'bg-secondary/10 text-secondary'}`}
-                            style={{whiteSpace:'normal',maxHeight:48,overflowY:'auto',wordBreak:'break-all',marginBottom:2}}
-                            onClick={() => handleEventClick(task)}
-                          >
-                            <div>{task.title}</div>
-                            {timeStr && <div className="text-[10px] text-gray-500 mt-0.5">{timeStr}</div>}
-                          </div>
-                        )
-                      })}
-                    </>
+                        
+                        let topPosition = 0;
+                        let height = 64;
+                        let startMinute = 0;
+                        let endMinute = 1440; // 하루 끝
+                        
+                        if (start && end) {
+                          const startHour = start.getHours();
+                          const startMin = start.getMinutes();
+                          startMinute = startHour * 60 + startMin;
+                          topPosition = (startHour * 64) + (startMin * 64 / 60);
+                          
+                          const endHour = end.getHours();
+                          const endMin = end.getMinutes();
+                          endMinute = endHour * 60 + endMin;
+                          
+                          const durationMinutes = endMinute - startMinute;
+                          height = Math.max(32, (durationMinutes / 60) * 64);
+                          
+                          console.log(`[일별뷰] 일정 "${task.title}": ${startHour}:${startMin.toString().padStart(2,'0')} - ${endHour}:${endMin.toString().padStart(2,'0')} (${startMinute}-${endMinute}분)`);
+                        } else if (task.dueDate) {
+                          topPosition = 0;
+                          height = 24 * 64; // 전체 하루
+                          startMinute = 0;
+                          endMinute = 1440; // 하루 종일
+                        }
+                        
+                        return {
+                          ...task,
+                          originalIndex: i,
+                          topPosition,
+                          height,
+                          startMinute,
+                          endMinute,
+                          column: 0,
+                          totalColumns: 1
+                        };
+                      });
+                      
+                      // 시간 순으로 정렬
+                      const sortedEvents = [...eventsWithPosition].sort((a, b) => {
+                        if (a.startMinute !== b.startMinute) {
+                          return a.startMinute - b.startMinute;
+                        }
+                        return a.endMinute - b.endMinute;
+                      });
+                      
+                      // 간단한 겹침 처리 알고리즘으로 변경 (일별뷰)
+                      const finalEvents: any[] = [];
+                      
+                      // 시간 순으로 정렬된 이벤트들을 순차적으로 처리
+                      for (let i = 0; i < sortedEvents.length; i++) {
+                        const currentEvent = sortedEvents[i];
+                        
+                        // 현재 이벤트와 겹치는 이미 배치된 이벤트들 찾기
+                        const conflictingEvents = finalEvents.filter(placedEvent => {
+                          // 겹침 조건을 더 엄격하게: 시작시간이 같거나 시간대가 겹치는 경우
+                          return (currentEvent.startMinute <= placedEvent.endMinute && 
+                                  currentEvent.endMinute >= placedEvent.startMinute);
+                        });
+                        
+                        // 사용 중인 컬럼 번호들 수집
+                        const usedColumns = new Set(conflictingEvents.map(event => event.column));
+                        
+                        // 사용되지 않은 가장 작은 컬럼 번호 찾기
+                        let column = 0;
+                        while (usedColumns.has(column)) {
+                          column++;
+                        }
+                        
+                        // 이벤트에 컬럼 정보 할당
+                        const eventWithColumn = {
+                          ...currentEvent,
+                          column,
+                          totalColumns: 1 // 임시로 1로 설정, 나중에 업데이트
+                        };
+                        
+                        finalEvents.push(eventWithColumn);
+                      }
+                      
+                      // 모든 이벤트의 totalColumns를 최대 컬럼 수로 업데이트
+                      const maxColumns = finalEvents.length > 0 ? Math.max(...finalEvents.map(event => event.column)) + 1 : 1;
+                      finalEvents.forEach(event => {
+                        event.totalColumns = maxColumns;
+                      });
+                      
+                      // 디버깅 로그
+                      if (finalEvents.length > 1) {
+                        console.log('[일별뷰] 겹침 처리 결과:', finalEvents.map(e => ({
+                          title: e.title,
+                          column: e.column,
+                          totalColumns: e.totalColumns,
+                          startMinute: e.startMinute,
+                          endMinute: e.endMinute
+                        })));
+                      }
+                      
+                      return finalEvents;
+                    })();
+                    
+                    return processedEvents.map((processedTask) => {
+                      const { column, totalColumns, topPosition, height } = processedTask;
+                      
+                      // 디버깅용 로그
+                      if (totalColumns > 1) {
+                        console.log(`[일별뷰] 일정 "${processedTask.title}": column=${column}, totalColumns=${totalColumns}`);
+                      }
+                      
+                      // 컬럼 너비 계산 (겹치는 일정이 있으면 나누어서 표시)
+                      const columnWidth = totalColumns > 1 ? `${85 / totalColumns}%` : '85%';
+                      const leftOffset = totalColumns > 1 ? `${(column * 85) / totalColumns + 7.5}%` : '7.5%';
+                      
+                      const start = processedTask.startDate ? new Date(processedTask.startDate) : undefined;
+                      const end = processedTask.endDate ? new Date(processedTask.endDate) : undefined;
+                      
+                      const timeStr = (start && end)
+                        ? `${start.getHours().toString().padStart(2,'0')}:${start.getMinutes().toString().padStart(2,'0')}~${end.getHours().toString().padStart(2,'0')}:${end.getMinutes().toString().padStart(2,'0')}`
+                        : processedTask.dueDate ? '하루 종일' : '';
+                      
+                      return (
+                        <div
+                          key={processedTask.id + '' + processedTask.originalIndex}
+                          className={`absolute rounded px-2 py-1 text-xs font-medium cursor-pointer border-2 shadow-sm ${processedTask.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()}`}
+                          style={{
+                            top: `${topPosition}px`,
+                            height: `${height}px`,
+                            left: leftOffset,
+                            width: columnWidth,
+                            zIndex: 10 + column,
+                            minHeight: '32px',
+                            overflow: 'hidden',
+                            marginRight: totalColumns > 1 ? '4px' : '0px'
+                          }}
+                          onClick={() => handleEventClick(processedTask)}
+                          draggable={!processedTask.isCalendarEvent}
+                          onDragStart={!processedTask.isCalendarEvent ? handleDragStart(processedTask) : undefined}
+                          onDragEnd={!processedTask.isCalendarEvent ? handleDragEnd : undefined}
+                          title={!processedTask.isCalendarEvent ? "드래그하여 일정 변경" : "클릭하여 수정"}
+                        >
+                          <div className="font-semibold truncate">{processedTask.title}</div>
+                          {timeStr && (
+                            <div className="text-[10px] opacity-75 mt-0.5">{timeStr}</div>
+                          )}
+                          {processedTask.description && height > 48 && (
+                            <div className="text-[10px] opacity-60 mt-1 line-clamp-2">
+                              {processedTask.description}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
+                  
+                  {/* 현재 시간 표시선 (오늘인 경우에만) */}
+                  {isToday(selectedDate || currentDate) && (() => {
+                    const now = new Date();
+                    const currentHour = now.getHours();
+                    const currentMinute = now.getMinutes();
+                    const currentTimePosition = (currentHour * 64) + (currentMinute * 64 / 60);
+                    
+                    return (
+                      <div
+                        className="absolute left-0 right-0 border-t-2 border-red-500 z-20"
+                        style={{ top: `${currentTimePosition}px` }}
+                      >
+                        <div className="absolute -left-2 -top-2 w-4 h-4 bg-red-500 rounded-full"></div>
+                        <div className="absolute right-2 -top-3 text-xs text-red-500 font-medium">
+                          {now.getHours().toString().padStart(2, '0')}:{now.getMinutes().toString().padStart(2, '0')}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                    </div>
                   );
                 })()}
               </div>
@@ -1188,6 +1881,88 @@ const CalendarPage: React.FC = () => {
             </div>
           </div>
         )}
+        {/* 태스크 상세 정보: showTaskDetail이 true일 때만 표시 */}
+        {showTaskDetail && selectedTask && (
+          <div className="mb-6 border-b pb-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-lg">태스크 상세 정보</h3>
+              <Button variant="ghost" size="sm" onClick={() => {
+                setShowTaskDetail(false);
+                setSelectedTask(null);
+              }}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-4">
+              {/* 제목 */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">제목</label>
+                <div className="mt-1 text-base font-semibold">{selectedTask.title}</div>
+              </div>
+              
+              {/* 설명 */}
+              {selectedTask.description && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">설명</label>
+                  <div className="mt-1 text-sm text-foreground whitespace-pre-wrap">{selectedTask.description}</div>
+                </div>
+              )}
+              
+              {/* 상태 */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">상태</label>
+                <div className="mt-1">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
+                  }`}>
+                    {selectedTask.status === 'todo' ? '할 일' : 
+                     selectedTask.status === 'in-progress' ? '진행 중' : 
+                     selectedTask.status === 'done' ? '완료' : '검토'}
+                  </span>
+                </div>
+              </div>
+              
+              {/* 우선순위 */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">우선순위</label>
+                <div className="mt-1">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    selectedTask.priority === 'high' ? 
+                      (theme === 'dark' ? 'bg-red-900/20 text-red-400' : 'bg-red-100 text-red-700') :
+                    selectedTask.priority === 'medium' ? 
+                      (theme === 'dark' ? 'bg-yellow-900/20 text-yellow-400' : 'bg-yellow-100 text-yellow-700') :
+                      (theme === 'dark' ? 'bg-green-900/20 text-green-400' : 'bg-green-100 text-green-700')
+                  }`}>
+                    {selectedTask.priority === 'high' ? '높은 우선순위' : 
+                     selectedTask.priority === 'medium' ? '중간 우선순위' : '낮은 우선순위'}
+                  </span>
+                </div>
+              </div>
+              
+              {/* 마감일 */}
+              {selectedTask.dueDate && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">마감일</label>
+                  <div className="mt-1 text-sm">{format(new Date(selectedTask.dueDate), 'yyyy년 MM월 dd일 (E)', { locale: ko })}</div>
+                </div>
+              )}
+              
+              {/* 생성일 */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">생성일</label>
+                <div className="mt-1 text-sm">{format(new Date(selectedTask.createdAt), 'yyyy년 MM월 dd일 (E)', { locale: ko })}</div>
+              </div>
+              
+              {/* 프로젝트 */}
+              {selectedTask.project && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">프로젝트</label>
+                  <div className="mt-1 text-sm">{selectedTask.project.name}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {/* 기존 우측 안내/예정된 회의/단축키 안내 */}
         <div className="mb-6">
           <div className="font-bold text-lg mb-2">예정된 회의</div>
@@ -1234,6 +2009,14 @@ const CalendarPage: React.FC = () => {
               <X className="h-4 w-4" />
             </Button>
           </div>
+          
+          {/* 드래그 안내 메시지 */}
+          <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
+            <p className="text-xs text-muted-foreground">
+              💡 업무를 클릭하여 상세 정보를 보거나, 캘린더의 날짜로 드래그하여 일정을 설정하세요
+            </p>
+          </div>
+          
           <div className="space-y-2">
             {sidebarTasks.length === 0 ? (
               <div className="text-muted-foreground text-center py-4">
@@ -1241,23 +2024,29 @@ const CalendarPage: React.FC = () => {
               </div>
             ) : (
               sidebarTasks.map(task => {
-                // 테마에 따른 색상 변수 (예시, 실제 테마 변수 사용 권장)
-                const borderColor = 'border-primary/50'; // 테마의 primary 색상을 연하게
-                const bgColor = 'bg-primary/10';       // 테마의 primary 색상을 더 연하게
-                const statusBg = 'bg-secondary/20';    // 테마의 secondary 색상을 연하게
-                const statusText = 'text-secondary-foreground';    // 테마의 secondary foreground 색상으로 변경
-                const priorityText = 'text-muted-foreground'; // 우선순위 텍스트 색상
+                // 테마에 따른 칸반 태스크 색상 적용
+                const taskClasses = getKanbanTaskClasses();
+                const statusBg = theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100';
+                const statusText = theme === 'dark' ? 'text-gray-300' : 'text-gray-700';
+                const priorityText = 'text-muted-foreground';
 
                 return (
                   <div
                     key={task.id}
-                    className={`${bgColor} border ${borderColor} rounded-md p-3 shadow-sm cursor-pointer text-foreground`}
+                    className={`${taskClasses} rounded-md p-3 shadow-sm cursor-move border transition-all duration-200 hover:shadow-md`}
                     draggable
                     onDragStart={handleDragStart(task)}
                     onDragEnd={handleDragEnd}
+                    onClick={(e) => {
+                      // 드래그 시작 후 클릭 이벤트가 발생하지 않도록 방지
+                      if (!e.defaultPrevented) {
+                        handleEventClick(task);
+                      }
+                    }}
+                    title="클릭하여 상세 정보 보기 또는 캘린더로 드래그하여 일정 설정"
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-medium text-sm text-foreground">{task.title}</h4>
+                      <h4 className="font-medium text-sm">{task.title}</h4>
                       <span className={`text-xs px-2 py-1 rounded-full ${statusBg} ${statusText}`}>
                         {task.status === 'todo' ? '할 일' : 
                          task.status === 'in-progress' ? '진행 중' : 
