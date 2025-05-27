@@ -1724,12 +1724,6 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       }
       
       setLastSaved(new Date());
-      setSaveSuccess(true);
-      
-      // 3초 후 성공 메시지 숨김
-      setTimeout(() => {
-        setSaveSuccess(false);
-      }, 3000);
       
     } catch (error) {
       console.error('자동 저장 중 오류:', error);
@@ -2242,22 +2236,20 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
     const handleUpdate = () => {
       setHasUnsavedChanges(true);
       
-      // 이전 타이머 제거 (더 이상 필요없음)
+      // 이전 타이머 제거
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
       }
       
-      // Y.js 데이터가 변경되면 바로 저장하지 않고 잠시 지연
+      // 타이핑할 때마다 2초 후 자동저장
       autoSaveTimerRef.current = setTimeout(() => {
         autoSave();
-      }, 300000); // 5분 지연 (300,000 밀리초)
+      }, 2000); // 2초 지연
     };
     
-    // editor가 null이 아님이 확인된 상태
     editor.on('update', handleUpdate);
     
     return () => {
-      // editor가 null이 아님이 확인된 상태
       editor.off('update', handleUpdate);
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
@@ -2276,11 +2268,40 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
     
     setHasUnsavedChanges(true);
     
-    // 일정 시간 후 자동저장 실행
+    // 제목 변경 후 2초 후 자동저장 실행
     autoSaveTimerRef.current = setTimeout(() => {
       autoSave();
-    }, 300000); // 5분 지연 (300,000 밀리초)
+    }, 2000); // 2초 지연
   }, [title, autoSaveEnabled, autoSave]);
+
+  // 새 문서 생성 시 즉시 자동저장 트리거
+  useEffect(() => {
+    if (isNewDocument && editor && autoSaveEnabled && title && selectedProjectId) {
+      // 새 문서에서 제목이나 내용이 있으면 즉시 저장
+      const timer = setTimeout(() => {
+        autoSave();
+      }, 1000); // 1초 후 즉시 저장
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isNewDocument, editor, autoSaveEnabled, title, selectedProjectId, autoSave]);
+
+  // 폴더, 이모지, 즐겨찾기 변경시 자동저장 트리거
+  useEffect(() => {
+    if (!autoSaveEnabled || isNewDocument) return;
+    
+    // 이전 타이머 취소
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+    
+    setHasUnsavedChanges(true);
+    
+    // 메타데이터 변경 후 2초 후 자동저장 실행
+    autoSaveTimerRef.current = setTimeout(() => {
+      autoSave();
+    }, 2000);
+  }, [folder, emoji, isStarred, autoSaveEnabled, autoSave, isNewDocument]);
 
   // 현재 사용자 정보가 변경될 때 provider에 적용
   useEffect(() => {
@@ -2980,7 +3001,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
             {/* 읽기 전용 모드 버튼 또는 상태 표시 (관리자/소유자는 버튼, 일반 멤버는 상태 표시) */}
             {((userProjectRole && userProjectRole !== 'member') || isProjectOwner) ? (
               <button 
-                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" 
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" 
                 onClick={!isLoading && !isButtonDebouncing ? toggleReadOnlyMode : undefined}
                 disabled={isLoading}
                 title={isReadOnlyMode ? "편집 모드로 전환" : "읽기 전용 모드로 전환"}
@@ -2988,22 +3009,20 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
                 {isReadOnlyMode ? (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                      className="w-5 h-5 text-gray-600 dark:text-gray-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+                    className="w-5 h-5 text-gray-600 dark:text-gray-400"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
                   >
                     <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                      fillRule="evenodd"
+                      d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                      clipRule="evenodd"
                     />
                   </svg>
                 ) : (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                      className="w-5 h-5 text-gray-600 dark:text-gray-400"
+                    className="w-5 h-5 text-gray-600 dark:text-gray-400"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -3012,7 +3031,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                        d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2 2v6a2 2 0 002 2z"
+                      d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
                     />
                   </svg>
                 )}
@@ -3022,16 +3041,14 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
                 <div className="p-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                      className="w-5 h-5 text-gray-400 dark:text-gray-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+                    className="w-5 h-5 text-gray-600 dark:text-gray-400"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
                   >
                     <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                      fillRule="evenodd"
+                      d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 616 0z"
+                      clipRule="evenodd"
                     />
                   </svg>
                 </div>
@@ -3040,11 +3057,18 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
             
             <button
               onClick={saveDocument}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
               disabled={isSaving || isLoading}
               title={isSaving ? "저장 중..." : "저장"}
             >
+              {isSaving ? (
+                <svg className="animate-spin h-5 w-5 text-gray-600 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : (
                 <SaveIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              )}
             </button>
           </div>
         </div>
@@ -3052,7 +3076,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
         {/* 문서 편집 영역 */}
         <div className="flex-1 overflow-auto">
       
-                {/* 로딩 및 오류 상태 표시 */}
+      {/* 로딩 및 오류 상태 표시 */}
       {isLoading && (
             <div className={`min-h-screen flex items-center justify-center bg-background text-foreground`}>
           <div className="text-center flex flex-col items-center">
@@ -3091,27 +3115,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
         </div>
       )}
       
-      {/* 성공 메시지 */}
-      {saveSuccess && (
-            <div className="fixed top-16 right-4 bg-green-50 dark:bg-green-900 border-l-4 border-green-500 dark:border-green-400 p-4 rounded-lg shadow-md z-50">
-          <div className="flex">
-            <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-green-400 dark:text-green-300" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-                  <p className="text-sm text-green-800 dark:text-green-200">
-                문서가 성공적으로 저장되었습니다.
-                {selectedProjectId && (
-                  <span className="block text-xs mt-1 font-mono">
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+
       
       {isReadOnlyMode && (
             <div className="fixed top-16 left-1/2 transform -translate-x-1/2 bg-blue-50 dark:bg-blue-900 border-l-4 border-blue-500 dark:border-blue-400 p-4 rounded-lg shadow-md z-50">
