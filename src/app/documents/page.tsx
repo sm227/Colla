@@ -30,6 +30,9 @@ import {
   VideoIcon,
   CalendarIcon,
   Trello,
+  SunIcon,
+  MoonIcon,
+  UserIcon,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -37,6 +40,17 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useProject } from "@/app/contexts/ProjectContext";
 import { Button } from "@/components/ui/button";
+import { useTheme } from "next-themes";
+
+// shadcn/ui DropdownMenu 컴포넌트 임포트
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // SidebarLink 컴포넌트 (page.tsx에서 가져옴)
 function SidebarLink({
@@ -249,10 +263,10 @@ const ModernScrollbarStyles = () => (
 );
 
 export default function DocumentsPage() {
-  // 테마 상태 추가 (컴포넌트 내부로 이동)
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false); // 모바일 사이드바 상태
   const [isDocumentsSubmenuOpen, setIsDocumentsSubmenuOpen] = useState(true); // 문서 하위 메뉴 상태 추가
+  const [mounted, setMounted] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   const router = useRouter();
   const { user, loading: authLoading, logout } = useAuth();
@@ -266,34 +280,19 @@ export default function DocumentsPage() {
     hasProjects
   } = useProject();
   
-  // 테마 설정 useEffect (page.tsx에서 가져옴)
+  // 테마 관련 코드 수정 (next-themes 사용)
+  const { theme: currentTheme, setTheme } = useTheme();
+  
+  // theme 값 계산
+  const theme = (currentTheme || 'dark') as 'light' | 'dark';
+
+  // next-themes hydration 처리를 위한 mounted 상태 추가
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' || 'dark';
-      setTheme(savedTheme);
-      if (savedTheme === 'dark') {
-        document.documentElement.classList.add('dark-mode');
-        document.documentElement.classList.remove('light-mode');
-      } else {
-        document.documentElement.classList.remove('dark-mode');
-        document.documentElement.classList.add('light-mode');
-      }
-    }
+    setMounted(true);
   }, []);
 
   const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('theme', newTheme);
-      if (newTheme === 'dark') {
-        document.documentElement.classList.add('dark-mode');
-        document.documentElement.classList.remove('light-mode');
-      } else {
-        document.documentElement.classList.remove('dark-mode');
-        document.documentElement.classList.add('light-mode');
-      }
-    }
+    setTheme(theme === 'light' ? 'dark' : 'light');
   };
   
   // URL에서 projectId 가져오기
@@ -523,6 +522,8 @@ export default function DocumentsPage() {
   }, [documents, selectedFolder, searchQuery, folders]);
   
   const createNewDocument = () => {
+    setIsNavigating(true);
+    
     // 프로젝트 ID가 있고 빈 문자열이 아닐 때만 쿼리스트링 추가
     const searchParams = new URLSearchParams();
     if (selectedProjectId && selectedProjectId !== '') {
@@ -767,13 +768,30 @@ export default function DocumentsPage() {
     }
   };
   
-  // 로딩 중일 때
-  if (loading || authLoading || projectLoading) {
+  // hydration mismatch 방지
+  if (!mounted) {
+    return null;
+  }
+
+  // 로딩 중일 때 (네비게이션 로딩 포함)
+  if (loading || authLoading || projectLoading || isNavigating) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-300">문서를 불러오는 중...</p>
+      <div className={`min-h-screen flex items-center justify-center bg-background text-foreground`}>
+        <div className="text-center flex flex-col items-center">
+          <div className={`relative w-24 h-24 ${theme === 'dark' ? 'text-blue-500' : 'text-blue-600'}`}>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className={`w-16 h-16 border-4 border-current border-solid rounded-full opacity-20 ${theme === 'dark' ? 'border-blue-500' : 'border-blue-600'}`}></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className={`w-16 h-16 border-4 border-current border-solid rounded-full border-t-transparent animate-spin`}></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className={`text-3xl font-bold ${theme === 'dark' ? 'text-blue-500' : 'text-blue-600'}`}>C</span>
+            </div>
+          </div>
+          <p className={`mt-6 text-lg font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+            {isNavigating ? '새 문서로 이동 중...' : '문서를 불러오는 중...'}
+          </p>
         </div>
       </div>
     );
@@ -791,30 +809,28 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className={`flex h-screen ${theme === 'dark' ? 'bg-gray-900 text-gray-100' : 'bg-white text-gray-900'}`}>
+    <div className="flex h-screen bg-background text-foreground">
       {/* 스크롤바 스타일 적용 */}
       <ModernScrollbarStyles />
       
       {/* 사이드바 (page.tsx에서 가져옴) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 ${
-          theme === 'dark' ? 'bg-gray-800 border-r border-gray-700' : 'bg-gray-50 border-r border-gray-200'
-        } transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-30 w-64  border-r border-gray-200 bg-background dark:border-gray-700 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         } md:relative md:flex-shrink-0 flex flex-col`}
       >
-        <div className={`flex items-center justify-between h-16 px-4 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center">
-            <div className={`w-8 h-8 ${theme === 'dark' ? 'bg-blue-600' : 'bg-black'} rounded-lg flex items-center justify-center mr-2`}>
+            <div className="w-8 h-8 bg-black dark:bg-blue-600 rounded-lg flex items-center justify-center mr-2">
               <span className="text-white font-bold text-lg">C</span>
             </div>
-            <span className={`text-xl font-semibold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>Colla</span>
+            <span className="text-xl font-semibold text-gray-900 dark:text-gray-100">Colla</span>
           </div>
           <button
             className="md:hidden"
             onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
           >
-            <XIcon className={`w-6 h-6 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`} />
+            <XIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
           </button>
           </div>
           
@@ -854,9 +870,7 @@ export default function DocumentsPage() {
           />
           
           <div className="pt-4">
-            <h3 className={`px-2 text-xs font-semibold uppercase tracking-wider ${
-              theme === 'dark' ? 'text-gray-500' : 'text-gray-400'
-            }`}>
+            <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
               내 작업 공간
             </h3>
             <div className="mt-2 space-y-1">
@@ -887,9 +901,9 @@ export default function DocumentsPage() {
                   e.preventDefault(); // 기본 링크 동작 방지
                   setIsDocumentsSubmenuOpen(!isDocumentsSubmenuOpen);
                   // 필요하다면 현재 projectId를 사용해 router.push 로직 유지
-                  if (currentProject?.id && !pathname.includes(currentProject.id)) {
+                  if (currentProject?.id && pathname && !pathname.includes(currentProject.id)) {
                     router.push(`/documents?projectId=${currentProject.id}`);
-                  } else if (!currentProject?.id && pathname !== "/documents") {
+                  } else if (!currentProject?.id && pathname && pathname !== "/documents") {
                     router.push("/documents");
                   }
                 }}
@@ -1012,9 +1026,7 @@ export default function DocumentsPage() {
       </div>
 
           <div className="pt-4">
-            <h3 className={`px-2 text-xs font-semibold uppercase tracking-wider ${
-              theme === 'dark' ? 'text-gray-500' : 'text-gray-400'
-            }`}>
+            <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
               프로젝트
             </h3>
             <nav className="mt-2 space-y-1">
@@ -1048,31 +1060,34 @@ export default function DocumentsPage() {
           </div>
         </nav>
 
-        <div className={`p-4 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
-          <div className="flex items-center justify-between mb-3">
-          <button
-            onClick={toggleTheme}
-            // className={`p-2 rounded-md hover:${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}
-            // title={theme === 'dark' ? "라이트 모드로 변경" : "다크 모드로 변경"}
-          >
-            {/* {theme === 'dark' ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />} */}
-          </button>
-             <Link href="/mypage" className={`flex items-center p-2 rounded-md hover:${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}>
-                {/* <UserIcon className={`w-5 h-5 mr-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`} /> */}
-                {/* <span className="text-sm">{user.name}</span> */}
-              </Link>
-          </div>
-            <button
-            onClick={handleLogout}
-            className={`flex items-center px-3 py-2 text-sm font-medium rounded-md w-full ${
-                theme === 'dark'
-                ? 'text-gray-300 hover:bg-gray-700' 
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <LogOutIcon className="w-5 h-5 mr-2" />
-            로그아웃
-            </button>
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center w-full p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
+                <UserIcon className="w-6 h-6 mr-3 rounded-full bg-gray-200 dark:bg-gray-600 p-0.5 text-gray-700 dark:text-gray-300" />
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user?.name}</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end" sideOffset={5}>
+              <DropdownMenuLabel className="px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400">
+                {user?.email}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push('/mypage')} className="cursor-pointer">
+                <UserIcon className="w-4 h-4 mr-2" />
+                <span>정보 수정</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
+                {theme === 'dark' ? <SunIcon className="w-4 h-4 mr-2" /> : <MoonIcon className="w-4 h-4 mr-2" />}
+                <span>{theme === 'dark' ? "라이트 모드" : "다크 모드"}</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/50 focus:text-red-600 dark:focus:text-red-400">
+                <LogOutIcon className="w-4 h-4 mr-2" />
+                <span>로그아웃</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </aside>
 
@@ -1080,52 +1095,48 @@ export default function DocumentsPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
       {/* 폴더 생성 모달 */}
       {showFolderModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-            </div>
-            
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
-                    <FolderIcon className="h-6 w-6 text-green-600" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="w-full max-w-md mx-4">
+            <div className="rounded-xl shadow-xl bg-white dark:bg-[#2a2a2c] p-6">
+              {/* 헤더 */}
+              <div className="mb-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mr-4">
+                    <FolderIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                   </div>
-                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">새 폴더 만들기</h3>
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-500 mb-4">
-                        새 폴더를 만들어 문서를 체계적으로 관리하세요.
-                      </p>
-                      <input
-                        type="text"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                        placeholder="폴더 이름"
-                        value={newFolderName}
-                        onChange={(e) => setNewFolderName(e.target.value)}
-                      />
-                      {folderError && (
-                        <p className="mt-2 text-sm text-red-600">{folderError}</p>
-                      )}
-                    </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">새 폴더 만들기</h3>
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              
+              {/* 본문 */}
+              <div className="mb-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      폴더 이름
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                      placeholder="폴더 이름을 입력하세요"
+                      value={newFolderName}
+                      onChange={(e) => setNewFolderName(e.target.value)}
+                      autoFocus
+                    />
+                    {folderError && (
+                      <p className="mt-2 text-sm text-red-500 dark:text-red-400">{folderError}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* 푸터 */}
+              <div className="flex justify-end space-x-3">
                 <button
                   type="button"
-                  className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm ${isFolderCreating ? 'opacity-75 cursor-not-allowed' : ''}`}
-                  onClick={createFolder}
-                  disabled={isFolderCreating}
-                >
-                  {isFolderCreating ? '생성 중...' : '폴더 생성'}
-                </button>
-                <button
-                  type="button"
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                   onClick={() => {
                     setShowFolderModal(false);
                     setNewFolderName("");
@@ -1135,54 +1146,68 @@ export default function DocumentsPage() {
                 >
                   취소
                 </button>
+                <button
+                  type="button"
+                  className={`px-4 py-2 text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 dark:bg-gray-600 dark:hover:bg-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors ${isFolderCreating ? 'opacity-75 cursor-not-allowed' : ''}`}
+                  onClick={createFolder}
+                  disabled={isFolderCreating}
+                >
+                  {isFolderCreating ? (
+                    <span className="flex items-center">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      생성 중...
+                    </span>
+                  ) : (
+                    '폴더 생성'
+                  )}
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
       
-      {/* 삭제 확인 모달 */}
+      {/* 문서 삭제 모달 */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-            </div>
-            
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                    <AlertCircleIcon className="h-6 w-6 text-red-600" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="w-full max-w-md mx-4">
+            <div className="rounded-xl shadow-xl bg-white dark:bg-[#2a2a2c] p-6">
+              {/* 헤더 */}
+              <div className="mb-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mr-4">
+                    <AlertCircleIcon className="w-5 h-5 text-red-600 dark:text-red-400" />
                   </div>
-                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">문서 삭제</h3>
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-500">
-                        <strong>{documentToDelete?.title}</strong> 문서를 삭제하시겠습니까?
-                        <br />삭제된 문서는 복구할 수 없습니다.
-                      </p>
-                      {deleteError && (
-                        <p className="mt-2 text-sm text-red-600">{deleteError}</p>
-                      )}
-                    </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">문서 삭제</h3>
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              
+              {/* 본문 */}
+              <div className="mb-6">
+                <div className="space-y-4">
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      <span className="font-semibold text-red-600 dark:text-red-400">"{documentToDelete?.title}"</span> 문서를 삭제하시겠습니까?
+                    </p>
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                      이 작업은 되돌릴 수 없습니다.
+                    </p>
+                  </div>
+                  {deleteError && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                      <p className="text-sm text-red-600 dark:text-red-400">{deleteError}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* 푸터 */}
+              <div className="flex justify-end space-x-3">
                 <button
                   type="button"
-                  className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm ${isDeleting ? 'opacity-75 cursor-not-allowed' : ''}`}
-                  onClick={handleDeleteDocument}
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? '삭제 중...' : '삭제'}
-                </button>
-                <button
-                  type="button"
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                   onClick={() => {
                     setShowDeleteModal(false);
                     setDocumentToDelete(null);
@@ -1192,6 +1217,21 @@ export default function DocumentsPage() {
                 >
                   취소
                 </button>
+                <button
+                  type="button"
+                  className={`px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors ${isDeleting ? 'opacity-75 cursor-not-allowed' : ''}`}
+                  onClick={handleDeleteDocument}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <span className="flex items-center">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      삭제 중...
+                    </span>
+                  ) : (
+                    '삭제'
+                  )}
+                </button>
               </div>
             </div>
           </div>
@@ -1200,49 +1240,45 @@ export default function DocumentsPage() {
       
       {/* 폴더 삭제 모달 */}
       {showDeleteFolderModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-            </div>
-            
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                    <svg className="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="w-full max-w-md mx-4">
+            <div className="rounded-xl shadow-xl bg-white dark:bg-[#2a2a2c] p-6">
+              {/* 헤더 */}
+              <div className="mb-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mr-4">
+                    <AlertCircleIcon className="w-5 h-5 text-red-600 dark:text-red-400" />
                   </div>
-                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">폴더 삭제</h3>
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-500">
-                        정말 <strong>"{folderToDelete}"</strong> 폴더를 삭제하시겠습니까?
-                        <br />
-                        <span className="text-red-500">이 폴더의 모든 문서는 '기본 폴더'로 이동됩니다.</span>
-                      </p>
-                      {deleteFolderError && (
-                        <p className="mt-2 text-sm text-red-600">{deleteFolderError}</p>
-                      )}
-                    </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">폴더 삭제</h3>
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              
+              {/* 본문 */}
+              <div className="mb-6">
+                <div className="space-y-4">
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      <span className="font-semibold text-red-600 dark:text-red-400">"{folderToDelete}"</span> 폴더를 삭제하시겠습니까?
+                    </p>
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                      폴더의 모든 문서는 '기본 폴더'로 이동되며, 이 작업은 되돌릴 수 없습니다.
+                    </p>
+                  </div>
+                  {deleteFolderError && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                      <p className="text-sm text-red-600 dark:text-red-400">{deleteFolderError}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* 푸터 */}
+              <div className="flex justify-end space-x-3">
                 <button
                   type="button"
-                  className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm ${isDeletingFolder ? 'opacity-75 cursor-not-allowed' : ''}`}
-                  onClick={deleteFolder}
-                  disabled={isDeletingFolder}
-                >
-                  {isDeletingFolder ? '삭제 중...' : '삭제'}
-                </button>
-                <button
-                  type="button"
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                   onClick={() => {
                     setShowDeleteFolderModal(false);
                     setFolderToDelete(null);
@@ -1252,44 +1288,42 @@ export default function DocumentsPage() {
                 >
                   취소
                 </button>
+                <button
+                  type="button"
+                  className={`px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors ${isDeletingFolder ? 'opacity-75 cursor-not-allowed' : ''}`}
+                  onClick={deleteFolder}
+                  disabled={isDeletingFolder}
+                >
+                  {isDeletingFolder ? (
+                    <span className="flex items-center">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      삭제 중...
+                    </span>
+                  ) : (
+                    '삭제'
+                  )}
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
       
-      {/* 메인 콘텐츠 */}
-        <div className={`w-full h-full overflow-y-auto ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'} px-4 py-6`}>
+              {/* 메인 콘텐츠 */}
+        <main className="flex flex-col flex-1 p-6 lg:p-8 overflow-y-auto bg-background">
         {/* 페이지 헤더 */}
-        <div className="mb-6 flex items-center space-x-2">
-          <FileTextIcon className="w-6 h-6 text-green-600" />
-          <h1 className="text-2xl font-bold">문서</h1>
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold mb-2 flex items-center">
+            <FileTextIcon className="w-8 h-8 text-gray-600 dark:text-gray-400 mr-3" />
+            문서
+          </h2>
+          <p className={`text-lg ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+            {selectedFolder ? `'${selectedFolder}' 폴더의 문서를 관리하세요` : (selectedProjectId ? '프로젝트 문서를 관리하고 공유하세요' : '팀의 지식을 체계적으로 관리하고 공유하세요')}
+          </p>
         </div>
         
-        <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm text-gray-600">
-              {selectedFolder ? `'${selectedFolder}' 폴더 문서` : (selectedProjectId ? '프로젝트 문서를 관리하고 공유하세요' : '팀의 지식을 체계적으로 관리하고 공유하세요')}
-            </p>
-            {selectedProjectId && (
-              <div className="mt-2 flex items-center">
-                <label className="inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showAllDocuments}
-                    onChange={() => setShowAllDocuments(!showAllDocuments)}
-                    className="sr-only peer"
-                  />
-                  {/* <div className="relative w-10 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600"></div>
-                  <span className="ml-2 text-xs text-gray-500">모든 문서 보기</span> */}
-                </label>
-              </div>
-            )}
-          </div>
-        </div>
-        
-        {/* 검색 및 필터 */}
-          <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-sm p-6 mb-6`}>
+        {/* 검색 및 필터 위젯 */}
+        <div className="rounded-xl shadow-sm bg-white border border-gray-200 dark:bg-[#2a2a2c] dark:border-gray-700 p-6 mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="relative flex-1">
               <input
@@ -1297,30 +1331,30 @@ export default function DocumentsPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="문서 검색..."
-                  className={`w-full pl-10 pr-4 py-2 rounded-lg border ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-green-500 focus:border-green-500' : 'border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-green-500'} outline-none`}
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               />
-                <SearchIcon className={`absolute left-3 top-2.5 w-5 h-5 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
+              <SearchIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400 dark:text-gray-500" />
             </div>
             
             <div className="flex items-center gap-3">
               <button 
-                  className={`p-2 rounded-md ${viewMode === 'grid' ? (theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200') : (theme === 'dark' ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-100')}`}
+                className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
                 onClick={() => setViewMode('grid')}
               >
-                  <GridIcon className={`w-5 h-5 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`} />
+                <GridIcon className="w-5 h-5" />
               </button>
               <button 
-                  className={`p-2 rounded-md ${viewMode === 'list' ? (theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200') : (theme === 'dark' ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-100')}`}
+                className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
                 onClick={() => setViewMode('list')}
               >
-                  <ListIcon className={`w-5 h-5 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`} />
+                <ListIcon className="w-5 h-5" />
               </button>
-                <div className={`h-6 border-l ${theme === 'dark' ? 'border-gray-700' : 'border-gray-300'}`}></div>
-                <button className={`flex items-center gap-1 text-sm ${theme === 'dark' ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-900'}`}>
+              <div className="h-6 border-l border-gray-300 dark:border-gray-600"></div>
+              <button className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
                 <SortAscIcon className="w-4 h-4" />
                 <span>정렬</span>
               </button>
-                <button className={`flex items-center gap-1 text-sm ${theme === 'dark' ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-900'}`}>
+              <button className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
                 <FilterIcon className="w-4 h-4" />
                 <span>필터</span>
               </button>
@@ -1328,25 +1362,26 @@ export default function DocumentsPage() {
           </div>
         </div>
         
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* 메인 콘텐츠 - 문서 목록 */}
-          <div className="flex-1">
-            <div className="mb-4 flex justify-between items-center">
-                <h2 className={`text-lg font-medium ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>
+        {/* 문서 목록 위젯 */}
+        <div className="rounded-xl shadow-sm bg-white border border-gray-200 dark:bg-[#2a2a2c] dark:border-gray-700 p-6 flex flex-col">
+          <div className="flex justify-between items-center mb-5">
+            <div className="flex items-center">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                 {selectedFolder ? selectedFolder : "모든 문서"}
-                  <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} ml-2`}>({filteredDocuments.length})</span>
-              </h2>
-              
-              <Button
-                size="sm"
-                onClick={createNewDocument}
-                className="flex items-center space-x-1 bg-green-600 hover:bg-green-700 text-white"
-              >
-                <PlusIcon className="w-4 h-4" />
-                <span>새 문서</span>
-              </Button>
+                <span className="text-base font-normal text-gray-500 dark:text-gray-400 ml-2">({filteredDocuments.length})</span>
+              </h3>
             </div>
+            <Button
+              size="sm"
+              onClick={createNewDocument}
+              className="flex items-center space-x-1 bg-gray-600 hover:bg-gray-700 dark:bg-gray-600 dark:hover:bg-gray-500 text-white"
+            >
+              <PlusIcon className="w-4 h-4" />
+              <span>새 문서</span>
+            </Button>
+          </div>
             
+          <div className="flex-1">
             {error && (
               <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
                 <div className="flex">
@@ -1356,17 +1391,17 @@ export default function DocumentsPage() {
             )}
             
             {filteredDocuments.length === 0 ? (
-                <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-sm p-8 text-center`}>
-                  <FileTextIcon className={`w-12 h-12 ${theme === 'dark' ? 'text-gray-600' : 'text-gray-400'} mx-auto mb-4`} />
-                  <h3 className={`text-lg font-medium ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'} mb-2`}>문서가 없습니다</h3>
-                  <p className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} mb-4`}>
+              <div className="text-center py-8">
+                <FileTextIcon className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">문서가 없습니다</h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
                   {selectedProjectId 
                     ? `${selectedFolder ? `'${selectedFolder}' 폴더에` : ''} 문서가 없거나 검색 조건에 맞는 문서가 없습니다.` 
                     : '검색 조건에 맞는 문서가 없거나 아직 문서를 작성하지 않았습니다.'}
                 </p>
                 <Button 
                   onClick={createNewDocument}
-                  className="flex items-center space-x-1 mx-auto"
+                  className="flex items-center space-x-1 mx-auto bg-gray-600 hover:bg-gray-700 dark:bg-gray-600 dark:hover:bg-gray-500"
                 >
                   <PlusIcon className="w-4 h-4" />
                   <span>새 문서</span>
@@ -1376,33 +1411,33 @@ export default function DocumentsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredDocuments.map(doc => (
                   <Link key={doc.id} href={`/documents/${doc.id}${doc.projectId ? `?projectId=${doc.projectId}` : ''}`}>
-                      <div className={`${theme === 'dark' ? 'bg-gray-800 hover:shadow-gray-700' : 'bg-white hover:shadow-md'} rounded-lg shadow-sm p-4 transition-shadow h-full flex flex-col relative group`}>
+                    <div className="bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg p-4 transition-colors h-full flex flex-col relative group border border-gray-200 dark:border-gray-600">
                       <div className="flex justify-between items-start mb-3">
                         <div className="text-3xl">{doc.emoji || "📄"}</div>
                         <div className="flex items-center space-x-1">
                           {doc.isStarred && <StarIcon className="w-5 h-5 text-yellow-400" />}
                         </div>
                       </div>
-                        <h3 className={`font-medium ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'} mb-2`}>{doc.title}</h3>
-                        <div className={`flex items-center text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} mb-2`}>
+                      <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">{doc.title}</h3>
+                      <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-2">
                         <FolderIcon className="w-3 h-3 mr-1" />
                         <span>{doc.folder || "기본 폴더"}</span>
                       </div>
                       <div className="flex flex-wrap gap-1 mt-2 mb-3">
                         {parseTags(doc.tags).map((tag, index) => (
-                            <span key={index} className={`text-xs ${theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'} px-2 py-0.5 rounded-full`}>
+                          <span key={index} className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
                             {tag}
                           </span>
                         ))}
                       </div>
-                        <div className={`mt-auto pt-3 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-100'} flex justify-between items-center text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                      <div className="mt-auto pt-3 border-t border-gray-200 dark:border-gray-600 flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
                         <span>{formatDate(doc.updatedAt)}</span>
                       </div>
                       
                       {/* 삭제 버튼 */}
                       <button 
                         onClick={(e) => openDeleteModal(e, doc)}
-                          className={`absolute top-3 right-3 p-1.5 rounded-full ${theme === 'dark' ? 'bg-gray-800 shadow-gray-700 hover:bg-red-700 hover:bg-opacity-20' : 'bg-white shadow hover:bg-red-50'} z-10`}
+                        className="absolute top-3 right-3 p-1.5 rounded-full bg-white dark:bg-gray-800 shadow hover:bg-red-50 dark:hover:bg-red-900/20 z-10 border border-gray-200 dark:border-gray-600"
                       >
                         <Trash2Icon className="w-4 h-4 text-red-500" />
                       </button>
@@ -1411,33 +1446,33 @@ export default function DocumentsPage() {
                 ))}
               </div>
             ) : (
-                <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-sm overflow-hidden`}>
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className={`${theme === 'dark' ? 'bg-gray-750' : 'bg-gray-50'}`}>
+              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                  <thead className="bg-gray-100 dark:bg-gray-700">
                     <tr>
-                        <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>문서</th>
-                        <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>폴더</th>
-                        <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>태그</th>
-                        <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>수정일</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">문서</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">폴더</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">태그</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">수정일</th>
                       <th scope="col" className="relative px-6 py-3">
                         <span className="sr-only">Actions</span>
                       </th>
                     </tr>
                   </thead>
-                    <tbody className={`${theme === 'dark' ? 'bg-gray-800 divide-gray-700' : 'bg-white divide-gray-200'}`}>
+                  <tbody className="bg-white dark:bg-gray-700/50 divide-y divide-gray-200 dark:divide-gray-600">
                     {filteredDocuments.map(doc => (
-                        <tr key={doc.id} className={`${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}>
+                      <tr key={doc.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <Link href={`/documents/${doc.id}${doc.projectId ? `?projectId=${doc.projectId}` : ''}`} className="flex items-center">
                             <span className="text-xl mr-3">{doc.emoji || "📄"}</span>
                             <div className="flex items-center">
-                                <span className={`font-medium ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>{doc.title}</span>
+                              <span className="font-medium text-gray-900 dark:text-gray-100">{doc.title}</span>
                               {doc.isStarred && <StarIcon className="w-4 h-4 text-yellow-400 ml-2" />}
                             </div>
                           </Link>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                            <div className={`flex items-center text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                          <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
                             <FolderIcon className="w-4 h-4 mr-1" />
                             <span>{doc.folder || "기본 폴더"}</span>
                           </div>
@@ -1445,24 +1480,24 @@ export default function DocumentsPage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex flex-wrap gap-1">
                             {parseTags(doc.tags).map((tag, index) => (
-                                <span key={index} className={`text-xs ${theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'} px-2 py-0.5 rounded-full`}>
+                              <span key={index} className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
                                 {tag}
                               </span>
                             ))}
                           </div>
                         </td>
-                          <td className={`px-6 py-4 whitespace-nowrap text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                           {formatDate(doc.updatedAt)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center justify-end space-x-2">
                             <button 
                               onClick={(e) => openDeleteModal(e, doc)}
-                                className={`${theme === 'dark' ? 'text-red-500 hover:text-red-400' : 'text-red-400 hover:text-red-600'}`}
+                              className="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
                             >
                               <Trash2Icon className="w-5 h-5" />
                             </button>
-                              <button className={`${theme === 'dark' ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}>
+                            <button className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">
                               <MoreHorizontalIcon className="w-5 h-5" />
                             </button>
                           </div>
@@ -1473,9 +1508,9 @@ export default function DocumentsPage() {
                 </table>
               </div>
             )}
-            </div>
           </div>
         </div>
+        </main>
       </div>
     </div>
   );
