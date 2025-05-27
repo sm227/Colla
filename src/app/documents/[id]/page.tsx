@@ -27,12 +27,37 @@ import {
   SettingsIcon,
   ShieldIcon,
   KeyIcon,
-  UserPlusIcon
+  UserPlusIcon,
+  // 사이드바용 추가 아이콘
+  LayoutDashboardIcon,
+  SearchIcon,
+  BellIcon,
+  UserIcon,
+  CalendarIcon,
+  VideoIcon,
+  XIcon,
+  SunIcon,
+  MoonIcon,
+  LogOutIcon,
+  Trello,
+  BarChart3Icon
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/app/contexts/AuthContext";
+import { useProject } from "@/app/contexts/ProjectContext";
+import { useTheme } from "next-themes";
+
+// shadcn/ui DropdownMenu 컴포넌트 임포트
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Tiptap 관련 임포트
 import { EditorContent, useEditor, Editor, BubbleMenu } from '@tiptap/react';
@@ -83,10 +108,10 @@ function SummaryModal({ isOpen, onClose, summary, isLoading }: SummaryModalProps
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-          <h3 className="text-lg font-medium">AI 문서 요약</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+      <div className="bg-white dark:bg-[#2a2a2c] rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden border border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">AI 문서 요약</h3>
+          <button onClick={onClose} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -95,26 +120,26 @@ function SummaryModal({ isOpen, onClose, summary, isLoading }: SummaryModalProps
         <div className="p-4 max-h-[400px] overflow-auto">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center p-8">
-              <svg className="animate-spin h-8 w-8 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin h-8 w-8 text-blue-600 dark:text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <span className="text-gray-700">요약 생성 중...</span>
+              <span className="text-gray-700 dark:text-gray-300">요약 생성 중...</span>
             </div>
           ) : (
             <div className="space-y-2">
               {summary.split('\n').map((line, index) => (
-                <p key={index} className="text-gray-700">
-                  {line || <span className="text-gray-400 italic">내용 없음</span>}
+                <p key={index} className="text-gray-700 dark:text-gray-300">
+                  {line || <span className="text-gray-400 dark:text-gray-500 italic">내용 없음</span>}
                 </p>
               ))}
             </div>
           )}
         </div>
-        <div className="p-4 border-t border-gray-100 flex justify-end">
+        <div className="p-4 border-t border-gray-100 dark:border-gray-700 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-lg text-white bg-blue-600 hover:bg-blue-700"
+            className="px-4 py-2 rounded-lg text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
           >
             닫기
           </button>
@@ -189,17 +214,17 @@ function TemplateModal({ isOpen, onClose, templates, onSelect, isLoading, select
   
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-          <h3 className="text-lg font-medium">문서 템플릿 선택</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+      <div className="bg-white dark:bg-[#2a2a2c] rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden border border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">문서 템플릿 선택</h3>
+          <button onClick={onClose} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
         <div className="p-4 max-h-[400px] overflow-auto">
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             템플릿을 선택하면 AI가 자동으로 문서 구조를 생성합니다
           </p>
           <div className="space-y-2">
@@ -210,28 +235,28 @@ function TemplateModal({ isOpen, onClose, templates, onSelect, isLoading, select
                 disabled={isLoading}
                 className={`w-full text-left p-3 rounded-lg border ${
                   selectedTemplate === template.id 
-                    ? 'border-blue-500 bg-blue-50' 
-                    : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
+                    ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/30' 
+                    : 'border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-900/20'
                 } transition-colors`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{template.name}</span>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{template.name}</span>
                   {selectedTemplate === template.id && isLoading && (
-                    <svg className="animate-spin h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin h-4 w-4 text-blue-600 dark:text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                   )}
                 </div>
-                <p className="text-sm text-gray-500 mt-1">{template.description}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{template.description}</p>
               </button>
             ))}
           </div>
         </div>
-        <div className="p-4 border-t border-gray-100 flex justify-end">
+        <div className="p-4 border-t border-gray-100 dark:border-gray-700 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 mr-2 hover:bg-gray-50"
+            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 mr-2 hover:bg-gray-50 dark:hover:bg-gray-700"
           >
             취소
           </button>
@@ -240,8 +265,8 @@ function TemplateModal({ isOpen, onClose, templates, onSelect, isLoading, select
             disabled={!selectedTemplate || isLoading}
             className={`px-4 py-2 rounded-lg text-white ${
               !selectedTemplate || isLoading
-                ? 'bg-blue-400 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700'
+                ? 'bg-blue-400 dark:bg-blue-500 cursor-not-allowed opacity-50'
+                : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600'
             }`}
           >
             {isLoading ? '생성 중...' : '템플릿 생성'}
@@ -307,10 +332,10 @@ function PasswordModal({ isOpen, onClose, currentPassword, isPasswordProtected, 
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-          <h3 className="text-lg font-medium">문서 암호 설정</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+      <div className="bg-white dark:bg-[#2a2a2c] rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden border border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">문서 암호 설정</h3>
+          <button onClick={onClose} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -325,40 +350,40 @@ function PasswordModal({ isOpen, onClose, currentPassword, isPasswordProtected, 
                 id="enablePassword"
                 checked={enablePassword}
                 onChange={(e) => setEnablePassword(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
               />
-              <label htmlFor="enablePassword" className="ml-2 block text-sm text-gray-900">
+              <label htmlFor="enablePassword" className="ml-2 block text-sm text-gray-900 dark:text-gray-100">
                 문서 암호 보호 사용
               </label>
             </div>
             
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               암호 보호를 활성화하면 문서 접근 시 암호를 입력해야 합니다.
             </p>
             
             {enablePassword && (
               <>
                 <div className="mb-4">
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     암호
                   </label>
                   <div className="relative rounded-md shadow-sm">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <KeyIcon className="h-4 w-4 text-gray-400" />
+                      <KeyIcon className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                     </div>
                     <input
                       type={showPassword ? "text" : "password"}
                       id="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="block w-full pl-10 pr-10 py-2 sm:text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      className="block w-full pl-10 pr-10 py-2 sm:text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       placeholder="문서 접근 암호 입력"
                     />
                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="text-gray-400 hover:text-gray-500 focus:outline-none"
+                        className="text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400 focus:outline-none"
                       >
                         {showPassword ? (
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -376,19 +401,19 @@ function PasswordModal({ isOpen, onClose, currentPassword, isPasswordProtected, 
                 </div>
                 
                 <div className="mb-4">
-                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     암호 확인
                   </label>
                   <div className="relative rounded-md shadow-sm">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <KeyIcon className="h-4 w-4 text-gray-400" />
+                      <KeyIcon className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                     </div>
                     <input
                       type={showPassword ? "text" : "password"}
                       id="confirmPassword"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="block w-full pl-10 pr-3 py-2 sm:text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      className="block w-full pl-10 pr-3 py-2 sm:text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       placeholder="암호 확인"
                     />
                   </div>
@@ -397,30 +422,83 @@ function PasswordModal({ isOpen, onClose, currentPassword, isPasswordProtected, 
             )}
             
             {error && (
-              <div className="text-sm text-red-600 mt-2">
+              <div className="text-sm text-red-600 dark:text-red-400 mt-2">
                 {error}
               </div>
             )}
           </div>
         </div>
         
-        <div className="px-4 py-3 bg-gray-50 text-right sm:px-6 flex justify-end space-x-2">
+        <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 text-right sm:px-6 flex justify-end space-x-2">
           <button
             onClick={onClose}
-            className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             취소
           </button>
           <button
             onClick={handleSave}
             disabled={isLoading}
-            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
           >
             {isLoading ? '저장 중...' : '저장'}
           </button>
         </div>
       </div>
     </div>
+  );
+}
+
+// 사이드바 링크 컴포넌트
+function SidebarLink({
+  icon,
+  text,
+  href,
+  active = false,
+  small = false,
+  onClick,
+  theme = "dark", 
+  badgeCount,
+  isProject = false
+}: {
+  icon: React.ReactNode;
+  text: string;
+  href: string;
+  active?: boolean;
+  small?: boolean;
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+  theme?: "light" | "dark";
+  badgeCount?: string | number;
+  isProject?: boolean;
+}) {
+  const activeProjectBg = theme === 'dark' 
+    ? 'bg-blue-900 bg-opacity-30' 
+    : 'bg-blue-100 bg-opacity-50'; 
+    
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className={`flex items-center justify-between px-2 py-1.5 ${small ? "text-sm" : "text-[15px]"} rounded-md transition-colors duration-150 ${
+        theme === 'dark'
+          ? active && isProject
+            ? `${activeProjectBg} text-gray-300 hover:bg-gray-700 hover:text-gray-100` 
+            : "text-gray-300 hover:bg-gray-700 hover:text-gray-100"
+          : active && isProject
+            ? `${activeProjectBg} text-gray-600 hover:bg-gray-200 hover:text-gray-900`
+            : "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+      }`}
+    >
+      <div className="flex items-center">
+        <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{icon}</div>
+        <span>{text}</span>
+      </div>
+      {badgeCount && (
+        <span className={`px-1.5 py-0.5 text-xs font-semibold rounded-full ${badgeCount === 'new' ? (theme === 'dark' ? 'bg-red-500 text-white' : 'bg-red-500 text-white') : (theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-700')}`}>
+          {badgeCount === 'new' ? '' : badgeCount}
+        </span>
+      )}
+    </Link>
   );
 }
 
@@ -460,7 +538,44 @@ const showToast = (title: string, description: string, status: 'success' | 'erro
 
 export default function DocumentPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { user } = useAuth(); // AuthContext에서 사용자 정보 가져오기
+  const { 
+    projects, 
+    currentProject, 
+    setCurrentProject,
+    loading: projectLoading,
+    hasProjects
+  } = useProject();
+  
+  // 테마 관련
+  const { theme: currentTheme, setTheme } = useTheme();
+  const theme = (currentTheme || 'dark') as 'light' | 'dark';
+  
+  const toggleTheme = () => {
+    setTheme(theme === 'light' ? 'dark' : 'light');
+  };
+  
+  // 사이드바 상태
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isDocumentsSubmenuOpen, setIsDocumentsSubmenuOpen] = useState(true);
+  const [mounted, setMounted] = useState(false);
+  
+  // next-themes hydration 처리
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
+  // 로그아웃 핸들러
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/auth/login');
+    } catch (error) {
+      console.error('로그아웃 실패:', error);
+    }
+  };
+
   const [title, setTitle] = useState("제목 없음");
   const [emoji, setEmoji] = useState("📄");
   const [isStarred, setIsStarred] = useState(false);
@@ -967,18 +1082,24 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       }
     };
     
-    const handleEscKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setShowSlashMenu(false);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (showSlashMenu) {
+        // 슬래시 메뉴가 열려있을 때 모든 키 입력에 대해 메뉴 닫기
+        // 단, 화살표 키와 Tab, Enter는 제외하여 메뉴 탐색 가능하게 함
+        const allowedKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'];
+        
+        if (!allowedKeys.includes(e.key)) {
+          setShowSlashMenu(false);
+        }
       }
     };
     
     document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscKey);
+    document.addEventListener('keydown', handleKeyDown);
     
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscKey);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [showMenu, showSlashMenu]);
   
@@ -1269,8 +1390,8 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
             
             const editorRect = editorElement.getBoundingClientRect();
             
-            // 기본 메뉴 위치
-            let menuX = editorRect.left + 50;
+            // 기본 메뉴 위치 (에디터 패딩 고려)
+            let menuX = editorRect.left + 16; // 에디터의 px-2 패딩 고려
             let menuY = editorRect.top + 100;
             
             // 커서 좌표 계산 시도
@@ -1278,15 +1399,46 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               if (view.domAtPos && typeof view.domAtPos === 'function' && 
                   from >= 0 && from <= state.doc.content.size) {
                 
-                // domAtPos를 통해 노드 가져오기
-                const domPos = view.domAtPos(from);
-                if (domPos && domPos.node) {
-                  // 커서 좌표 가져오기
-                  const pos = view.coordsAtPos(from);
-                  
-                  // 항상 커서 좌표를 직접 사용하여 메뉴를 표시
+                // 커서 좌표 가져오기
+                const pos = view.coordsAtPos(from);
+                
+                // 좌표가 유효한지 확인
+                if (pos && pos.left >= editorRect.left && pos.top >= editorRect.top) {
                   menuX = pos.left;
                   menuY = pos.bottom + 5;
+                } else {
+                  // 좌표가 유효하지 않으면 DOM 요소를 직접 찾아서 계산
+                  const domPos = view.domAtPos(from);
+                  if (domPos && domPos.node) {
+                    let targetElement = domPos.node;
+                    
+                    // 텍스트 노드인 경우 부모 요소 찾기
+                    if (targetElement.nodeType === Node.TEXT_NODE) {
+                      targetElement = targetElement.parentElement || targetElement;
+                    }
+                    
+                    // 요소가 Element인지 확인
+                    if (targetElement instanceof Element) {
+                      const rect = targetElement.getBoundingClientRect();
+                      // 에디터 내부의 패딩을 고려하여 위치 조정
+                      menuX = Math.max(rect.left + 16, editorRect.left + 16);
+                      menuY = rect.bottom + 5;
+                    } else {
+                      // DOM 요소를 찾을 수 없는 경우, 현재 줄의 시작 위치 추정
+                      // 에디터 내부 패딩 + 약간의 여백
+                      menuX = editorRect.left + 16;
+                      
+                      // Y 좌표는 현재 스크롤 위치와 커서 위치를 고려하여 추정
+                      const scrollTop = editorElement.scrollTop || 0;
+                      const lineHeight = 24; // 대략적인 줄 높이 (1.5em * 16px)
+                      
+                      // 문서에서 현재 위치의 줄 번호 추정
+                      const textBeforeCursor = state.doc.textBetween(0, from);
+                      const lineNumber = (textBeforeCursor.match(/\n/g) || []).length;
+                      
+                      menuY = editorRect.top + (lineNumber * lineHeight) + lineHeight + 5 - scrollTop;
+                    }
+                  }
                 }
               }
             } catch (coordError) {
@@ -1303,22 +1455,25 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               menuY = Math.max(window.innerHeight - 420, 10);
             }
             
+            // 위치를 먼저 설정한 후 메뉴 표시
+            setSlashMenuPosition({
+              x: menuX,
+              y: menuY
+            });
+            
             // 슬래시가 입력될 시간을 주기 위해 약간의 지연 후 메뉴 표시
             setTimeout(() => {
-              setSlashMenuPosition({
-                x: menuX,
-                y: menuY
-              });
               setShowSlashMenu(true);
             }, 10); // 10ms 지연으로 슬래시가 입력되도록
           } catch (error) {
             console.error("슬래시 메뉴 표시 중 오류 발생:", error);
             // 오류 발생 시 화면 중앙에 메뉴 표시
+            setSlashMenuPosition({
+              x: Math.max(window.innerWidth / 2 - 140, 10),
+              y: window.innerHeight / 3
+            });
+            
             setTimeout(() => {
-              setSlashMenuPosition({
-                x: Math.max(window.innerWidth / 2 - 140, 10),
-                y: window.innerHeight / 3
-              });
               setShowSlashMenu(true);
             }, 10);
           }
@@ -1569,12 +1724,6 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       }
       
       setLastSaved(new Date());
-      setSaveSuccess(true);
-      
-      // 3초 후 성공 메시지 숨김
-      setTimeout(() => {
-        setSaveSuccess(false);
-      }, 3000);
       
     } catch (error) {
       console.error('자동 저장 중 오류:', error);
@@ -2087,22 +2236,20 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
     const handleUpdate = () => {
       setHasUnsavedChanges(true);
       
-      // 이전 타이머 제거 (더 이상 필요없음)
+      // 이전 타이머 제거
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
       }
       
-      // Y.js 데이터가 변경되면 바로 저장하지 않고 잠시 지연
+      // 타이핑할 때마다 2초 후 자동저장
       autoSaveTimerRef.current = setTimeout(() => {
         autoSave();
-      }, 300000); // 5분 지연 (300,000 밀리초)
+      }, 2000); // 2초 지연
     };
     
-    // editor가 null이 아님이 확인된 상태
     editor.on('update', handleUpdate);
     
     return () => {
-      // editor가 null이 아님이 확인된 상태
       editor.off('update', handleUpdate);
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
@@ -2121,11 +2268,40 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
     
     setHasUnsavedChanges(true);
     
-    // 일정 시간 후 자동저장 실행
+    // 제목 변경 후 2초 후 자동저장 실행
     autoSaveTimerRef.current = setTimeout(() => {
       autoSave();
-    }, 300000); // 5분 지연 (300,000 밀리초)
+    }, 2000); // 2초 지연
   }, [title, autoSaveEnabled, autoSave]);
+
+  // 새 문서 생성 시 즉시 자동저장 트리거
+  useEffect(() => {
+    if (isNewDocument && editor && autoSaveEnabled && title && selectedProjectId) {
+      // 새 문서에서 제목이나 내용이 있으면 즉시 저장
+      const timer = setTimeout(() => {
+        autoSave();
+      }, 1000); // 1초 후 즉시 저장
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isNewDocument, editor, autoSaveEnabled, title, selectedProjectId, autoSave]);
+
+  // 폴더, 이모지, 즐겨찾기 변경시 자동저장 트리거
+  useEffect(() => {
+    if (!autoSaveEnabled || isNewDocument) return;
+    
+    // 이전 타이머 취소
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+    
+    setHasUnsavedChanges(true);
+    
+    // 메타데이터 변경 후 2초 후 자동저장 실행
+    autoSaveTimerRef.current = setTimeout(() => {
+      autoSave();
+    }, 2000);
+  }, [folder, emoji, isStarred, autoSaveEnabled, autoSave, isNewDocument]);
 
   // 현재 사용자 정보가 변경될 때 provider에 적용
   useEffect(() => {
@@ -2382,10 +2558,20 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
   // 로딩 중이거나 암호 검증이 필요한 경우 적절한 UI 표시
   if (isLoading) {
     return (
-      <div className="fixed inset-0 bg-white bg-opacity-70 flex items-center justify-center z-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">문서 가져오는 중...</p>
+      <div className={`min-h-screen flex items-center justify-center bg-background text-foreground`}>
+        <div className="text-center flex flex-col items-center">
+          <div className={`relative w-24 h-24 ${theme === 'dark' ? 'text-blue-500' : 'text-blue-600'}`}>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className={`w-16 h-16 border-4 border-current border-solid rounded-full opacity-20 ${theme === 'dark' ? 'border-blue-500' : 'border-blue-600'}`}></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className={`w-16 h-16 border-4 border-current border-solid rounded-full border-t-transparent animate-spin`}></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className={`text-3xl font-bold ${theme === 'dark' ? 'text-blue-500' : 'text-blue-600'}`}>C</span>
+            </div>
+          </div>
+          <p className={`mt-6 text-lg font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>문서를 불러오는 중...</p>
         </div>
       </div>
     );
@@ -2402,32 +2588,264 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
   }
   
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className="flex h-screen bg-gray-50 dark:bg-[#1f1f21]">
+      {/* 사이드바 */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-30 w-64 border-r border-gray-200 bg-white dark:bg-[#2a2a2c] dark:border-gray-700 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
+          mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        } md:relative md:flex-shrink-0 flex flex-col`}
+      >
+        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-black dark:bg-blue-600 rounded-lg flex items-center justify-center mr-2">
+              <span className="text-white font-bold text-lg">C</span>
+            </div>
+            <span className="text-xl font-semibold text-gray-900 dark:text-gray-100">Colla</span>
+          </div>
+          <button
+            className="md:hidden"
+            onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+          >
+            <XIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+          </button>
+        </div>
+        
+        <nav className="flex-grow px-4 py-4 space-y-2 overflow-y-auto">
+          <SidebarLink
+            icon={<SearchIcon className="w-5 h-5" />}
+            text="검색"
+            href="#" 
+            theme={theme}
+            onClick={(e) => { e.preventDefault(); alert('검색 기능 구현 예정'); }}
+          />
+          <SidebarLink
+            icon={<LayoutDashboardIcon className="w-5 h-5" />}
+            text="대시보드"
+            href="/"
+            active={pathname === "/"}
+            theme={theme}
+          />
+          <SidebarLink
+            icon={<BellIcon className="w-5 h-5" />}
+            text="알림"
+            href="#" 
+            theme={theme}
+            onClick={(e) => { 
+              e.preventDefault(); 
+              alert('알림 기능은 대시보드에서 확인해주세요.');
+            }}
+          />
+          <SidebarLink
+            icon={<SettingsIcon className="w-5 h-5" />}
+            text="설정"
+            href="/settings" 
+            active={pathname === "/settings"}
+            theme={theme}
+          />
+          
+          <div className="pt-4">
+            <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+              내 작업 공간
+            </h3>
+            <div className="mt-2 space-y-1">
+              <SidebarLink
+                icon={<Trello className="w-5 h-5" />}
+                text="칸반보드"
+                href={currentProject ? `/kanban?projectId=${currentProject.id}` : "/kanban"}
+                active={pathname?.startsWith("/kanban")}
+                theme={theme}
+                small
+              />
+              <SidebarLink
+                icon={<CalendarIcon className="w-5 h-5" />}
+                text="캘린더"
+                href={currentProject ? `/calendar?projectId=${currentProject.id}` : "/calendar"}
+                active={pathname?.startsWith("/calendar")}
+                theme={theme}
+                small
+              />
+              <SidebarLink
+                icon={<FileTextIcon className="w-5 h-5" />}
+                text="문서"
+                href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
+                active={pathname?.startsWith("/documents") || isDocumentsSubmenuOpen}
+                theme={theme}
+                small
+                onClick={(e) => {
+                  e.preventDefault();
+                  setIsDocumentsSubmenuOpen(!isDocumentsSubmenuOpen);
+                }}
+              />
+              {/* 문서 하위 메뉴 */}
+              {isDocumentsSubmenuOpen && (
+                <div className="pl-4 pt-1 space-y-1 ml-2.5 transition-all duration-300 ease-in-out">
+                  <SidebarLink
+                    icon={<FileTextIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
+                    text="모든 문서"
+                    href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
+                    active={pathname?.startsWith("/documents") && !pathname?.includes("/new")}
+                    theme={theme}
+                    small
+                  />
+                  <SidebarLink
+                    icon={<StarIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
+                    text="즐겨찾기"
+                    href={currentProject?.id ? `/documents?projectId=${currentProject.id}&favorites=true` : "/documents?favorites=true"}
+                    active={pathname?.startsWith("/documents") && false} // favorites 체크 로직 필요시 추가
+                    theme={theme}
+                    small
+                  />
+                  <SidebarLink
+                    icon={<PlusIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
+                    text="새 문서 작성"
+                    href={currentProject?.id ? `/documents/new?projectId=${currentProject.id}` : "/documents/new"}
+                    active={pathname?.includes("/documents/new")}
+                    theme={theme}
+                    small
+                  />
+                </div>
+              )}
+              
+              <SidebarLink 
+                icon={<UsersIcon className="w-5 h-5"/>} 
+                text="팀원 관리" 
+                href={currentProject ? `/projects/${currentProject.id}/members` : "/projects"}
+                active={pathname?.includes("/projects") && pathname?.includes("/members")}
+                theme={theme}
+                small 
+              />
+              <SidebarLink
+                icon={<VideoIcon className="w-5 h-5" />}
+                text="화상 회의"
+                href="/meeting"
+                active={pathname?.startsWith("/meeting")}
+                theme={theme}
+                small
+              />
+              <SidebarLink
+                icon={<BarChart3Icon className="w-5 h-5" />}
+                text="보고서"
+                href="/reports"
+                active={pathname?.startsWith("/reports")}
+                theme={theme}
+                small
+              />
+            </div>
+          </div>
+
+          <div className="pt-4">
+            <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+              프로젝트
+            </h3>
+            <nav className="mt-2 space-y-1">
+              {projects.map((project) => (
+                <SidebarLink
+                  key={project.id}
+                  icon={<FolderIcon className="w-5 h-5" />}
+                  text={project.name}
+                  href={`/documents?projectId=${project.id}`}
+                  small
+                  active={currentProject?.id === project.id && pathname?.startsWith("/documents")}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentProject(project);
+                    router.push(`/documents?projectId=${project.id}`); 
+                  }}
+                  theme={theme}
+                  isProject={true}
+                />
+              ))}
+              <SidebarLink
+                icon={<PlusIcon className="w-5 h-5" />}
+                text="새 프로젝트"
+                href="/projects/new"
+                active={pathname === "/projects/new"}
+                theme={theme}
+                small
+                onClick={() => router.push("/projects/new")}
+              />
+            </nav>
+          </div>
+        </nav>
+
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center w-full p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
+                <UserIcon className="w-6 h-6 mr-3 rounded-full bg-gray-200 dark:bg-gray-600 p-0.5 text-gray-700 dark:text-gray-300" />
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user?.name || user?.email || '사용자'}</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end" sideOffset={5}>
+              <DropdownMenuLabel className="px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400">
+                {user?.email}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push('/mypage')} className="cursor-pointer">
+                <UserIcon className="w-4 h-4 mr-2" />
+                <span>정보 수정</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
+                {theme === 'dark' ? <SunIcon className="w-4 h-4 mr-2" /> : <MoonIcon className="w-4 h-4 mr-2" />}
+                <span>{theme === 'dark' ? "라이트 모드" : "다크 모드"}</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/50 focus:text-red-600 dark:focus:text-red-400">
+                <LogOutIcon className="w-4 h-4 mr-2" />
+                <span>로그아웃</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </aside>
+
+      {/* 모바일 사이드바 오버레이 */}
+      {mobileSidebarOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black bg-opacity-50 md:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
+            {/* 메인 콘텐츠 영역 */}
+      <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#2a2a2c]">
       {/* 상단 네비게이션 바 */}
-      <div className="bg-white border-b border-gray-200 py-4 px-6">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="bg-white dark:bg-[#2a2a2c] py-4 px-6">
+          <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Link href="/" className="text-gray-500 hover:text-blue-600 transition-colors">
-              <HomeIcon className="w-5 h-5" />
-            </Link>
-            <span className="text-gray-500">/</span>
-            <Link href={projectId ? `/documents?projectId=${projectId}` : '/documents'} className="text-gray-500 hover:text-blue-600 transition-colors">
-              문서
-            </Link>
-            <span className="text-gray-500">/</span>
-            <span className="text-gray-900 font-medium truncate max-w-xs">
+              {/* 모바일 메뉴 버튼 */}
+              <button
+                className="md:hidden"
+                onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              
+              <span className="text-gray-900 dark:text-gray-100 font-medium truncate max-w-xs">
               {isLoading ? '문서 로딩 중...' : (title || '새 문서')}
               {isLoading && (
-                <span className="ml-2 inline-block h-4 w-4 rounded-full border-2 border-gray-300 border-t-green-600 animate-spin"></span>
+                  <span className={`ml-2 inline-block relative w-4 h-4 ${theme === 'dark' ? 'text-blue-500' : 'text-blue-600'}`}>
+                    <span className="absolute inset-0 flex items-center justify-center">
+                      <span className={`w-3 h-3 border border-current border-solid rounded-full opacity-20 ${theme === 'dark' ? 'border-blue-500' : 'border-blue-600'}`}></span>
+                    </span>
+                    <span className="absolute inset-0 flex items-center justify-center">
+                      <span className={`w-3 h-3 border border-current border-solid rounded-full border-t-transparent animate-spin`}></span>
+                    </span>
+                    <span className="absolute inset-0 flex items-center justify-center">
+                      <span className={`text-xs font-bold ${theme === 'dark' ? 'text-blue-500' : 'text-blue-600'}`}>C</span>
+                    </span>
+                  </span>
               )}
             </span>
           </div>
-          
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => router.push(projectId ? `/documents?projectId=${projectId}` : '/documents')}
+                className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
               돌아가기
@@ -2435,14 +2853,14 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
             
             {/* 접속 중인 사용자 표시 추가 */}
             {connectedUsers.length > 0 && (
-              <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded-md">
-                <UsersIcon className="w-4 h-4 text-gray-500" />
-                <span className="text-xs text-gray-600">{connectedUsers.length}명 접속 중</span>
+                <div className="flex items-center space-x-1 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-lg">
+                  <UsersIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-xs text-gray-600 dark:text-gray-300">{connectedUsers.length}명 접속 중</span>
                 <div className="flex -space-x-2">
                   {connectedUsers.slice(0, 3).map((user, index) => (
                     <div 
                       key={index}
-                      className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-xs text-white"
+                        className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center text-xs text-white"
                       style={{ backgroundColor: user.color || '#888' }}
                       title={user.name}
                     >
@@ -2450,7 +2868,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
                     </div>
                   ))}
                   {connectedUsers.length > 3 && (
-                    <div className="w-6 h-6 rounded-full bg-gray-400 border-2 border-white flex items-center justify-center text-xs text-white">
+                      <div className="w-6 h-6 rounded-full bg-gray-400 dark:bg-gray-600 border-2 border-white dark:border-gray-800 flex items-center justify-center text-xs text-white">
                       +{connectedUsers.length - 3}
                     </div>
                   )}
@@ -2461,31 +2879,31 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
             <div className="relative">
               <button
                 onClick={() => setShowFolderDropdown(!showFolderDropdown)}
-                className="flex items-center bg-gray-50 hover:bg-gray-100 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 text-sm text-gray-700"
+                  className="flex items-center bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 text-sm text-gray-700 dark:text-gray-300"
                 disabled={isLoading}
               >
-                <FolderIcon className="w-4 h-4 mr-1 text-gray-500" />
+                  <FolderIcon className="w-4 h-4 mr-1 text-gray-500 dark:text-gray-400" />
                 <span className="truncate max-w-[150px]">{folder || '기본 폴더'}</span>
                 <span className="ml-1">
-                  <ChevronDown className="w-4 h-4 text-gray-500" />
+                    <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                 </span>
               </button>
               
               {showFolderDropdown && (
-                <div className="absolute left-0 mt-1 w-64 bg-white shadow-lg rounded-md z-10 border border-gray-200">
-                  <div className="py-2 px-3 border-b border-gray-200">
-                    <div className="text-sm font-medium text-gray-700 mb-1">폴더 선택</div>
+                  <div className="absolute left-0 mt-1 w-64 bg-white dark:bg-[#2a2a2c] shadow-lg rounded-xl z-10 border border-gray-200 dark:border-gray-700">
+                    <div className="py-2 px-3 border-b border-gray-200 dark:border-gray-700">
+                      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">폴더 선택</div>
                     <div className="relative">
                       <input
                         type="text"
                         placeholder="새 폴더 이름..."
                         value={newFolderName}
                         onChange={(e) => setNewFolderName(e.target.value)}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       />
                       <button
                         onClick={() => createNewFolder(newFolderName)}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-blue-600 hover:text-blue-800"
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                       >
                         <PlusIcon className="w-4 h-4" />
                       </button>
@@ -2497,20 +2915,20 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
                       availableFolders.map((f) => (
                         <button
                           key={f.id}
-                          className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center justify-between ${f.id === folderId ? 'bg-gray-50 font-medium text-blue-600' : 'text-gray-700'}`}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between ${f.id === folderId ? 'bg-gray-50 dark:bg-gray-700 font-medium text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}
                           onClick={() => handleFolderChange({ id: f.id, name: f.name })}
                         >
                           <div className="flex items-center">
-                            <FolderIcon className="w-4 h-4 mr-2 text-gray-500" />
+                              <FolderIcon className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
                             <span className="truncate">{f.name}</span>
                           </div>
                           {f.id === folderId && (
-                            <CheckIcon className="w-4 h-4 text-blue-600" />
+                              <CheckIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                           )}
                         </button>
                       ))
                     ) : (
-                      <div className="px-3 py-2 text-sm text-gray-500">폴더가 없습니다</div>
+                        <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">폴더가 없습니다</div>
                     )}
                   </div>
                 </div>
@@ -2518,33 +2936,33 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
             </div>
             
             <button
-              className={`p-2 rounded-md hover:bg-gray-100 ${isStarred ? 'text-yellow-400' : 'text-gray-400'}`}
+                className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 ${isStarred ? 'text-yellow-400' : 'text-gray-400 dark:text-gray-500'}`}
               title={isStarred ? '즐겨찾기 해제' : '즐겨찾기 추가'}
               onClick={() => setIsStarred(!isStarred)}
               disabled={isLoading}
             >
-              <StarIcon className={`w-5 h-5 ${isStarred ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400'}`} />
+                <StarIcon className={`w-5 h-5 ${isStarred ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400 dark:text-gray-500'}`} />
             </button>
             
-            <button className="p-2 rounded-md hover:bg-gray-100" disabled={isLoading}>
-              <ShareIcon className="w-5 h-5 text-gray-600" />
+              <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" disabled={isLoading}>
+                <ShareIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
             </button>
             
             <div className="relative security-menu-container">
               <button 
-                className="p-2 rounded-md hover:bg-gray-100 flex items-center" 
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" 
                 disabled={isLoading}
                 onClick={toggleSecurityMenu}
               >
-                <SettingsIcon className="w-5 h-5 text-gray-600 mr-1" />
-                <ChevronDown className="w-3 h-3 text-gray-500" />
+                  <SettingsIcon className="w-5 h-5 text-gray-600 dark:text-gray-400 mr-1" />
+                  <ChevronDown className="w-3 h-3 text-gray-500 dark:text-gray-400" />
               </button>
               
               {showSecurityMenu && (
-                <div className="absolute right-0 mt-1 w-56 bg-white rounded-md shadow-lg z-10 border border-gray-100 py-1 overflow-hidden">
+                  <div className="absolute right-0 mt-1 w-56 bg-white dark:bg-[#2a2a2c] rounded-xl shadow-lg z-10 border border-gray-100 dark:border-gray-700 py-1 overflow-hidden">
                   <div className="py-1">
                     <button 
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center" 
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" 
                       onClick={() => {
                         // 문서 접근 권한 설정
                         setShowSecurityMenu(false);
@@ -2555,7 +2973,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
                     </button>
                     
                     <button 
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center" 
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" 
                       onClick={() => {
                         // 문서 권한 이력
                         setShowSecurityMenu(false);
@@ -2566,7 +2984,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
                     </button>
                     
                     <button 
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center" 
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" 
                       onClick={() => {
                         // 문서 암호 설정
                         handleOpenPasswordModal();
@@ -2583,7 +3001,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
             {/* 읽기 전용 모드 버튼 또는 상태 표시 (관리자/소유자는 버튼, 일반 멤버는 상태 표시) */}
             {((userProjectRole && userProjectRole !== 'member') || isProjectOwner) ? (
               <button 
-                className="p-2 rounded-md hover:bg-gray-100" 
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" 
                 onClick={!isLoading && !isButtonDebouncing ? toggleReadOnlyMode : undefined}
                 disabled={isLoading}
                 title={isReadOnlyMode ? "편집 모드로 전환" : "읽기 전용 모드로 전환"}
@@ -2591,22 +3009,20 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
                 {isReadOnlyMode ? (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="w-5 h-5 text-gray-600"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+                    className="w-5 h-5 text-gray-600 dark:text-gray-400"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
                   >
                     <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                      fillRule="evenodd"
+                      d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                      clipRule="evenodd"
                     />
                   </svg>
                 ) : (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="w-5 h-5 text-gray-600"
+                    className="w-5 h-5 text-gray-600 dark:text-gray-400"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -2625,16 +3041,14 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
                 <div className="p-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="w-5 h-5 text-gray-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+                    className="w-5 h-5 text-gray-600 dark:text-gray-400"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
                   >
                     <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                      fillRule="evenodd"
+                      d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 616 0z"
+                      clipRule="evenodd"
                     />
                   </svg>
                 </div>
@@ -2643,37 +3057,56 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
             
             <button
               onClick={saveDocument}
-              className="p-2 rounded-md hover:bg-gray-100"
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
               disabled={isSaving || isLoading}
               title={isSaving ? "저장 중..." : "저장"}
             >
-              <SaveIcon className="w-5 h-5 text-gray-600" />
+              {isSaving ? (
+                <svg className="animate-spin h-5 w-5 text-gray-600 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : (
+                <SaveIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              )}
             </button>
           </div>
         </div>
       </div>
+        {/* 문서 편집 영역 */}
+        <div className="flex-1 overflow-auto">
       
       {/* 로딩 및 오류 상태 표시 */}
       {isLoading && (
-        <div className="fixed inset-0 bg-white bg-opacity-70 flex items-center justify-center z-50">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">문서 가져오는 중...</p>
+            <div className={`min-h-screen flex items-center justify-center bg-background text-foreground`}>
+          <div className="text-center flex flex-col items-center">
+                <div className={`relative w-24 h-24 ${theme === 'dark' ? 'text-blue-500' : 'text-blue-600'}`}>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className={`w-16 h-16 border-4 border-current border-solid rounded-full opacity-20 ${theme === 'dark' ? 'border-blue-500' : 'border-blue-600'}`}></div>
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className={`w-16 h-16 border-4 border-current border-solid rounded-full border-t-transparent animate-spin`}></div>
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className={`text-3xl font-bold ${theme === 'dark' ? 'text-blue-500' : 'text-blue-600'}`}>C</span>
+                  </div>
+                </div>
+                <p className={`mt-6 text-lg font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>문서를 불러오는 중...</p>
           </div>
         </div>
       )}
       
       {loadingError && (
         <div className="max-w-7xl mx-auto mt-4 px-4">
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+              <div className="bg-red-50 dark:bg-red-900 border-l-4 border-red-500 dark:border-red-400 p-4 rounded-lg">
             <div className="flex">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                    <svg className="h-5 w-5 text-red-500 dark:text-red-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
               </div>
               <div className="ml-3">
-                <p className="text-sm text-red-700">
+                    <p className="text-sm text-red-700 dark:text-red-300">
                   {loadingError}
                 </p>
               </div>
@@ -2682,38 +3115,18 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
         </div>
       )}
       
-      {/* 성공 메시지 */}
-      {saveSuccess && (
-        <div className="fixed top-16 right-4 bg-green-50 border-l-4 border-green-500 p-4 rounded shadow-md z-50">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-green-800">
-                문서가 성공적으로 저장되었습니다.
-                {selectedProjectId && (
-                  <span className="block text-xs mt-1 font-mono">
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+
       
       {isReadOnlyMode && (
-        <div className="fixed top-16 left-1/2 transform -translate-x-1/2 bg-blue-50 border-l-4 border-blue-500 p-4 rounded shadow-md z-50">
+            <div className="fixed top-16 left-1/2 transform -translate-x-1/2 bg-blue-50 dark:bg-blue-900 border-l-4 border-blue-500 dark:border-blue-400 p-4 rounded-lg shadow-md z-50">
           <div className="flex">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="h-5 w-5 text-blue-400 dark:text-blue-300" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-sm text-blue-800">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
                 {((userProjectRole && userProjectRole !== 'member') || isProjectOwner) ? (
                   <span className="font-bold">읽기 전용입니다</span>
                 ) : (
@@ -2729,14 +3142,14 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       
       {/* 문서 편집 영역 */}
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="bg-white dark:bg-[#2a2a2c] p-6">
           {/* 문서 제목 */}
           <div className="mb-6 flex items-center">
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className={`w-full text-3xl font-bold text-gray-900 border-none outline-none focus:ring-0 p-0 placeholder-gray-400 ${isReadOnlyMode ? 'cursor-not-allowed' : ''}`}
+              className={`w-full text-3xl font-bold text-gray-900 dark:text-gray-100 border-none outline-none focus:ring-0 p-0 placeholder-gray-400 dark:placeholder-gray-500 bg-transparent ${isReadOnlyMode ? 'cursor-not-allowed' : ''}`}
               placeholder="제목 없음"
               disabled={isLoading || isReadOnlyMode}
             />
@@ -2745,9 +3158,19 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
           {/* 에디터 로딩 표시 */}
           {isLoading && !editor && (
             <div className="min-h-[500px] flex items-center justify-center">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-                <p className="mt-4 text-gray-600">에디터 로딩 중...</p>
+              <div className="text-center flex flex-col items-center">
+                <div className={`relative w-24 h-24 ${theme === 'dark' ? 'text-blue-500' : 'text-blue-600'}`}>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className={`w-16 h-16 border-4 border-current border-solid rounded-full opacity-20 ${theme === 'dark' ? 'border-blue-500' : 'border-blue-600'}`}></div>
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className={`w-16 h-16 border-4 border-current border-solid rounded-full border-t-transparent animate-spin`}></div>
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className={`text-3xl font-bold ${theme === 'dark' ? 'text-blue-500' : 'text-blue-600'}`}>C</span>
+                  </div>
+                </div>
+                <p className={`mt-6 text-lg font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>에디터 로딩 중...</p>
               </div>
             </div>
           )}
@@ -2763,6 +3186,10 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               font-size: 1rem;
               line-height: 1.6;
               color: #374151;
+            }
+            
+            .dark .ProseMirror {
+              color: #d1d5db;
             }
             
             /* 협업 커서 스타일 수정 */
@@ -2802,6 +3229,10 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               font-style: italic;
             }
             
+            .dark .ProseMirror p.is-editor-empty:first-child::before {
+              color: #6b7280;
+            }
+            
             /* 빈 줄과 협업 커서 사이의 간격 조정 */
             .ProseMirror p:empty {
               margin-top: 0;
@@ -2831,6 +3262,10 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               color: #111827;
             }
             
+            .dark .ProseMirror h1 {
+              color: #f9fafb;
+            }
+            
             .ProseMirror h2 {
               font-size: 1.5rem;
               font-weight: 600;
@@ -2839,11 +3274,19 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               color: #111827;
             }
             
+            .dark .ProseMirror h2 {
+              color: #f3f4f6;
+            }
+            
             .ProseMirror h3 {
               font-size: 1.25rem;
               font-weight: 600;
               margin: 1em 0 0.5em;
               color: #111827;
+            }
+            
+            .dark .ProseMirror h3 {
+              color: #e5e7eb;
             }
             
             .ProseMirror ul, .ProseMirror ol {
@@ -2866,6 +3309,12 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               border-radius: 0 0.25em 0.25em 0;
             }
             
+            .dark .ProseMirror blockquote {
+              border-left-color: #4b5563;
+              color: #9ca3af;
+              background-color: #374151;
+            }
+            
             .ProseMirror pre {
               background-color: #f3f4f6;
               padding: 1em;
@@ -2876,12 +3325,22 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               font-size: 0.875em;
             }
             
+            .dark .ProseMirror pre {
+              background-color: #374151;
+              color: #d1d5db;
+            }
+            
             .ProseMirror code {
               font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
               font-size: 0.875em;
               background-color: #f3f4f6;
               padding: 0.2em 0.4em;
               border-radius: 0.25em;
+            }
+            
+            .dark .ProseMirror code {
+              background-color: #374151;
+              color: #d1d5db;
             }
             
             .ProseMirror hr {
@@ -3036,15 +3495,15 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
           {showSlashMenu && (
             <div
               ref={slashMenuRef}
-              className="absolute bg-white dark:bg-white shadow-xl rounded-xl p-1 z-50 border-none max-h-[420px] overflow-auto w-[280px] transition-all duration-200 ease-in-out scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-200"
+              className="absolute bg-white dark:bg-[#2a2a2c] shadow-xl rounded-xl p-1 z-50 border border-gray-200 dark:border-gray-700 max-h-[420px] overflow-auto w-[280px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-200"
               style={{
                 top: slashMenuPosition.y + 15, // 커서 위치보다 더 아래로 위치하도록 15px 추가
                 left: slashMenuPosition.x
               }}
             >
-              <div className="text-sm font-medium text-slate-800 dark:text-slate-800 p-3 border-b border-slate-100 dark:border-slate-200 sticky top-0 bg-white dark:bg-white backdrop-blur-sm">
+              <div className="text-sm font-medium text-slate-800 dark:text-slate-200 p-3 border-b border-slate-100 dark:border-slate-700 sticky top-0 bg-white dark:bg-[#2a2a2c] backdrop-blur-sm">
                 <span className="flex items-center gap-1.5">
-                  <span className="bg-blue-100 text-blue-600 rounded-md p-0.5">
+                  <span className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 rounded-md p-0.5">
                     <span className="text-xs">/</span>
                   </span>
                   블록 선택
@@ -3053,116 +3512,116 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               <div className="grid grid-cols-1 gap-0.5 p-1">
                 <button
                   onClick={() => applyBlockType('ai')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-purple-100 text-purple-600 group-hover:bg-purple-200 transition-colors">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400 group-hover:bg-purple-200 dark:group-hover:bg-purple-800 transition-colors">
                     <SparklesIcon className="w-4 h-4" />
                   </span>
                   <div className="flex flex-col">
                     <span className="font-medium">문서 요약</span>
-                    <span className="text-xs text-slate-500">AI로 문서를 요약합니다</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">AI로 문서를 요약합니다</span>
                   </div>
                 </button>
                 <button
                   onClick={() => applyBlockType('paragraph')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-600 group-hover:bg-gray-200 transition-colors">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-gray-600 transition-colors">
                     <AlignLeft className="w-4 h-4" />
                   </span>
                   <span className="font-medium">본문</span>
                 </button>
                 <button
                   onClick={() => applyBlockType('heading1')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 text-blue-600 group-hover:bg-blue-200 transition-colors">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 group-hover:bg-blue-200 dark:group-hover:bg-blue-800 transition-colors">
                     <TypeIcon className="w-4 h-4" />
                   </span>
                   <span className="font-medium">제목 1</span>
                 </button>
                 <button
                   onClick={() => applyBlockType('heading2')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 text-blue-600 group-hover:bg-blue-200 transition-colors">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 group-hover:bg-blue-200 dark:group-hover:bg-blue-800 transition-colors">
                     <TypeIcon className="w-4 h-4" />
                   </span>
                   <span className="font-medium">제목 2</span>
                 </button>
                 <button
                   onClick={() => applyBlockType('heading3')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 text-blue-600 group-hover:bg-blue-200 transition-colors">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 group-hover:bg-blue-200 dark:group-hover:bg-blue-800 transition-colors">
                     <TypeIcon className="w-4 h-4" />
                   </span>
                   <span className="font-medium">제목 3</span>
                 </button>
                 <button
                   onClick={() => applyBlockType('bulletList')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 text-green-600 group-hover:bg-green-200 transition-colors">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400 group-hover:bg-green-200 dark:group-hover:bg-green-800 transition-colors">
                     <ListIcon className="w-4 h-4" />
                   </span>
                   <span className="font-medium">글머리 기호</span>
                 </button>
                 <button
                   onClick={() => applyBlockType('orderedList')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 text-green-600 group-hover:bg-green-200 transition-colors">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400 group-hover:bg-green-200 dark:group-hover:bg-green-800 transition-colors">
                     <ListIcon className="w-4 h-4" />
                   </span>
                   <span className="font-medium">번호 매기기</span>
                 </button>
                 <button
                   onClick={() => applyBlockType('taskList')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-100 text-amber-600 group-hover:bg-amber-200 transition-colors">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900 text-amber-600 dark:text-amber-400 group-hover:bg-amber-200 dark:group-hover:bg-amber-800 transition-colors">
                     <CheckSquareIcon className="w-4 h-4" />
                   </span>
                   <span className="font-medium">할 일 목록</span>
                 </button>
                 <button
                   onClick={() => applyBlockType('blockquote')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-orange-100 text-orange-600 group-hover:bg-orange-200 transition-colors">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-400 group-hover:bg-orange-200 dark:group-hover:bg-orange-800 transition-colors">
                     <QuoteIcon className="w-4 h-4" />
                   </span>
                   <span className="font-medium">인용</span>
                 </button>
                 <button
                   onClick={() => applyBlockType('codeBlock')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 group-hover:bg-indigo-200 transition-colors">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-200 dark:group-hover:bg-indigo-800 transition-colors">
                     <CodeIcon className="w-4 h-4" />
                   </span>
                   <span className="font-medium">코드</span>
                 </button>
                 <button
                   onClick={() => applyBlockType('image')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-rose-100 text-rose-600 group-hover:bg-rose-200 transition-colors">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-900 text-rose-600 dark:text-rose-400 group-hover:bg-rose-200 dark:group-hover:bg-rose-800 transition-colors">
                     <ImageIcon className="w-4 h-4" />
                   </span>
                   <span className="font-medium">이미지</span>
                 </button>
                 <button
                   onClick={() => applyBlockType('template')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 rounded-lg text-left text-slate-800 group transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-teal-100 text-teal-600 group-hover:bg-teal-200 transition-colors">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-900 text-teal-600 dark:text-teal-400 group-hover:bg-teal-200 dark:group-hover:bg-teal-800 transition-colors">
                     <FileTextIcon className="w-4 h-4" />
                   </span>
                   <div className="flex flex-col">
                     <span className="font-medium">문서 템플릿</span>
-                    <span className="text-xs text-slate-500">템플릿으로 문서 생성</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">템플릿으로 문서 생성</span>
                   </div>
                 </button>
               </div>
@@ -3180,7 +3639,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
           />
           
           {/* Tiptap 에디터 */}
-          <div className="prose max-w-none bg-white rounded-lg">
+          <div className="prose max-w-none bg-white dark:bg-[#2a2a2c] rounded-lg">
             <EditorContent 
               editor={editor} 
               className="min-h-[500px] px-2"
@@ -3207,6 +3666,8 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
         onSave={updateDocumentPassword}
         isLoading={isPasswordSaving}
       />
+        </div>
+      </div>
     </div>
   );
 }

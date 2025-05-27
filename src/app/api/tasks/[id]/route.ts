@@ -86,7 +86,7 @@ export async function PUT(
       );
     }
     
-    // 날짜 데이터 변환
+    // 날짜 데이터 변환 (dueDate만 처리)
     let formattedDueDate = null;
     if (body.dueDate) {
       formattedDueDate = new Date(body.dueDate);
@@ -115,7 +115,6 @@ export async function PUT(
       },
     });
     
-    console.log('태스크 전체 업데이트 완료:', updatedTask);
     return NextResponse.json(updatedTask);
   } catch (error) {
     console.error('태스크 전체 업데이트 오류:', error);
