@@ -37,10 +37,10 @@ export function KanbanColumn({
   const [isHovering, setIsHovering] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
-  const [lastScrollPosition, setLastScrollPosition] = useState(0);
   const [tasksLength, setTasksLength] = useState(tasks.length);
   const isFirstMount = useRef(true);
   const isAddingTaskFromButton = useRef(false);
+  const lastTaskRef = useRef<HTMLDivElement>(null);
   
   // 고유한 컬럼 ID 생성
   const columnElementId = `kanban-column-${status}`;
@@ -57,26 +57,8 @@ export function KanbanColumn({
         isFirstMount.current = false;
         return;
       }
-      
-      if (tasks.length !== tasksLength) {
-        const wasTaskAdded = tasks.length > tasksLength;
-        setTasksLength(tasks.length);
-        
-        // 스크롤 위치 복원 - UI 업데이트 후 실행되도록 지연
-        setTimeout(() => {
-          const columnElement = document.getElementById(columnElementId);
-          if (columnElement) {
-            columnElement.scrollTop = lastScrollPosition;
-          }
-          
-          // 작업이 추가된 직후에 작업 추가 버튼 자동 클릭 복원
-          if (wasTaskAdded && !isFirstMount.current) {
-            setIsAddingTask(true);
-          }
-        }, 100);
-      }
     }
-  }, [tasks, loading, tasksLength, lastScrollPosition, columnElementId]);
+  }, [tasks, loading, tasksLength]);
 
   // 드롭 영역 설정
   const { isOver, setNodeRef } = useDrop({
@@ -84,50 +66,6 @@ export function KanbanColumn({
       updateTaskStatus(taskId, status);
     },
   });
-  
-  const handleQuickAddTask = async () => {
-    if (!newTaskTitle.trim()) {
-      return;
-    }
-    
-    try {
-      // 현재 스크롤 위치 저장
-      const columnElement = document.getElementById(columnElementId);
-      if (columnElement) {
-        setLastScrollPosition(columnElement.scrollTop);
-      }
-      
-      if (onAddTask) {
-        // onAddTask 함수 호출 (비동기)
-        await onAddTask({
-          title: newTaskTitle,
-          description: "",
-          status: status,
-          priority: "medium", 
-        });
-      }
-    } catch (error) {
-      console.error("작업 추가 중 오류 발생:", error);
-    } finally {
-      // 입력 필드 초기화
-      setNewTaskTitle("");
-      
-      // 입력창 닫기 (작업 추가 버튼은 useEffect에서 자동 클릭됨)
-      setIsAddingTask(false);
-    }
-  };
-  
-  // 키보드 이벤트 처리 함수
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleQuickAddTask();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      setIsAddingTask(false);
-      setNewTaskTitle("");
-    }
-  };
   
   // 보드 밖 클릭 감지
   useEffect(() => {
@@ -181,6 +119,59 @@ export function KanbanColumn({
 
   const colorClasses = getColorClasses();
 
+  // 작업 추가 버튼 클릭 시 입력창 focus
+  const handleShowAddTask = () => {
+    setIsAddingTask(true);
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 0);
+  };
+
+  // 작업 추가(엔터) 핸들러
+  const handleQuickAddTask = async () => {
+    if (!newTaskTitle.trim()) return;
+    const trimmedTitle = newTaskTitle.trim();
+    
+    // 입력창 상태 즉시 초기화
+    setIsAddingTask(false);
+    setNewTaskTitle("");
+
+    try {
+      if (onAddTask) {
+        // 작업 추가
+        await onAddTask({
+          title: trimmedTitle,
+          description: "",
+          status: status,
+          priority: "medium",
+        });
+
+        // 다음 입력창 즉시 표시 (비동기로 처리)
+        requestAnimationFrame(() => {
+          setIsAddingTask(true);
+        });
+      }
+    } catch (error) {
+      // 에러 처리
+      console.error("작업 추가 중 오류 발생:", error);
+      // 오류 발생 시 입력 상태 복원
+      setNewTaskTitle(trimmedTitle);
+      setIsAddingTask(true);
+    }
+  };
+
+  // 입력창 키보드 이벤트
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleQuickAddTask();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsAddingTask(false);
+      setNewTaskTitle("");
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -203,10 +194,14 @@ export function KanbanColumn({
         </div>
       </div>
       
-      <div className="flex flex-col gap-1 p-3 flex-grow">
+      <div className="flex flex-col gap-1 p-3 flex-grow group">
         {/* 작업 목록 */}
-        {tasks.map((task) => (
-          <div key={task.id} onClick={() => onTaskClick(task)}>
+        {tasks.map((task, idx) => (
+          <div
+            key={task.id}
+            ref={idx === tasks.length - 1 ? lastTaskRef : undefined}
+            onClick={() => onTaskClick(task)}
+          >
             <KanbanTask 
               task={task} 
               onUpdate={(updatedTask) => {
@@ -220,7 +215,7 @@ export function KanbanColumn({
         
         {/* 작업 추가 입력창 (하단에 배치) */}
         {isAddingTask ? (
-          <div 
+          <div
             ref={inputContainerRef}
             className={`mt-2 border ${theme === 'dark' ? 'border-blue-700 bg-[#2A2A2C]' : 'border-blue-300 bg-white'} rounded-md shadow-sm focus-within:border-blue-500`}
           >
@@ -254,10 +249,10 @@ export function KanbanColumn({
           </div>
         ) : (
           <Button
-            onClick={() => setIsAddingTask(true)}
+            onClick={handleShowAddTask}
             variant="ghost"
             size="sm"
-            className={`w-full mt-2 justify-start text-sm ${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-200' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
+            className={`w-full mt-2 justify-start text-sm opacity-0 group-hover:opacity-100 transition-opacity ${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-200' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
           >
             <Plus className="h-4 w-4 mr-1" />
             작업 추가
