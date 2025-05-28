@@ -81,10 +81,26 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
 
   // 새 태스크 추가 함수
   const handleAddTask = async (newTask: Omit<Task, "id">) => {
-    await addTask({
-      ...newTask,
-      projectId: projectId || undefined,
-    });
+    // 1. 로컬 상태에 optimistic하게 추가
+    const tempId = "temp-" + Date.now();
+    const optimisticTask = { ...newTask, id: tempId, projectId: projectId || undefined };
+    setTasksState(prev => [...prev, optimisticTask]);
+
+    try {
+      // 2. 서버에 저장
+      const created = await addTask({
+        ...newTask,
+        projectId: projectId || undefined,
+      });
+      // 3. 서버에서 받은 id로 교체
+      setTasksState(prev =>
+        prev.map(t => t.id === tempId ? { ...created } : t)
+      );
+    } catch (e) {
+      // 4. 실패 시 롤백
+      setTasksState(prev => prev.filter(t => t.id !== tempId));
+      alert("작업 추가에 실패했습니다.");
+    }
   };
 
   // 태스크 상태 변경 함수
@@ -175,7 +191,7 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
         )}
       </div>
 
-      {loading ? (
+      {tasksState.length === 0 && loading ? (
         <div className={`flex items-center justify-center h-64 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
           <div className="text-center flex flex-col items-center">
             <div className="relative w-20 h-20">
