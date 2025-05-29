@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 // 실제 로그인된 사용자 정보 가져오기
 async function getCurrentUserId(request: NextRequest) {
   // 쿠키에서 토큰 가져오기
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const token = cookieStore.get('token')?.value;
   // 헤더에서 토큰 확인
   const authHeader = request.headers.get('authorization');

@@ -2172,29 +2172,31 @@ function UpcomingEvents({ /* theme prop 제거 */ }) {
         </div>
       </div>
 
-      <div className="w-2/3 pl-6 py-2 space-y-4 overflow-y-auto flex-1" style={{ maxHeight: '100%' }}>
-        {Object.keys(groupedEvents).map((dateKey) => (
-          <div key={dateKey}>
-            <h4 className="text-sm font-semibold mb-2 text-gray-500 dark:text-gray-400">
-              {formatDateForEventGroup(dateKey)}
-            </h4>
-    <div className="space-y-3">
-              {groupedEvents[dateKey].map((event) => (
-                <div 
-                  key={event.id} 
-                  className="flex items-start p-2 rounded-md transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <div className="w-px bg-gray-300 dark:bg-gray-600 mr-3 self-stretch"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{event.title}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      {formatTime(event.startDate)} - {event.project?.name || '개인 일정'}
-            </p>
-          </div>
-        </div>
-      ))}
+      <div className="w-2/3 pl-6 py-2 flex flex-col">
+        <div className="space-y-4 overflow-y-auto upcoming-events-scrollbar" style={{ maxHeight: '320px' }}>
+          {Object.keys(groupedEvents).map((dateKey) => (
+            <div key={dateKey}>
+              <h4 className="text-sm font-semibold mb-2 text-gray-500 dark:text-gray-400">
+                {formatDateForEventGroup(dateKey)}
+              </h4>
+              <div className="space-y-3">
+                {groupedEvents[dateKey].map((event) => (
+                  <div 
+                    key={event.id} 
+                    className="flex items-start p-2 rounded-md transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <div className="w-px bg-gray-300 dark:bg-gray-600 mr-3 self-stretch"></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{event.title}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        {formatTime(event.startDate)} - {event.project?.name || '개인 일정'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -2447,6 +2449,48 @@ const ModernScrollbarStyles = () => (
       scrollbar-color: #4b5563 #1f2937; /* thumb track for Firefox */
     }
     html:not(.dark) .assigned-tasks-scrollbar {
+      scrollbar-width: thin;
+      scrollbar-color: #d1d5db #f3f4f6; /* thumb track for Firefox */
+    }
+
+    /* 다가오는 일정 스크롤바 스타일 */
+    html.dark .upcoming-events-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    html:not(.dark) .upcoming-events-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    html.dark .upcoming-events-scrollbar::-webkit-scrollbar-track {
+      background: #1f2937; /* gray-800 */
+      border-radius: 3px;
+    }
+    html:not(.dark) .upcoming-events-scrollbar::-webkit-scrollbar-track {
+      background: #f3f4f6; /* gray-100 */
+      border-radius: 3px;
+    }
+    html.dark .upcoming-events-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #4b5563; /* gray-600 */
+      border-radius: 3px;
+      border: 1px solid #1f2937; /* gray-800, creates padding */
+    }
+    html:not(.dark) .upcoming-events-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #d1d5db; /* gray-300 */
+      border-radius: 3px;
+      border: 1px solid #f3f4f6; /* gray-100, creates padding */
+    }
+    html.dark .upcoming-events-scrollbar::-webkit-scrollbar-thumb:hover {
+      background-color: #6b7280; /* gray-500 */
+    }
+    html:not(.dark) .upcoming-events-scrollbar::-webkit-scrollbar-thumb:hover {
+      background-color: #9ca3af; /* gray-400 */
+    }
+    html.dark .upcoming-events-scrollbar {
+      scrollbar-width: thin;
+      scrollbar-color: #4b5563 #1f2937; /* thumb track for Firefox */
+    }
+    html:not(.dark) .upcoming-events-scrollbar {
       scrollbar-width: thin;
       scrollbar-color: #d1d5db #f3f4f6; /* thumb track for Firefox */
     }
