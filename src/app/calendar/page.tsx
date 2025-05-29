@@ -26,6 +26,7 @@ export interface Task {
   createdAt: Date;
   projectId?: string;
   isCalendarEvent?: boolean; // 캘린더 일정과 칸반 태스크를 구분하는 필드
+  isHoliday?: boolean; // 공휴일 여부를 나타내는 필드
   kanbanTaskId?: string; // 연결된 칸반 태스크 ID
   userId?: string; // 일정 생성자 ID
   user?: { // 일정 생성자 정보
@@ -133,6 +134,16 @@ const CalendarPage: React.FC = () => {
       }
       const tasksData = await tasksResponse.json();
       
+      // 공휴일 데이터 가져오기
+      const currentYear = currentDate.getFullYear();
+      const holidaysResponse = await fetch(`/api/holidays?year=${currentYear}`);
+      let holidaysData = [];
+      if (holidaysResponse.ok) {
+        holidaysData = await holidaysResponse.json();
+      } else {
+        console.warn('공휴일 데이터를 가져오는데 실패했습니다:', holidaysResponse.statusText);
+      }
+      
       // 캘린더 이벤트 포맷팅
       const calendarEvents = calendarData.map((event: any) => ({
         ...event,
@@ -158,15 +169,27 @@ const CalendarPage: React.FC = () => {
           };
         });
       
+      // 공휴일 이벤트 포맷팅
+      const holidayEvents = holidaysData.map((holiday: any) => ({
+        ...holiday,
+        id: holiday.id,
+        startDate: new Date(holiday.date),
+        endDate: new Date(holiday.date),
+        dueDate: new Date(holiday.date),
+        createdAt: new Date(),
+        isCalendarEvent: true,
+        isHoliday: true
+      }));
+      
       // 모든 이벤트 합치기
-      setTasks([...calendarEvents, ...taskEvents]);
+      setTasks([...calendarEvents, ...taskEvents, ...holidayEvents]);
     } catch (error) {
       console.error('캘린더 이벤트 가져오기 오류:', error);
       setTasks([]);
     } finally {
       setIsLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, currentDate]);
 
   // 칸반 태스크를 가져오는 함수
   const fetchKanbanTasks = useCallback(async () => {
@@ -407,7 +430,11 @@ const CalendarPage: React.FC = () => {
   }, [calendarView, selectedDate, currentDate]);
 
   if (!mounted) {
-    return null;
+    return (
+      <div className="flex h-screen bg-background text-foreground items-center justify-center">
+        <div className="text-lg">로딩 중...</div>
+      </div>
+    );
   }
 
   // 일정 추가 함수
@@ -540,7 +567,7 @@ const CalendarPage: React.FC = () => {
       e.currentTarget.style.boxShadow = '';
     }
     
-    if (!draggedTask) return;
+    if (!draggedTask || draggedTask.isHoliday) return; // 공휴일은 드래그 불가
     
     try {
       // 날짜 설정 - 날짜 경계값 설정
@@ -659,7 +686,7 @@ const CalendarPage: React.FC = () => {
   const handleDropToSidebar = async (e: React.DragEvent) => {
     e.preventDefault();
     
-    if (!draggedTask) return;
+    if (!draggedTask || draggedTask.isHoliday) return; // 공휴일은 드래그 불가
     
     // 캘린더 일정(isCalendarEvent=true)은 사이드바에 드롭할 수 없음
     if (draggedTask.isCalendarEvent) {
@@ -832,6 +859,12 @@ const CalendarPage: React.FC = () => {
 
   // 일정 클릭 핸들러 함수
   const handleEventClick = (event: Task) => {
+    if (event.isHoliday) {
+      // 공휴일인 경우 간단한 정보만 표시
+      alert(`${event.title}\n\n공휴일입니다.`);
+      return;
+    }
+    
     if (event.isCalendarEvent) {
       // 캘린더 일정인 경우 기존 로직
       setEditEventDialog({ show: true, event });
@@ -856,6 +889,7 @@ const CalendarPage: React.FC = () => {
 
   // 캘린더 일정 색상 함수 (테마별 색상 적용)
   function getCalendarEventColor() {
+    if (!mounted) return '#6366f1'; // 기본값
     if (theme === 'dark') {
       return '#8b5cf6'; // 다크모드: 보라색 (violet-500)
     }
@@ -864,6 +898,7 @@ const CalendarPage: React.FC = () => {
 
   // 칸반 태스크 색상 함수 (테마별 색상 적용)
   function getKanbanTaskColor() {
+    if (!mounted) return '#3b82f6'; // 기본값
     if (theme === 'dark') {
       return '#06b6d4'; // 다크모드: 시안색 (cyan-500)
     }
@@ -872,6 +907,7 @@ const CalendarPage: React.FC = () => {
 
   // 캘린더 일정 스타일 클래스 함수
   function getCalendarEventClasses() {
+    if (!mounted) return 'bg-indigo-500/10 text-indigo-700 border-indigo-500/20'; // 기본값
     if (theme === 'dark') {
       return 'bg-violet-500/20 text-violet-300 border-violet-500/30';
     }
@@ -880,23 +916,111 @@ const CalendarPage: React.FC = () => {
 
   // 칸반 태스크 스타일 클래스 함수
   function getKanbanTaskClasses() {
+    if (!mounted) return 'bg-blue-500/10 text-blue-700 border-blue-500/20'; // 기본값
     if (theme === 'dark') {
       return 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30';
     }
     return 'bg-blue-500/10 text-blue-700 border-blue-500/20';
   }
 
+  // 공휴일 색상 함수 (테마별 색상 적용)
+  function getHolidayColor() {
+    if (!mounted) return '#dc2626'; // 기본값
+    if (theme === 'dark') {
+      return '#ef4444'; // 다크모드: 빨간색 (red-500)
+    }
+    return '#dc2626'; // 라이트모드: 진한 빨간색 (red-600)
+  }
+
+  // 공휴일 스타일 클래스 함수
+  function getHolidayClasses() {
+    if (!mounted) return 'bg-red-500/10 text-red-700 border-red-500/20'; // 기본값
+    if (theme === 'dark') {
+      return 'bg-red-500/20 text-red-300 border-red-500/30';
+    }
+    return 'bg-red-500/10 text-red-700 border-red-500/20';
+  }
+
   return (
     <div className="flex h-screen bg-background text-foreground">
       {/* 좌측 패널 */}
       <aside className="w-72 border-r border-border bg-card text-card-foreground flex flex-col p-4">
-        {/* 미니 달력 (예시: react-calendar 또는 커스텀) */}
+        {/* 미니 달력 */}
         <div className="mb-6">
-          <div className="font-bold text-lg mb-2">2025년 5월</div>
-          {/* 미니 달력 자리 (추후 라이브러리 적용 가능) */}
-          <div className="grid grid-cols-7 gap-1 text-xs text-center text-gray-500">
-            {['일','월','화','수','목','금','토'].map(d => <div key={d}>{d}</div>)}
-            {[...Array(31)].map((_,i) => <div key={i} className="py-1 rounded hover:bg-blue-100 cursor-pointer">{i+1}</div>)}
+          <div className="font-bold text-lg mb-2">{format(currentDate, 'yyyy년 M월', {locale:ko})}</div>
+          <div className="grid grid-cols-7 gap-1 text-xs text-center">
+            {/* 요일 헤더 */}
+            {['일','월','화','수','목','금','토'].map((d, i) => (
+              <div key={d} className={`py-1 font-medium ${i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-muted-foreground'}`}>
+                {d}
+              </div>
+            ))}
+            {/* 날짜 */}
+            {(() => {
+              const monthStart = startOfMonth(currentDate);
+              const monthEnd = endOfMonth(currentDate);
+              const firstDayOfMonth = getDay(monthStart);
+              
+              // 이전 달의 마지막 날짜들
+              const prevMonthDays = firstDayOfMonth > 0 
+                ? eachDayOfInterval({ 
+                    start: addDays(monthStart, -firstDayOfMonth), 
+                    end: addDays(monthStart, -1) 
+                  }) 
+                : [];
+              
+              // 현재 달의 날짜들
+              const currentMonthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
+              
+              // 다음 달의 시작 날짜들 (42개 칸 채우기 위함)
+              const totalCells = 42;
+              const usedCells = prevMonthDays.length + currentMonthDays.length;
+              const nextMonthDays = usedCells < totalCells 
+                ? eachDayOfInterval({ 
+                    start: addDays(monthEnd, 1), 
+                    end: addDays(monthEnd, totalCells - usedCells) 
+                  }) 
+                : [];
+              
+              const allDays = [...prevMonthDays, ...currentMonthDays, ...nextMonthDays];
+              
+              return allDays.map((day, index) => {
+                const isCurrentMonth = isSameMonth(day, currentDate);
+                const isCurrentDay = isToday(day);
+                const isSelectedDay = selectedDate && isSameDay(day, selectedDate);
+                
+                // 해당 날짜에 일정이 있는지 확인
+                const dateKey = format(day, 'yyyy-MM-dd');
+                const dayEvents = tasksByDate.get(dateKey) || [];
+                const hasEvents = dayEvents.length > 0;
+                
+                return (
+                  <div 
+                    key={index} 
+                    className={`
+                      py-1 rounded cursor-pointer transition-colors relative
+                      ${!isCurrentMonth ? 'text-muted-foreground/50' : 'text-foreground'}
+                      ${isCurrentDay ? 'bg-primary text-primary-foreground font-bold' : ''}
+                      ${isSelectedDay && !isCurrentDay ? 'bg-muted text-foreground font-medium' : ''}
+                      ${!isCurrentDay && !isSelectedDay ? 'hover:bg-muted/50' : ''}
+                    `}
+                    onClick={() => {
+                      setSelectedDate(day);
+                      setCurrentDate(day);
+                    }}
+                  >
+                    {format(day, 'd')}
+                    {/* 일정 있음 표시 */}
+                    {hasEvents && isCurrentMonth && (
+                      <div className={`
+                        absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full
+                        ${isCurrentDay ? 'bg-primary-foreground' : 'bg-primary'}
+                      `} />
+                    )}
+                  </div>
+                );
+              });
+            })()}
           </div>
         </div>
         {/* 일정 추가 버튼 */}
@@ -931,12 +1055,13 @@ const CalendarPage: React.FC = () => {
             프로젝트 일정
           </div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="w-2 h-2 rounded-full bg-gray-400 inline-block" /> 공휴일/기념일
+            <span
+              className="w-2 h-2 rounded-full inline-block"
+              style={{ backgroundColor: getHolidayColor() }}
+            />
+            공휴일
           </div>
         </div>
-        {/* 공휴일/기념일 예시 */}
-        <div className="text-xs text-gray-400 mb-1">공휴일</div>
-        <div className="text-xs text-gray-600">5/1 노동절<br/>5/5 어린이날<br/>5/15 스승의날</div>
       </aside>
       
       {/* 중앙 메인 캘린더 */}
@@ -996,16 +1121,39 @@ const CalendarPage: React.FC = () => {
                     }}
                     onDragOver={handleDragOver(day)}
                     onDragLeave={handleDragLeave}
-                    onDrop={handleDrop(day)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (draggedTask && !draggedTask.isCalendarEvent && !draggedTask.isHoliday) {
+                        handleDrop(selectedDate || currentDate)(e);
+                      }
+                    }}
                   >
-                    <div className="absolute top-2 left-2 text-xs font-semibold">{format(day,'d')}</div>
-                    {/* 일정 표시 */}
+                    {/* 날짜와 공휴일 표시 */}
+                    <div className="absolute top-2 left-2 text-xs font-semibold flex items-center gap-1">
+                      <span>{format(day,'d')}</span>
+                      {(() => {
+                        const dateKey = format(day, 'yyyy-MM-dd');
+                        const events = tasksByDate.get(dateKey) || [];
+                        const holidayEvent = events.find(event => event.isHoliday);
+                        return holidayEvent ? (
+                          <span 
+                            className="text-red-500 text-[10px]"
+                            title={holidayEvent.title}
+                          >
+                            {holidayEvent.title}
+                          </span>
+                        ) : null;
+                      })()}
+                    </div>
+                    {/* 일정 표시 (공휴일 제외) */}
                     <div className="mt-6 space-y-1 relative h-full">
                       {(() => {
                         const dateKey = format(day, 'yyyy-MM-dd');
                         const events = tasksByDate.get(dateKey) || [];
-                        const showEvents = events.slice(0,2);
-                        const moreCount = events.length - 2;
+                        // 공휴일이 아닌 이벤트만 필터링
+                        const nonHolidayEvents = events.filter(event => !event.isHoliday);
+                        const showEvents = nonHolidayEvents.slice(0,2);
+                        const moreCount = nonHolidayEvents.length - 2;
                         return (
                           <>
                             {showEvents.map((task,i)=>{
@@ -1017,7 +1165,9 @@ const CalendarPage: React.FC = () => {
                                 : '';
                               return (
                                 <div key={task.id+''+i} 
-                                  className={`truncate px-2 py-0.5 rounded text-xs font-medium cursor-move ${task.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()}`}
+                                  className={`truncate px-2 py-0.5 rounded text-xs font-medium cursor-move ${
+                                    task.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()
+                                  }`}
                                   style={{whiteSpace:'normal',maxHeight:48,overflowY:'auto',wordBreak:'break-all',marginBottom:2}}
                                   onClick={() => handleEventClick(task)}
                                   draggable={!task.isCalendarEvent} // 칸반 태스크만 드래그 가능
@@ -1063,9 +1213,11 @@ const CalendarPage: React.FC = () => {
                   const dateKey = format(day, 'yyyy-MM-dd');
                   const events = tasksByDate.get(dateKey) || [];
                   
-                  if (events.length === 0) return 1;
+                  // 공휴일이 아닌 이벤트만 필터링
+                  const nonHolidayEvents = events.filter(event => !event.isHoliday);
+                  if (nonHolidayEvents.length === 0) return 1;
                   
-                  const eventsWithTime = events.map(task => {
+                  const eventsWithTime = nonHolidayEvents.map(task => {
                     const start = task.startDate ? new Date(task.startDate) : undefined;
                     const end = task.endDate ? new Date(task.endDate) : undefined;
                     
@@ -1114,8 +1266,21 @@ const CalendarPage: React.FC = () => {
                       style={headerStyle}
                     >
                       <div className="font-semibold">{weekDays[i]}</div>
-                      <div className={`text-lg ${isCurrentDay ? 'text-primary font-bold' : ''}`}>
-                        {format(day, 'd')}
+                      <div className={`text-lg ${isCurrentDay ? 'text-primary font-bold' : ''} flex items-center justify-center gap-1`}>
+                        <span>{format(day, 'd')}</span>
+                        {(() => {
+                          const dateKey = format(day, 'yyyy-MM-dd');
+                          const events = tasksByDate.get(dateKey) || [];
+                          const holidayEvent = events.find(event => event.isHoliday);
+                          return holidayEvent ? (
+                            <span 
+                              className="text-red-500 text-xs"
+                              title={holidayEvent.title}
+                            >
+                              {holidayEvent.title}
+                            </span>
+                          ) : null;
+                        })()}
                       </div>
                       {maxColumns > 1 && (
                         <div className="text-xs text-muted-foreground mt-1">
@@ -1245,7 +1410,7 @@ const CalendarPage: React.FC = () => {
                         }}
                         onDrop={(e) => {
                           e.preventDefault();
-                          if (draggedTask && !draggedTask.isCalendarEvent) {
+                          if (draggedTask && !draggedTask.isCalendarEvent && !draggedTask.isHoliday) {
                             handleDrop(day)(e);
                           }
                         }}
@@ -1275,11 +1440,13 @@ const CalendarPage: React.FC = () => {
                           const dateKey = format(day, 'yyyy-MM-dd');
                           const events = tasksByDate.get(dateKey) || [];
                           
-                          // 시간대별로 일정들을 그룹화하고 겹침 처리
+                          // 시간대별로 일정들을 그룹화하고 겹침 처리 (공휴일 제외)
                           const processedEvents = (() => {
-                            if (events.length === 0) return [];
+                            // 공휴일이 아닌 이벤트만 필터링
+                            const nonHolidayEvents = events.filter(event => !event.isHoliday);
+                            if (nonHolidayEvents.length === 0) return [];
                             
-                            const eventsWithPosition = events.map((task, i) => {
+                            const eventsWithPosition = nonHolidayEvents.map((task, i) => {
                               const start = task.startDate ? new Date(task.startDate) : undefined;
                               const end = task.endDate ? new Date(task.endDate) : undefined;
                               
@@ -1406,7 +1573,10 @@ const CalendarPage: React.FC = () => {
                             return (
                               <div
                                 key={processedTask.id + '' + processedTask.originalIndex}
-                                className={`absolute rounded px-1 py-0.5 text-xs font-medium cursor-pointer border-2 shadow-sm ${processedTask.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()}`}
+                                className={`absolute rounded px-1 py-0.5 text-xs font-medium cursor-pointer border-2 shadow-sm ${
+                                  processedTask.isHoliday ? getHolidayClasses() :
+                                  processedTask.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()
+                                }`}
                                 style={{
                                   top: `${topPosition}px`,
                                   height: `${height}px`,
@@ -1418,10 +1588,10 @@ const CalendarPage: React.FC = () => {
                                   marginRight: totalColumns > 1 ? '2px' : '0px'
                                 }}
                                 onClick={() => handleEventClick(processedTask)}
-                                draggable={!processedTask.isCalendarEvent}
-                                onDragStart={!processedTask.isCalendarEvent ? handleDragStart(processedTask) : undefined}
-                                onDragEnd={!processedTask.isCalendarEvent ? handleDragEnd : undefined}
-                                title={!processedTask.isCalendarEvent ? "드래그하여 일정 변경" : "클릭하여 수정"}
+                                draggable={!processedTask.isCalendarEvent && !processedTask.isHoliday}
+                                onDragStart={!processedTask.isCalendarEvent && !processedTask.isHoliday ? handleDragStart(processedTask) : undefined}
+                                onDragEnd={!processedTask.isCalendarEvent && !processedTask.isHoliday ? handleDragEnd : undefined}
+                                title={processedTask.isHoliday ? "공휴일" : !processedTask.isCalendarEvent ? "드래그하여 일정 변경" : "클릭하여 수정"}
                               >
                                 <div className="font-semibold truncate text-[10px]">{processedTask.title}</div>
                                 {timeStr && height > 24 && (
@@ -1458,8 +1628,21 @@ const CalendarPage: React.FC = () => {
         )}
         {calendarView === 'day' && (
           <div className="bg-card text-card-foreground rounded-lg shadow border border-border overflow-hidden w-full h-full flex flex-col">
-            <div className="border-b border-border text-center text-sm font-medium bg-muted text-muted-foreground py-2">
-              {format(selectedDate || currentDate, 'yyyy년 MM월 dd일 (E)', {locale:ko})}
+            <div className="border-b border-border text-center text-sm font-medium bg-muted text-muted-foreground py-2 flex items-center justify-center gap-2">
+              <span>{format(selectedDate || currentDate, 'yyyy년 MM월 dd일 (E)', {locale:ko})}</span>
+              {(() => {
+                const dateKey = format(selectedDate || currentDate, 'yyyy-MM-dd');
+                const events = tasksByDate.get(dateKey) || [];
+                const holidayEvent = events.find(event => event.isHoliday);
+                return holidayEvent ? (
+                  <span 
+                    className="text-red-500 text-sm"
+                    title={holidayEvent.title}
+                  >
+                    {holidayEvent.title}
+                  </span>
+                ) : null;
+              })()}
             </div>
             <div className="flex-1 overflow-y-auto day-view-scroll">
               {/* 시간대별 일정 표시 */}
@@ -1482,8 +1665,10 @@ const CalendarPage: React.FC = () => {
                   const events = tasksByDate.get(dateKey) || [];
                   
                   let maxColumns = 1;
-                  if (events.length > 0) {
-                    const eventsWithTime = events.map(task => {
+                  // 공휴일이 아닌 이벤트만 필터링
+                  const nonHolidayEvents = events.filter(event => !event.isHoliday);
+                  if (nonHolidayEvents.length > 0) {
+                    const eventsWithTime = nonHolidayEvents.map(task => {
                       const start = task.startDate ? new Date(task.startDate) : undefined;
                       const end = task.endDate ? new Date(task.endDate) : undefined;
                       
@@ -1528,7 +1713,7 @@ const CalendarPage: React.FC = () => {
                       }}
                       onDrop={(e) => {
                         e.preventDefault();
-                        if (draggedTask && !draggedTask.isCalendarEvent) {
+                        if (draggedTask && !draggedTask.isCalendarEvent && !draggedTask.isHoliday) {
                           handleDrop(selectedDate || currentDate)(e);
                         }
                       }}
@@ -1559,11 +1744,13 @@ const CalendarPage: React.FC = () => {
                     const dateKey = format(selectedDate || currentDate, 'yyyy-MM-dd');
                     const events = tasksByDate.get(dateKey) || [];
                     
-                    // 시간대별로 일정들을 그룹화하고 겹침 처리
+                    // 시간대별로 일정들을 그룹화하고 겹침 처리 (공휴일 제외)
                     const processedEvents = (() => {
-                      if (events.length === 0) return [];
+                      // 공휴일이 아닌 이벤트만 필터링
+                      const nonHolidayEvents = events.filter(event => !event.isHoliday);
+                      if (nonHolidayEvents.length === 0) return [];
                       
-                      const eventsWithPosition = events.map((task, i) => {
+                      const eventsWithPosition = nonHolidayEvents.map((task, i) => {
                         const start = task.startDate ? new Date(task.startDate) : undefined;
                         const end = task.endDate ? new Date(task.endDate) : undefined;
                         
@@ -1688,7 +1875,9 @@ const CalendarPage: React.FC = () => {
                       return (
                         <div
                           key={processedTask.id + '' + processedTask.originalIndex}
-                          className={`absolute rounded px-2 py-1 text-xs font-medium cursor-pointer border-2 shadow-sm ${processedTask.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()}`}
+                          className={`absolute rounded px-2 py-1 text-xs font-medium cursor-pointer border-2 shadow-sm ${
+                            processedTask.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()
+                          }`}
                           style={{
                             top: `${topPosition}px`,
                             height: `${height}px`,
@@ -1700,10 +1889,10 @@ const CalendarPage: React.FC = () => {
                             marginRight: totalColumns > 1 ? '4px' : '0px'
                           }}
                           onClick={() => handleEventClick(processedTask)}
-                          draggable={!processedTask.isCalendarEvent}
-                          onDragStart={!processedTask.isCalendarEvent ? handleDragStart(processedTask) : undefined}
-                          onDragEnd={!processedTask.isCalendarEvent ? handleDragEnd : undefined}
-                          title={!processedTask.isCalendarEvent ? "드래그하여 일정 변경" : "클릭하여 수정"}
+                          draggable={!processedTask.isCalendarEvent && !processedTask.isHoliday}
+                          onDragStart={!processedTask.isCalendarEvent && !processedTask.isHoliday ? handleDragStart(processedTask) : undefined}
+                          onDragEnd={!processedTask.isCalendarEvent && !processedTask.isHoliday ? handleDragEnd : undefined}
+                          title={processedTask.isHoliday ? "공휴일" : !processedTask.isCalendarEvent ? "드래그하여 일정 변경" : "클릭하여 수정"}
                         >
                           <div className="font-semibold truncate">{processedTask.title}</div>
                           {timeStr && (
@@ -1913,7 +2102,7 @@ const CalendarPage: React.FC = () => {
                 <label className="text-sm font-medium text-muted-foreground">상태</label>
                 <div className="mt-1">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
+                    !mounted ? 'bg-gray-100 text-gray-700' : theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
                   }`}>
                     {selectedTask.status === 'todo' ? '할 일' : 
                      selectedTask.status === 'in-progress' ? '진행 중' : 
@@ -1927,11 +2116,17 @@ const CalendarPage: React.FC = () => {
                 <label className="text-sm font-medium text-muted-foreground">우선순위</label>
                 <div className="mt-1">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    selectedTask.priority === 'high' ? 
-                      (theme === 'dark' ? 'bg-red-900/20 text-red-400' : 'bg-red-100 text-red-700') :
-                    selectedTask.priority === 'medium' ? 
-                      (theme === 'dark' ? 'bg-yellow-900/20 text-yellow-400' : 'bg-yellow-100 text-yellow-700') :
-                      (theme === 'dark' ? 'bg-green-900/20 text-green-400' : 'bg-green-100 text-green-700')
+                    !mounted ? (
+                      selectedTask.priority === 'high' ? 'bg-red-100 text-red-700' :
+                      selectedTask.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-green-100 text-green-700'
+                    ) : (
+                      selectedTask.priority === 'high' ? 
+                        (theme === 'dark' ? 'bg-red-900/20 text-red-400' : 'bg-red-100 text-red-700') :
+                      selectedTask.priority === 'medium' ? 
+                        (theme === 'dark' ? 'bg-yellow-900/20 text-yellow-400' : 'bg-yellow-100 text-yellow-700') :
+                        (theme === 'dark' ? 'bg-green-900/20 text-green-400' : 'bg-green-100 text-green-700')
+                    )
                   }`}>
                     {selectedTask.priority === 'high' ? '높은 우선순위' : 
                      selectedTask.priority === 'medium' ? '중간 우선순위' : '낮은 우선순위'}
@@ -1971,19 +2166,13 @@ const CalendarPage: React.FC = () => {
         <div className="mb-6">
           <div className="font-bold text-lg mb-2">캘린더 안내</div>
           <ul className="text-xs text-gray-600 list-disc pl-4">
-            <li>1</li>
-            <li>2</li>
             <li>날짜 더블클릭으로 새 일정 추가</li>
+            <li>월/주/일 뷰 전환 가능</li>
+            <li>일정 클릭으로 수정 및 삭제</li>
+            <li>프로젝트별 일정 관리</li>
+            <li>예약되지 않은 업무 관리</li>
           </ul>
         </div>
-        {/* <div>
-          <div className="font-bold text-lg mb-2">단축키 안내</div>
-          <ul className="text-xs text-gray-600 list-disc pl-4">
-            <li>←/→ : 월 이동</li>
-            <li>Enter : 오늘로 이동</li>
-            <li>Esc : 다이얼로그 닫기</li>
-          </ul>
-        </div> */}
       </aside>
 
       {/* 예약되지 않은 업무 사이드바 (드래그 앤 드롭) */}
@@ -2026,8 +2215,8 @@ const CalendarPage: React.FC = () => {
               sidebarTasks.map(task => {
                 // 테마에 따른 칸반 태스크 색상 적용
                 const taskClasses = getKanbanTaskClasses();
-                const statusBg = theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100';
-                const statusText = theme === 'dark' ? 'text-gray-300' : 'text-gray-700';
+                const statusBg = !mounted ? 'bg-gray-100' : theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100';
+                const statusText = !mounted ? 'text-gray-700' : theme === 'dark' ? 'text-gray-300' : 'text-gray-700';
                 const priorityText = 'text-muted-foreground';
 
                 return (

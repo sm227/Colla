@@ -21,12 +21,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
       <body className={inter.className}>
         <AuthProvider>
           <ProjectProvider>
             <UserProvider>
-              <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+              <ThemeProvider 
+                attribute="class" 
+                defaultTheme="dark" 
+                enableSystem
+              >
                 {children}
               </ThemeProvider>
               <ChatButton />
