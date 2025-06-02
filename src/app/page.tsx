@@ -1282,25 +1282,42 @@ export default function Home() {
               active={pathname === "/"}
               theme={theme}
             />
-            <SidebarLink
-              icon={<BellIcon className="w-5 h-5" />}
-              text="알림"
-              href="#" 
-              theme={theme}
-              onClick={(e) => { 
-                e.preventDefault(); 
-                setShowNotificationPanel(!showNotificationPanel);
-              }}
-              badgeCount={hasNewNotifications ? 'new' : undefined}
-            />
-            <SidebarLink
-              icon={<SettingsIcon className="w-5 h-5" />}
-              text="설정"
-              href="/settings" 
-              active={pathname === "/settings"}
-              theme={theme}
-            />
             
+            <div className="pt-4">
+              <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                프로젝트
+              </h3>
+              <nav className="mt-2 space-y-1">
+                {projects.map((project) => (
+                  <SidebarLink
+                    key={project.id}
+                    icon={<FolderIcon className="w-5 h-5" />}
+                    text={project.name}
+                    href={`/?projectId=${project.id}`}
+                    small
+                    active={currentProject?.id === project.id}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentProject(project);
+                      const newUrl = `/?projectId=${project.id}`;
+                      router.push(newUrl);
+                    }}
+                    theme={theme}
+                    isProject={true}
+                  />
+                ))}
+                <SidebarLink
+                  icon={<PlusIcon className="w-5 h-5" />}
+                  text="새 프로젝트"
+                  href="/projects/new"
+                  active={pathname === "/projects/new"}
+                  theme={theme}
+                  small
+                  onClick={() => router.push("/projects/new")}
+                />
+              </nav>
+            </div>
+
             <div className="pt-4">
               <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                 내 작업 공간
@@ -1332,37 +1349,6 @@ export default function Home() {
                 />
                 
                 {/* 문서 하위 메뉴 추가 */}
-                {pathname?.startsWith("/documents") && (
-                  <div className="pl-4 pt-1 space-y-1 ml-2.5">
-                    <SidebarLink
-                      icon={<FileTextIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
-                      text="모든 문서"
-                      href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
-                      active={pathname?.startsWith("/documents") && !searchParams?.has("favorites") && !pathname?.includes("/new")}
-                      theme={theme}
-                      small
-                    />
-                    
-                    <SidebarLink
-                      icon={<StarIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
-                      text="즐겨찾기"
-                      href={currentProject?.id ? `/documents?projectId=${currentProject.id}&favorites=true` : "/documents?favorites=true"}
-                      active={pathname?.startsWith("/documents") && searchParams?.has("favorites")}
-                      theme={theme}
-                      small
-                    />
-                    
-                    <SidebarLink
-                      icon={<PlusIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
-                      text="새 문서 작성"
-                      href={currentProject?.id ? `/documents/new?projectId=${currentProject.id}` : "/documents/new"}
-                      active={pathname?.includes("/documents/new")}
-                      theme={theme}
-                      small
-                    />
-                  </div>
-                )}
-                
                 <SidebarLink 
                   icon={<UsersIcon className="w-5 h-5"/>} 
                   text="팀원 관리" 
@@ -1389,91 +1375,68 @@ export default function Home() {
                 />
             </div>
           </div>
+        </nav>
 
-            <div className="pt-4">
-              <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                프로젝트
-              </h3>
-              <nav className="mt-2 space-y-1">
-                {projects.map((project) => (
-                  <SidebarLink
-                    key={project.id}
-                    icon={<FolderIcon className="w-5 h-5" />}
-                    text={project.name}
-                    href={`/?projectId=${project.id}`} 
-                    small
-                    active={currentProject?.id === project.id && pathname === "/"}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setCurrentProject(project);
-                      router.push(`/?projectId=${project.id}`); 
-                    }}
-                    theme={theme}
-                    isProject={true}
-                  />
-                ))}
-                <SidebarLink
-                  icon={<PlusIcon className="w-5 h-5" />}
-                  text="새 프로젝트"
-                  href="/projects/new"
-                  active={pathname === "/projects/new"}
-                  theme={theme}
-                  small
-                  onClick={() => router.push("/projects/new")}
-                />
-              </nav>
-            </div>
-          </nav>
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center w-full p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
+                <UserIcon className="w-6 h-6 mr-3 rounded-full bg-gray-200 dark:bg-gray-600 p-0.5 text-gray-700 dark:text-gray-300" />
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user?.name || user?.email || '사용자'}</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end" sideOffset={5}>
+              <DropdownMenuLabel className="px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400">
+                {user?.email}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push('/mypage')} className="cursor-pointer">
+                <UserIcon className="w-4 h-4 mr-2" />
+                <span>정보 수정</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowNotificationPanel(!showNotificationPanel)} className="cursor-pointer">
+                <BellIcon className="w-4 h-4 mr-2" />
+                <span>알림</span>
+                {hasNewNotifications && (
+                  <span className="ml-auto w-2 h-2 bg-red-500 rounded-full"></span>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer">
+                <SettingsIcon className="w-4 h-4 mr-2" />
+                <span>설정</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
+                {theme === 'dark' ? <SunIcon className="w-4 h-4 mr-2" /> : <MoonIcon className="w-4 h-4 mr-2" />}
+                <span>{theme === 'dark' ? "라이트 모드" : "다크 모드"}</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/50 focus:text-red-600 dark:focus:text-red-400">
+                <LogOutIcon className="w-4 h-4 mr-2" />
+                <span>로그아웃</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </aside>
 
-          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center w-full p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
-                  <UserIcon className="w-6 h-6 mr-3 rounded-full bg-gray-200 dark:bg-gray-600 p-0.5 text-gray-700 dark:text-gray-300" />
-                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user.name}</span>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" sideOffset={5}>
-                <DropdownMenuLabel className="px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400">
-                  {user.email}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push('/mypage')} className="cursor-pointer">
-                  <UserIcon className="w-4 h-4 mr-2" />
-                  <span>정보 수정</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
-                  {theme === 'dark' ? <SunIcon className="w-4 h-4 mr-2" /> : <MoonIcon className="w-4 h-4 mr-2" />}
-                  <span>{theme === 'dark' ? "라이트 모드" : "다크 모드"}</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/50 focus:text-red-600 dark:focus:text-red-400">
-                  <LogOutIcon className="w-4 h-4 mr-2" />
-                  <span>로그아웃</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </aside>
-
-        {showNotificationPanel && (
-          <div 
-              className={`fixed top-0 left-0 md:left-64 h-full w-80 md:w-96 z-40 transform transition-transform duration-300 ease-in-out ${ 
-              showNotificationPanel ? 'translate-x-0' : '-translate-x-full'
-              } bg-white border-r border-gray-300 text-gray-800 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 shadow-lg flex flex-col`}
-          >
-              <div className="p-4 border-b border-gray-200 dark:border-gray-700"> 
-                  <div className="flex justify-between items-center">
-                  <h3 className={`text-lg font-semibold`}>알림</h3>
-                  <button 
-                      onClick={() => setShowNotificationPanel(false)} 
-                      className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
-                  >
-                        <XIcon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-                      </button>
+      {showNotificationPanel && (
+        <div 
+            className={`fixed top-0 left-0 md:left-64 h-full w-80 md:w-96 z-40 transform transition-transform duration-300 ease-in-out ${ 
+            showNotificationPanel ? 'translate-x-0' : '-translate-x-full'
+            } bg-white border-r border-gray-300 text-gray-800 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 shadow-lg flex flex-col`}
+        >
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700"> 
+                <div className="flex justify-between items-center">
+                <h3 className={`text-lg font-semibold`}>알림</h3>
+                <button 
+                    onClick={() => setShowNotificationPanel(false)} 
+                    className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
+                >
+                      <XIcon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                    </button>
+                </div>
                   </div>
-                    </div>
-                    
+                  
               <div className="flex-grow overflow-y-auto p-4">
                     {notificationLoading && (
                       <div className="flex justify-center items-center py-10">

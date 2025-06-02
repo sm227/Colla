@@ -33,6 +33,7 @@ import {
   SunIcon,
   MoonIcon,
   UserIcon,
+  BarChart3Icon,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -849,26 +850,41 @@ export default function DocumentsPage() {
             active={pathname === "/"}
             theme={theme}
           />
-          <SidebarLink
-            icon={<BellIcon className="w-5 h-5" />}
-            text="알림"
-            href="#" 
-            theme={theme}
-            onClick={(e) => { 
-              e.preventDefault(); 
-              // setShowNotificationPanel(!showNotificationPanel); // 알림 패널 로직은 문서 페이지에 없음
-              alert('알림 기능은 대시보드에서 확인해주세요.');
-            }}
-            // badgeCount={hasNewNotifications ? 'new' : undefined} // 알림 관련 상태 없음
-          />
-          <SidebarLink
-            icon={<SettingsIcon className="w-5 h-5" />}
-            text="설정"
-            href="/settings" 
-            active={pathname === "/settings"}
-            theme={theme}
-          />
           
+          <div className="pt-4">
+            <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+              프로젝트
+            </h3>
+            <nav className="mt-2 space-y-1">
+              {projects.map((project) => (
+                <SidebarLink
+                  key={project.id}
+                  icon={<FolderIcon className="w-5 h-5" />}
+                  text={project.name}
+                  href={`/documents?projectId=${project.id}`}
+                  small
+                  active={selectedProjectId === project.id}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const newUrl = `/documents?projectId=${project.id}`;
+                    router.push(newUrl);
+                  }}
+                  theme={theme}
+                  isProject={true}
+                />
+              ))}
+              <SidebarLink
+                icon={<PlusIcon className="w-5 h-5" />}
+                text="새 프로젝트"
+                href="/projects/new"
+                active={pathname === "/projects/new"}
+                theme={theme}
+                small
+                onClick={() => router.push("/projects/new")}
+              />
+            </nav>
+          </div>
+
           <div className="pt-4">
             <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
               내 작업 공간
@@ -894,118 +910,10 @@ export default function DocumentsPage() {
                 icon={<FileTextIcon className="w-5 h-5" />}
                 text="문서"
                 href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
-                active={pathname?.startsWith("/documents") || isDocumentsSubmenuOpen}
+                active={pathname?.startsWith("/documents")}
                 theme={theme}
                 small
-                onClick={(e) => {
-                  e.preventDefault(); // 기본 링크 동작 방지
-                  setIsDocumentsSubmenuOpen(!isDocumentsSubmenuOpen);
-                  // 필요하다면 현재 projectId를 사용해 router.push 로직 유지
-                  if (currentProject?.id && pathname && !pathname.includes(currentProject.id)) {
-                    router.push(`/documents?projectId=${currentProject.id}`);
-                  } else if (!currentProject?.id && pathname && pathname !== "/documents") {
-                    router.push("/documents");
-                  }
-                }}
               />
-              {/* 문서 하위 메뉴 시작 */}
-              {isDocumentsSubmenuOpen && (
-                <div 
-                  className={`pl-4 pt-1 space-y-1 ml-2.5 transition-all duration-300 ease-in-out ${
-                    isDocumentsSubmenuOpen ? 'max-h-[20rem] opacity-100' : 'max-h-0 opacity-0'
-                  }`}
-                >
-                  <div className="transform transition-all duration-300 ease-in-out" 
-                       style={{ 
-                         opacity: isDocumentsSubmenuOpen ? 1 : 0, 
-                         transform: isDocumentsSubmenuOpen ? 'translateY(0)' : 'translateY(-10px)',
-                         transition: 'opacity 300ms ease-in-out, transform 300ms ease-in-out'
-                       }}>
-                    <SidebarLink
-                      icon={<FileTextIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
-                      text="모든 문서"
-                      href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"} 
-                      onClick={() => setSelectedFolder(null)}
-                      active={selectedFolder === null && pathname?.startsWith("/documents")}
-                      theme={theme}
-                      small
-                    />
-                  </div>
-                  
-                  <div className="transform transition-all duration-300 ease-in-out" 
-                       style={{ 
-                         opacity: isDocumentsSubmenuOpen ? 1 : 0, 
-                         transform: isDocumentsSubmenuOpen ? 'translateY(0)' : 'translateY(-10px)',
-                         transition: 'opacity 300ms ease-in-out 100ms, transform 300ms ease-in-out 100ms'
-                       }}>
-                    <SidebarLink
-                      icon={<StarIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
-                      text="즐겨찾기"
-                      href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"} 
-                      onClick={() => setSelectedFolder("즐겨찾기")}
-                      active={selectedFolder === "즐겨찾기" && pathname?.startsWith("/documents")}
-                      theme={theme}
-                      small
-                    />
-                  </div>
-                  
-                  {folders.length > 0 && (
-                    <div className="transform transition-all duration-300 ease-in-out pt-1 mt-1"
-                         style={{ 
-                           opacity: isDocumentsSubmenuOpen ? 1 : 0, 
-                           transform: isDocumentsSubmenuOpen ? 'translateY(0)' : 'translateY(-10px)',
-                           transition: 'opacity 300ms ease-in-out 200ms, transform 300ms ease-in-out 200ms'
-                         }}>
-                      <h4 className="px-1 pt-1 pb-0.5 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                        내 폴더
-                      </h4>
-                      {folders.map((folder, index) => (
-                        <div key={folder.id} className="flex justify-between items-center"
-                             style={{ 
-                               opacity: isDocumentsSubmenuOpen ? 1 : 0, 
-                               transform: isDocumentsSubmenuOpen ? 'translateY(0)' : 'translateY(-10px)',
-                               transition: `opacity 300ms ease-in-out ${250 + index * 50}ms, transform 300ms ease-in-out ${250 + index * 50}ms`
-                             }}>
-                          <SidebarLink
-                            icon={<FolderIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
-                            text={folder.name}
-                            href={currentProject?.id ? `/documents?projectId=${currentProject.id}&folderId=${folder.id}` : `/documents?folderId=${folder.id}`}
-                            onClick={() => setSelectedFolder(folder.name)}
-                            active={selectedFolder === folder.name && pathname?.startsWith("/documents")}
-                            theme={theme}
-                            small
-                          />
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openDeleteFolderModal(folder.id, folder.name);
-                            }}
-                            className={`ml-1 p-0.5 rounded-md ${theme === 'dark' ? 'hover:bg-red-700 hover:bg-opacity-20 text-gray-500 hover:text-red-400' : 'hover:bg-red-50 text-gray-400 hover:text-red-500'}`}
-                          >
-                            <Trash2Icon className="w-3 h-3" />
-                          </button>
-          </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  <div className="transform transition-all duration-300 ease-in-out" 
-                       style={{ 
-                         opacity: isDocumentsSubmenuOpen ? 1 : 0, 
-                         transform: isDocumentsSubmenuOpen ? 'translateY(0)' : 'translateY(-10px)',
-                         transition: `opacity 300ms ease-in-out ${250 + folders.length * 50}ms, transform 300ms ease-in-out ${250 + folders.length * 50}ms`
-                       }}>
-                    <button 
-                      onClick={() => setShowFolderModal(true)}
-                      className={`w-full flex items-center px-1 py-1.5 rounded-md text-sm ${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'} mt-1`}
-                    >
-                      <PlusIcon className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
-                      <span>새 폴더 추가</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-              {/* 문서 하위 메뉴 끝 */}
               <SidebarLink 
                 icon={<UsersIcon className="w-5 h-5"/>} 
                 text="팀원 관리" 
@@ -1022,41 +930,15 @@ export default function DocumentsPage() {
                 theme={theme}
                 small
               />
-        </div>
-      </div>
-
-          <div className="pt-4">
-            <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              프로젝트
-            </h3>
-            <nav className="mt-2 space-y-1">
-              {projects.map((project) => (
-                <SidebarLink
-                  key={project.id}
-                  icon={<FolderIcon className="w-5 h-5" />}
-                  text={project.name}
-                  href={`/documents?projectId=${project.id}`} // 문서 페이지로 연결
-                  small
-                  active={currentProject?.id === project.id && pathname === "/documents"} // 활성 상태 조건 변경
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setCurrentProject(project);
-                    router.push(`/documents?projectId=${project.id}`); 
-                  }}
-                  theme={theme}
-                  isProject={true}
-                />
-              ))}
               <SidebarLink
-                icon={<PlusIcon className="w-5 h-5" />}
-                text="새 프로젝트"
-                href="/projects/new"
-                active={pathname === "/projects/new"}
+                icon={<BarChart3Icon className="w-5 h-5" />}
+                text="보고서"
+                href="/reports"
+                active={pathname?.startsWith("/reports")}
                 theme={theme}
                 small
-                onClick={() => router.push("/projects/new")}
               />
-            </nav>
+            </div>
           </div>
         </nav>
 
@@ -1065,7 +947,7 @@ export default function DocumentsPage() {
             <DropdownMenuTrigger asChild>
               <button className="flex items-center w-full p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
                 <UserIcon className="w-6 h-6 mr-3 rounded-full bg-gray-200 dark:bg-gray-600 p-0.5 text-gray-700 dark:text-gray-300" />
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user?.name}</span>
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user?.name || user?.email || '사용자'}</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end" sideOffset={5}>
@@ -1076,6 +958,14 @@ export default function DocumentsPage() {
               <DropdownMenuItem onClick={() => router.push('/mypage')} className="cursor-pointer">
                 <UserIcon className="w-4 h-4 mr-2" />
                 <span>정보 수정</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => alert('알림 기능은 대시보드에서 확인해주세요.')} className="cursor-pointer">
+                <BellIcon className="w-4 h-4 mr-2" />
+                <span>알림</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer">
+                <SettingsIcon className="w-4 h-4 mr-2" />
+                <span>설정</span>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
                 {theme === 'dark' ? <SunIcon className="w-4 h-4 mr-2" /> : <MoonIcon className="w-4 h-4 mr-2" />}
