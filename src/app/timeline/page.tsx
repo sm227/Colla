@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useAuth } from "@/app/contexts/AuthContext";
+import { useProject } from "@/app/contexts/ProjectContext";
 import Link from "next/link";
 import { 
   HomeIcon, 
@@ -10,40 +12,134 @@ import {
   PlusIcon, 
   FolderIcon, 
   ChevronDownIcon, 
-  TrelloIcon
+  Trello,
+  SearchIcon,
+  LayoutDashboardIcon,
+  BellIcon,
+  SettingsIcon,
+  CalendarIcon,
+  FileTextIcon,
+  UsersIcon,
+  VideoIcon,
+  BarChart3Icon,
+  StarIcon,
+  XIcon,
+  UserIcon,
+  LogOutIcon,
+  SunIcon,
+  MoonIcon,
+  MenuIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useProject } from "@/app/contexts/ProjectContext";
 import { Timeline } from "@/components/timeline/Timeline";
+import { useTheme } from "next-themes";
+
+// shadcn/ui DropdownMenu 컴포넌트 임포트
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+// SidebarLink 컴포넌트 (다른 페이지와 동일)
+function SidebarLink({
+  icon,
+  text,
+  href,
+  active = false,
+  small = false,
+  onClick,
+  theme = "dark", 
+  badgeCount,
+  isProject = false 
+}: {
+  icon: React.ReactNode;
+  text: string;
+  href: string;
+  active?: boolean;
+  small?: boolean;
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+  theme?: "light" | "dark";
+  badgeCount?: string | number;
+  isProject?: boolean;
+}) {
+  const activeProjectBg = theme === 'dark' 
+    ? 'bg-blue-900 bg-opacity-30' 
+    : 'bg-blue-100 bg-opacity-50'; 
+    
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className={`flex items-center justify-between px-2 py-1.5 ${small ? "text-sm" : "text-[15px]"} rounded-md transition-colors duration-150 ${
+        theme === 'dark'
+          ? active && isProject
+            ? `${activeProjectBg} text-gray-300 hover:bg-gray-700 hover:text-gray-100` 
+            : "text-gray-300 hover:bg-gray-700 hover:text-gray-100"
+          : active && isProject
+            ? `${activeProjectBg} text-gray-600 hover:bg-gray-200 hover:text-gray-900`
+            : "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+      }`}
+    >
+      <div className="flex items-center">
+        <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{icon}</div>
+        <span>{text}</span>
+      </div>
+      {badgeCount && (
+        <span className={`px-1.5 py-0.5 text-xs font-semibold rounded-full ${badgeCount === 'new' ? (theme === 'dark' ? 'bg-red-500 text-white' : 'bg-red-500 text-white') : (theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-700')}`}>
+          {badgeCount === 'new' ? '' : badgeCount}
+        </span>
+      )}
+    </Link>
+  );
+}
 
 export default function TimelinePage() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const projectIdParam = searchParams.get('projectId');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const { projects } = useProject();
+  const { user, loading: authLoading, logout } = useAuth();
+  const { 
+    projects, 
+    currentProject, 
+    setCurrentProject,
+    loading: projectLoading,
+    hasProjects
+  } = useProject();
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isKanbanSubmenuOpen, setIsKanbanSubmenuOpen] = useState(true); // 칸반 하위 메뉴 상태
+  const [mounted, setMounted] = useState(false);
   
-  // theme 관련 코드 수정 시작
-  const getInitialTheme = () => {
-    if (typeof window !== "undefined") {
-      return (localStorage.getItem("theme") as "light" | "dark") || "light";
-    }
-    return "light";
-  };
-  const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme());
+  // 테마 관련 코드 수정 (next-themes 사용)
+  const { theme: currentTheme, setTheme } = useTheme();
+  
+  // theme 값 계산
+  const theme = (currentTheme || 'dark') as 'light' | 'dark';
 
+  // next-themes hydration 처리를 위한 mounted 상태 추가
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('theme', theme);
-      if (theme === 'dark') {
-        document.documentElement.classList.add('dark-mode');
-      } else {
-        document.documentElement.classList.remove('dark-mode');
-      }
+    setMounted(true);
+  }, []);
+
+  const toggleTheme = () => {
+    setTheme(theme === 'light' ? 'dark' : 'light');
+  };
+
+  // 로그아웃 함수
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push("/auth/login");
+    } catch (error) {
+      console.error("로그아웃 오류:", error);
     }
-  }, [theme]);
-  // theme 관련 코드 수정 끝
+  };
   
   // 드롭다운 메뉴 외부 클릭 시 닫히도록 이벤트 핸들러 등록
   useEffect(() => {
@@ -104,127 +200,309 @@ export default function TimelinePage() {
     ? projects.find(p => p.id === selectedProjectId)?.name || "프로젝트" 
     : "모든 프로젝트";
 
-  return (
-    <div className={`${theme === 'dark' ? 'bg-[#1F1F21]' : 'bg-gray-50'} min-h-screen`}>
-      {/* 상단 네비게이션 바 */}
-      <div className={`${theme === 'dark' ? 'bg-[#2A2A2C] border-gray-800' : 'bg-white border-gray-200'} border-b py-4 px-6`}>
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Link href="/" className="text-gray-500 hover:text-blue-600 transition-colors">
-              <HomeIcon className="w-5 h-5" />
-            </Link>
-            <span className="text-gray-500">/</span>
-            <Link href="/" className="text-gray-500 hover:text-blue-600 transition-colors">
-              워크스페이스
-            </Link>
-            <span className="text-gray-500">/</span>
-            <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'} font-medium`}>{currentProjectName} 타임라인</span>
+  // hydration mismatch 방지
+  if (!mounted) {
+    return null;
+  }
+
+  // 로딩 중일 때
+  if (authLoading || projectLoading) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center bg-background text-foreground`}>
+        <div className="text-center flex flex-col items-center">
+          <div className={`relative w-24 h-24 ${theme === 'dark' ? 'text-blue-500' : 'text-blue-600'}`}>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className={`w-16 h-16 border-4 border-current border-solid rounded-full opacity-20 ${theme === 'dark' ? 'border-blue-500' : 'border-blue-600'}`}></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className={`w-16 h-16 border-4 border-current border-solid rounded-full border-t-transparent animate-spin`}></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className={`text-3xl font-bold ${theme === 'dark' ? 'text-blue-500' : 'text-blue-600'}`}>C</span>
+            </div>
           </div>
+          <p className={`mt-6 text-lg font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>타임라인 로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 사용자 정보가 없거나 프로젝트 정보 로딩 중일 때 리디렉션
+  if (!authLoading && !user) {
+    router.push("/auth/login?callbackUrl=/timeline");
+    return null;
+  }
+
+  if (!authLoading && !projectLoading && user && !hasProjects) {
+    router.push("/projects/new");
+    return null;
+  }
+
+  return (
+    <div className="flex h-screen bg-background text-foreground">
+      {/* 사이드바 */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-30 w-64  border-r border-gray-200 bg-background dark:border-gray-700 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
+          mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        } md:relative md:flex-shrink-0 flex flex-col`}
+      >
+        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-black dark:bg-blue-600 rounded-lg flex items-center justify-center mr-2">
+              <span className="text-white font-bold text-lg">C</span>
+            </div>
+            <span className="text-xl font-semibold text-gray-900 dark:text-gray-100">Colla</span>
+          </div>
+          <button
+            className="md:hidden"
+            onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+          >
+            <XIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+          </button>
+        </div>
+
+        <nav className="flex-grow px-4 py-4 space-y-2 overflow-y-auto">
+          <SidebarLink
+            icon={<SearchIcon className="w-5 h-5" />}
+            text="검색"
+            href="#" 
+            theme={theme}
+            onClick={(e) => { e.preventDefault(); alert('검색 기능 구현 예정'); }}
+          />
+          <SidebarLink
+            icon={<LayoutDashboardIcon className="w-5 h-5" />}
+            text="대시보드"
+            href="/"
+            active={pathname === "/"}
+            theme={theme}
+          />
           
-          <div className="flex items-center space-x-2">
-            {/* 프로젝트 선택 드롭다운 */}
-            <div className="relative mr-3 project-dropdown">
-              <div 
-                className={`flex items-center px-3 py-1.5 text-sm ${theme === 'dark' ? 'bg-[#353538] border-gray-700 text-gray-300' : 'bg-white border-gray-300 text-gray-700'} border rounded-md cursor-pointer hover:${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}
-                onClick={() => setShowProjectDropdown(!showProjectDropdown)}
-              >
-                <FolderIcon className={`h-4 w-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} mr-2`} />
-                <span className="mr-1">{currentProjectName}</span>
-                <ChevronDownIcon className={`h-4 w-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
-              </div>
+          <div className="pt-4">
+            <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+              프로젝트
+            </h3>
+            <nav className="mt-2 space-y-1">
+              {projects.map((project) => (
+                <SidebarLink
+                  key={project.id}
+                  icon={<FolderIcon className="w-5 h-5" />}
+                  text={project.name}
+                  href={`/timeline?projectId=${project.id}`}
+                  small
+                  active={currentProject?.id === project.id && pathname === "/timeline"}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentProject(project);
+                    router.push(`/timeline?projectId=${project.id}`);
+                  }}
+                  theme={theme}
+                  isProject={true}
+                />
+              ))}
+              <SidebarLink
+                icon={<PlusIcon className="w-5 h-5" />}
+                text="새 프로젝트"
+                href="/projects/new"
+                active={pathname === "/projects/new"}
+                theme={theme}
+                small
+                onClick={() => router.push("/projects/new")}
+              />
+            </nav>
+          </div>
+
+          <div className="pt-4">
+            <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+              내 작업 공간
+            </h3>
+            <div className="mt-2 space-y-1">
+              <SidebarLink
+                icon={<Trello className="w-5 h-5" />}
+                text="칸반보드"
+                href={currentProject ? `/kanban?projectId=${currentProject.id}` : "/kanban"}
+                active={pathname?.startsWith("/kanban") || pathname?.startsWith("/timeline") || isKanbanSubmenuOpen}
+                theme={theme}
+                small
+                onClick={(e) => {
+                  e.preventDefault();
+                  setIsKanbanSubmenuOpen(!isKanbanSubmenuOpen);
+                  if (currentProject?.id && pathname && !pathname.includes(currentProject.id)) {
+                    router.push(`/kanban?projectId=${currentProject.id}`);
+                  } else if (!currentProject?.id && pathname && pathname !== "/kanban") {
+                    router.push("/kanban");
+                  }
+                }}
+              />
               
-              {/* 드롭다운 메뉴 */}
-              {showProjectDropdown && (
-                <div className={`absolute right-0 mt-1 w-64 ${theme === 'dark' ? 'bg-[#2A2A2C] border-gray-700' : 'bg-white border-gray-200'} border rounded-md shadow-lg z-50 max-h-72 overflow-y-auto`}>
-                  <div 
-                    className={`px-3 py-2 hover:${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} cursor-pointer flex items-center ${
-                      selectedProjectId === null ? (theme === 'dark' ? 'bg-blue-900 text-blue-300' : 'bg-blue-50 text-blue-700') : ''
-                    }`}
-                    onClick={() => handleSelectProject(null)}
-                  >
-                    <div className={`p-1 rounded-full ${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-100'} mr-2`}>
-                      <FolderIcon className={`h-4 w-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`} />
-                    </div>
-                    <span className={`font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>모든 작업</span>
+              {/* 칸반 하위 메뉴 */}
+              {isKanbanSubmenuOpen && (
+                <div className={`pl-4 pt-1 space-y-1 ml-2.5 transition-all duration-300 ease-in-out ${
+                  isKanbanSubmenuOpen ? 'max-h-[20rem] opacity-100' : 'max-h-0 opacity-0'
+                }`}>
+                  <div className="transform transition-all duration-300 ease-in-out" 
+                       style={{ 
+                         opacity: isKanbanSubmenuOpen ? 1 : 0, 
+                         transform: isKanbanSubmenuOpen ? 'translateY(0)' : 'translateY(-10px)',
+                         transition: 'opacity 300ms ease-in-out, transform 300ms ease-in-out'
+                       }}>
+                    <SidebarLink
+                      icon={<Trello className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
+                      text="칸반보드"
+                      href={currentProject ? `/kanban?projectId=${currentProject.id}` : "/kanban"}
+                      active={pathname?.startsWith("/kanban")}
+                      theme={theme}
+                      small
+                    />
                   </div>
                   
-                  {/* 프로젝트 목록 */}
-                  {projects.map((project) => (
-                    <div
-                      key={project.id}
-                      className={`px-3 py-2 hover:${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} cursor-pointer flex items-center ${
-                        selectedProjectId === project.id ? (theme === 'dark' ? 'bg-blue-900 text-blue-300' : 'bg-blue-50 text-blue-700') : ''
-                      }`}
-                      onClick={() => handleSelectProject(project.id)}
-                    >
-                      <div className={`p-1 rounded-full ${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-100'} mr-2`}>
-                        <FolderIcon className={`h-4 w-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`} />
-                      </div>
-                      <span className={`font-medium truncate ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>{project.name}</span>
-                    </div>
-                  ))}
+                  <div className="transform transition-all duration-300 ease-in-out" 
+                       style={{ 
+                         opacity: isKanbanSubmenuOpen ? 1 : 0, 
+                         transform: isKanbanSubmenuOpen ? 'translateY(0)' : 'translateY(-10px)',
+                         transition: 'opacity 300ms ease-in-out 100ms, transform 300ms ease-in-out 100ms'
+                       }}>
+                    <SidebarLink
+                      icon={<ClockIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
+                      text="타임라인"
+                      href={currentProject ? `/timeline?projectId=${currentProject.id}` : "/timeline"}
+                      active={pathname?.startsWith("/timeline")}
+                      theme={theme}
+                      small
+                    />
+                  </div>
                 </div>
               )}
+              
+              <SidebarLink
+                icon={<CalendarIcon className="w-5 h-5" />}
+                text="캘린더"
+                href={currentProject ? `/calendar?projectId=${currentProject.id}` : "/calendar"}
+                active={pathname?.startsWith("/calendar")}
+                theme={theme}
+                small
+              />
+              <SidebarLink
+                icon={<FileTextIcon className="w-5 h-5" />}
+                text="문서"
+                href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
+                active={pathname?.startsWith("/documents")}
+                theme={theme}
+                small
+              />
+              <SidebarLink 
+                icon={<UsersIcon className="w-5 h-5"/>} 
+                text="팀원 관리" 
+                href={currentProject ? `/projects/${currentProject.id}/members` : "/projects"}
+                active={pathname?.includes("/projects") && pathname?.includes("/members")}
+                theme={theme}
+                small 
+              />
+              <SidebarLink
+                icon={<VideoIcon className="w-5 h-5" />}
+                text="화상 회의"
+                href="/meeting"
+                active={pathname?.startsWith("/meeting")}
+                theme={theme}
+                small
+              />
+              <SidebarLink
+                icon={<BarChart3Icon className="w-5 h-5" />}
+                text="보고서"
+                href="/reports"
+                active={pathname?.startsWith("/reports")}
+                theme={theme}
+                small
+              />
+            </div>
+          </div>
+        </nav>
+
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center w-full p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
+                <UserIcon className="w-6 h-6 mr-3 rounded-full bg-gray-200 dark:bg-gray-600 p-0.5 text-gray-700 dark:text-gray-300" />
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user?.name}</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end" sideOffset={5}>
+              <DropdownMenuLabel className="px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400">
+                {user?.email}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push('/mypage')} className="cursor-pointer">
+                <UserIcon className="w-4 h-4 mr-2" />
+                <span>정보 수정</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => alert('알림 기능은 대시보드에서 확인해주세요.')} className="cursor-pointer">
+                <BellIcon className="w-4 h-4 mr-2" />
+                <span>알림</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer">
+                <SettingsIcon className="w-4 h-4 mr-2" />
+                <span>설정</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
+                {theme === 'dark' ? <SunIcon className="w-4 h-4 mr-2" /> : <MoonIcon className="w-4 h-4 mr-2" />}
+                <span>{theme === 'dark' ? "라이트 모드" : "다크 모드"}</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/50 focus:text-red-600 dark:focus:text-red-400">
+                <LogOutIcon className="w-4 h-4 mr-2" />
+                <span>로그아웃</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </aside>
+
+      {/* 메인 콘텐츠 영역 */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* 모바일 헤더 */}
+        <div className="md:hidden flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700 bg-background">
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
+            <MenuIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+          </button>
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-black dark:bg-blue-600 rounded-lg flex items-center justify-center mr-2">
+              <span className="text-white font-bold text-lg">C</span>
+            </div>
+            <span className="text-xl font-semibold text-gray-900 dark:text-gray-100">Colla</span>
+          </div>
+          <div className="w-10"></div> {/* 균형을 위한 빈 공간 */}
+        </div>
+
+        {/* 메인 콘텐츠 */}
+        <main className="flex flex-col flex-1 p-6 lg:p-8 overflow-y-auto bg-background">
+          {/* 페이지 헤더 */}
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold mb-2 flex items-center">
+              <ClockIcon className="w-8 h-8 text-gray-600 dark:text-gray-400 mr-3" />
+              타임라인
+            </h2>
+            <p className={`text-lg ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+              {currentProjectName}의 작업 일정을 시간순으로 확인하세요
+            </p>
+          </div>
+
+          {/* 타임라인 위젯 */}
+          <div className="rounded-xl shadow-sm bg-white dark:bg-[#2a2a2c] p-6 flex flex-col flex-1">
+            <div className="flex justify-between items-center mb-5">
+              <div className="flex items-center">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                  {currentProjectName} 타임라인
+                </h3>
+              </div>
             </div>
             
-            {/* 대시보드로 돌아가기 버튼 */}
-            {theme === 'dark' ? (
-              <button 
-                onClick={() => router.push('/')}
-                className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-[#2A2A2C] border border-gray-700 text-gray-300 hover:bg-gray-700 rounded-md transition-colors duration-200"
-              >
-                <ArrowLeftIcon className="w-4 h-4 mr-1" />
-                <span>대시보드로 돌아가기</span>
-              </button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push('/')}
-                className="flex items-center space-x-1"
-              >
-                <ArrowLeftIcon className="w-4 h-4" />
-                <span>대시보드로 돌아가기</span>
-              </Button>
-            )}
+            <div className="flex-1 overflow-hidden">
+              <Timeline projectId={selectedProjectId} theme={theme} />
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* 탭 네비게이션 */}
-      <div className={`${theme === 'dark' ? 'bg-[#2A2A2C] border-gray-800' : 'bg-white border-gray-200'} border-b`}>
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex">
-            <Link
-              href={selectedProjectId ? `/kanban?projectId=${selectedProjectId}` : '/kanban'}
-              className="flex items-center space-x-2 py-3 px-4 border-b-2 border-transparent hover:text-blue-600 hover:border-blue-600 transition-colors mr-4"
-            >
-              <TrelloIcon className={`w-5 h-5 ${theme === 'dark' ? 'text-white' : ''}`} />
-              <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>칸반보드</span>
-            </Link>
-            
-            <Link
-              href={selectedProjectId ? `/timeline?projectId=${selectedProjectId}` : '/timeline'}
-              className="flex items-center space-x-2 py-3 px-4 text-blue-600 border-blue-600 border-b-2"
-            >
-              <ClockIcon className={`w-5 h-5 ${theme === 'dark' ? 'text-white' : ''}`} />
-              <span>타임라인</span>
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto py-8 px-4">
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <ClockIcon className={`w-6 h-6 ${theme === 'dark' ? 'text-purple-400' : 'text-purple-600'}`} />
-            <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>타임라인</h1>
-          </div>
-        </div>
-        
-        <div className={`${theme === 'dark' ? 'bg-[#2A2A2C]' : 'bg-white'} rounded-lg shadow-sm p-6`}>
-          <Timeline projectId={selectedProjectId} theme={theme} />
-        </div>
+        </main>
       </div>
     </div>
   );

@@ -2625,24 +2625,41 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
             active={pathname === "/"}
             theme={theme}
           />
-          <SidebarLink
-            icon={<BellIcon className="w-5 h-5" />}
-            text="알림"
-            href="#" 
-            theme={theme}
-            onClick={(e) => { 
-              e.preventDefault(); 
-              alert('알림 기능은 대시보드에서 확인해주세요.');
-            }}
-          />
-          <SidebarLink
-            icon={<SettingsIcon className="w-5 h-5" />}
-            text="설정"
-            href="/settings" 
-            active={pathname === "/settings"}
-            theme={theme}
-          />
           
+          <div className="pt-4">
+            <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+              프로젝트
+            </h3>
+            <nav className="mt-2 space-y-1">
+              {projects.map((project) => (
+                <SidebarLink
+                  key={project.id}
+                  icon={<FolderIcon className="w-5 h-5" />}
+                  text={project.name}
+                  href={`/documents/${params.id}?projectId=${project.id}`}
+                  small
+                  active={projectId === project.id}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentProject(project);
+                    forceSetProjectId(project.id);
+                  }}
+                  theme={theme}
+                  isProject={true}
+                />
+              ))}
+              <SidebarLink
+                icon={<PlusIcon className="w-5 h-5" />}
+                text="새 프로젝트"
+                href="/projects/new"
+                active={pathname === "/projects/new"}
+                theme={theme}
+                small
+                onClick={() => router.push("/projects/new")}
+              />
+            </nav>
+          </div>
+
           <div className="pt-4">
             <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
               내 작업 공간
@@ -2667,45 +2684,11 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               <SidebarLink
                 icon={<FileTextIcon className="w-5 h-5" />}
                 text="문서"
-                href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
-                active={pathname?.startsWith("/documents") || isDocumentsSubmenuOpen}
+                href={projectId ? `/documents?projectId=${projectId}` : "/documents"}
+                active={pathname?.startsWith("/documents")}
                 theme={theme}
                 small
-                onClick={(e) => {
-                  e.preventDefault();
-                  setIsDocumentsSubmenuOpen(!isDocumentsSubmenuOpen);
-                }}
               />
-              {/* 문서 하위 메뉴 */}
-              {isDocumentsSubmenuOpen && (
-                <div className="pl-4 pt-1 space-y-1 ml-2.5 transition-all duration-300 ease-in-out">
-                  <SidebarLink
-                    icon={<FileTextIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
-                    text="모든 문서"
-                    href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
-                    active={pathname?.startsWith("/documents") && !pathname?.includes("/new")}
-                    theme={theme}
-                    small
-                  />
-                  <SidebarLink
-                    icon={<StarIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
-                    text="즐겨찾기"
-                    href={currentProject?.id ? `/documents?projectId=${currentProject.id}&favorites=true` : "/documents?favorites=true"}
-                    active={pathname?.startsWith("/documents") && false} // favorites 체크 로직 필요시 추가
-                    theme={theme}
-                    small
-                  />
-                  <SidebarLink
-                    icon={<PlusIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
-                    text="새 문서 작성"
-                    href={currentProject?.id ? `/documents/new?projectId=${currentProject.id}` : "/documents/new"}
-                    active={pathname?.includes("/documents/new")}
-                    theme={theme}
-                    small
-                  />
-                </div>
-              )}
-              
               <SidebarLink 
                 icon={<UsersIcon className="w-5 h-5"/>} 
                 text="팀원 관리" 
@@ -2732,40 +2715,6 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               />
             </div>
           </div>
-
-          <div className="pt-4">
-            <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              프로젝트
-            </h3>
-            <nav className="mt-2 space-y-1">
-              {projects.map((project) => (
-                <SidebarLink
-                  key={project.id}
-                  icon={<FolderIcon className="w-5 h-5" />}
-                  text={project.name}
-                  href={`/documents?projectId=${project.id}`}
-                  small
-                  active={currentProject?.id === project.id && pathname?.startsWith("/documents")}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setCurrentProject(project);
-                    router.push(`/documents?projectId=${project.id}`); 
-                  }}
-                  theme={theme}
-                  isProject={true}
-                />
-              ))}
-              <SidebarLink
-                icon={<PlusIcon className="w-5 h-5" />}
-                text="새 프로젝트"
-                href="/projects/new"
-                active={pathname === "/projects/new"}
-                theme={theme}
-                small
-                onClick={() => router.push("/projects/new")}
-              />
-            </nav>
-          </div>
         </nav>
 
         <div className="p-4 border-t border-gray-200 dark:border-gray-700">
@@ -2784,6 +2733,14 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               <DropdownMenuItem onClick={() => router.push('/mypage')} className="cursor-pointer">
                 <UserIcon className="w-4 h-4 mr-2" />
                 <span>정보 수정</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => alert('알림 기능은 대시보드에서 확인해주세요.')} className="cursor-pointer">
+                <BellIcon className="w-4 h-4 mr-2" />
+                <span>알림</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer">
+                <SettingsIcon className="w-4 h-4 mr-2" />
+                <span>설정</span>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
                 {theme === 'dark' ? <SunIcon className="w-4 h-4 mr-2" /> : <MoonIcon className="w-4 h-4 mr-2" />}
