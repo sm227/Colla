@@ -870,6 +870,7 @@ const CalendarPage: React.FC = () => {
       setEditEventDialog({ show: true, event });
       setShowAddForm(false);
       setShowTaskDetail(false);
+      setIsSidebarOpen(false);
       setEditingEvent({
         id: event.id,
         title: event.title,
@@ -884,6 +885,7 @@ const CalendarPage: React.FC = () => {
       setShowTaskDetail(true);
       setShowAddForm(false);
       setEditEventDialog({ show: false, event: null });
+      setIsSidebarOpen(false);
     }
   };
 
@@ -1028,6 +1030,8 @@ const CalendarPage: React.FC = () => {
           setAddEventDialog({show:true,date:null});
           setShowAddForm(true);
           setEditEventDialog({ show: false, event: null });
+          setShowTaskDetail(false);
+          setIsSidebarOpen(false);
           setNewEvent({
             ...newEvent,
             startDate: format(new Date(), 'yyyy-MM-dd'),
@@ -1093,7 +1097,6 @@ const CalendarPage: React.FC = () => {
               <Button size="sm" variant={calendarView==='week'?'default':'outline'} onClick={()=>setCalendarView('week')}>주</Button>
               <Button size="sm" variant={calendarView==='day'?'default':'outline'} onClick={()=>setCalendarView('day')}>일</Button>
             </div>
-            <MoreHorizontal className="w-5 h-5 text-gray-400" />
           </div>
         </div>
         {/* 월/주/일 달력 뷰 */}
@@ -1115,6 +1118,8 @@ const CalendarPage: React.FC = () => {
                       setAddFormDate(format(day, 'yyyy-MM-dd'));
                       setNewEvent({ ...newEvent, startDate: format(day, 'yyyy-MM-dd') });
                       setEditEventDialog({ show: false, event: null });
+                      setShowTaskDetail(false);
+                      setIsSidebarOpen(false);
                     }}
                     onClick={()=>{
                       setSelectedDate(day);
@@ -1124,7 +1129,7 @@ const CalendarPage: React.FC = () => {
                     onDrop={(e) => {
                       e.preventDefault();
                       if (draggedTask && !draggedTask.isCalendarEvent && !draggedTask.isHoliday) {
-                        handleDrop(selectedDate || currentDate)(e);
+                        handleDrop(day)(e);
                       }
                     }}
                   >
@@ -1431,6 +1436,7 @@ const CalendarPage: React.FC = () => {
                               });
                               setEditEventDialog({ show: false, event: null });
                               setShowTaskDetail(false);
+                              setIsSidebarOpen(false);
                             }}
                           />
                         ))}
@@ -1735,6 +1741,7 @@ const CalendarPage: React.FC = () => {
                         });
                         setEditEventDialog({ show: false, event: null });
                         setShowTaskDetail(false);
+                        setIsSidebarOpen(false);
                       }}
                     />
                   ))}
