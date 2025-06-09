@@ -25,6 +25,7 @@ import {
   BarChart3Icon,
   SunIcon,
   MoonIcon,
+  MenuIcon,
   AlertCircleIcon,
   CheckCircleIcon,
   ClockIcon,
@@ -37,18 +38,12 @@ import Link from "next/link";
 // import Image from "next/image"; // Image 주석 처리
 import { useAuth } from "./contexts/AuthContext";
 import { useProject } from "./contexts/ProjectContext";
+import { useNotifications } from "./contexts/NotificationContext";
 import { Task, TaskStatus } from "@/components/kanban/KanbanBoard";
 // import { useTasks } from "@/hooks/useTasks"; // useTasks 임포트 제거
 
-// shadcn/ui DropdownMenu 컴포넌트 임포트
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+// 통합 사이드바 컴포넌트 임포트
+import Sidebar from "@/components/Sidebar";
 
 // API 응답에 project 객체가 포함되므로, 이를 반영하는 새로운 타입을 정의합니다.
 // 기존 Task 타입의 필드도 포함하도록 확장합니다。
@@ -973,9 +968,8 @@ export default function Home() {
   }, []);
 
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [showNotificationPanel, setShowNotificationPanel] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
-  // const [roomId, /* setRoomId */] = useState(""); // roomId 및 setRoomId 주석 처리
+  const [tasks, setTasks] = useState<Task[]>([]);
 
   // 기존의 theme 저장 useEffect 제거 (next-themes가 자동으로 처리)
 
@@ -992,14 +986,12 @@ export default function Home() {
     acceptProjectInvitation,
     rejectProjectInvitation
   } = useProject();
-  // const { tasks = [], loading: tasksLoading } = useTasks( // tasks 변수 제거
-  //   currentProject?.id || null
-  // );
+  
+  const { showNotificationPanel, setShowNotificationPanel, hasNewNotifications, refreshNotifications } = useNotifications();
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationLoading, setNotificationLoading] = useState(false);
   const [notificationError, setNotificationError] = useState<string | null>(null);
-  const [hasNewNotifications, setHasNewNotifications] = useState(false);
   const lastNotificationCountRef = useRef(0);
   const notificationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [processingInvitation, setProcessingInvitation] = useState<string | null>(null);
@@ -1030,7 +1022,7 @@ export default function Home() {
            const prevIds = new Set(previousNotificationsRef.current.map(n => n.id));
            const hasTrulyNew = sortedNotifications.some(n => !prevIds.has(n.id));
            if (hasTrulyNew) {
-          setHasNewNotifications(true);
+          // setHasNewNotifications(true); // 전역 컨텍스트에서 처리
            }
         }
         
@@ -1069,7 +1061,7 @@ export default function Home() {
 
   useEffect(() => {
     if (showNotificationPanel) {
-      setHasNewNotifications(false);
+      // setHasNewNotifications(false); // 전역 컨텍스트에서 처리
       loadNotifications(true);
       }
   }, [showNotificationPanel]);
@@ -1245,6 +1237,11 @@ export default function Home() {
         console.error("작업 생성 알림 전송 실패:", notificationError);
       }
       
+      // 작업 추가 성공 시 알림 즉시 새로고침
+      setTimeout(() => {
+        refreshNotifications();
+      }, 1000); // 1초 후 새로고침 (서버에서 알림 처리 시간 고려)
+      
       alert("작업이 성공적으로 추가되었습니다.");
     } catch (error) {
       console.error("작업 추가 중 오류:", error);
@@ -1265,292 +1262,48 @@ export default function Home() {
       <CalendarStyles />
       <ModernScrollbarStyles />
       <div className="flex h-screen bg-background text-foreground">
-        <aside
-          className={`fixed inset-y-0 left-0 z-30 w-64  border-r border-gray-200 bg-background dark:border-gray-700 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
-            mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
-          } md:relative md:flex-shrink-0 flex flex-col`}
-        >
-          <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
+        {/* 통합 사이드바 */}
+        <Sidebar
+          mobileSidebarOpen={mobileSidebarOpen}
+          setMobileSidebarOpen={setMobileSidebarOpen}
+          currentPage="dashboard"
+          onSettingsClick={() => setShowTaskModal(true)}
+        />
+
+        <div className={`flex-1 flex flex-col overflow-hidden ${showNotificationPanel ? 'pl-80 md:pl-96' : ''} transition-all duration-300 ease-in-out`}>
+          {/* 모바일 헤더 */}
+          <div className="md:hidden bg-background border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+            >
+              <MenuIcon className="w-6 h-6" />
+            </button>
+            
             <div className="flex items-center">
               <div className="w-8 h-8 bg-black dark:bg-blue-600 rounded-lg flex items-center justify-center mr-2">
                 <span className="text-white font-bold text-lg">C</span>
               </div>
               <span className="text-xl font-semibold text-gray-900 dark:text-gray-100">Colla</span>
             </div>
-            <button
-              className="md:hidden"
-              onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-            >
-              <XIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
-            </button>
-          </div>
-
-          <nav className="flex-grow px-4 py-4 space-y-2 overflow-y-auto">
-            <SidebarLink
-              icon={<SearchIcon className="w-5 h-5" />}
-              text="검색"
-              href="#" 
-              theme={theme}
-              onClick={(e) => { e.preventDefault(); alert('검색 기능 구현 예정'); }}
-            />
-            <SidebarLink
-              icon={<LayoutDashboardIcon className="w-5 h-5" />}
-              text="대시보드"
-              href="/"
-              active={pathname === "/"}
-              theme={theme}
-            />
             
-            <div className="pt-4">
-              <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                프로젝트
-              </h3>
-              <nav className="mt-2 space-y-1">
-                {projects.map((project) => (
-                  <SidebarLink
-                    key={project.id}
-                    icon={<FolderIcon className="w-5 h-5" />}
-                    text={project.name}
-                    href={`/?projectId=${project.id}`}
-                    small
-                    active={currentProject?.id === project.id}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setCurrentProject(project);
-                      const newUrl = `/?projectId=${project.id}`;
-                      router.push(newUrl);
-                    }}
-                    theme={theme}
-                    isProject={true}
-                  />
-                ))}
-                <SidebarLink
-                  icon={<PlusIcon className="w-5 h-5" />}
-                  text="새 프로젝트"
-                  href="/projects/new"
-                  active={pathname === "/projects/new"}
-                  theme={theme}
-                  small
-                  onClick={() => router.push("/projects/new")}
-                />
-              </nav>
-            </div>
-
-            <div className="pt-4">
-              <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                내 작업 공간
-              </h3>
-              <div className="mt-2 space-y-1">
-                <SidebarLink
-                  icon={<Trello className="w-5 h-5" />}
-                  text="칸반보드"
-                  href={currentProject ? `/kanban?projectId=${currentProject.id}` : "/kanban"}
-                  active={pathname?.startsWith("/kanban")}
-                  theme={theme}
-                  small
-                />
-                <SidebarLink
-                  icon={<CalendarIcon className="w-5 h-5" />}
-                  text="캘린더"
-                  href={currentProject ? `/calendar?projectId=${currentProject.id}` : "/calendar"}
-                  active={pathname?.startsWith("/calendar")}
-                  theme={theme}
-                  small
-                />
-                <SidebarLink
-                  icon={<FileTextIcon className="w-5 h-5" />}
-                  text="문서"
-                  href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
-                  active={pathname?.startsWith("/documents")}
-                  theme={theme}
-                  small
-                />
-                
-                {/* 문서 하위 메뉴 추가 */}
-                <SidebarLink 
-                  icon={<UsersIcon className="w-5 h-5"/>} 
-                  text="팀원 관리" 
-                  href={currentProject ? `/projects/${currentProject.id}/members` : "/projects"}
-                  active={pathname?.includes("/projects") && pathname?.includes("/members")}
-                  theme={theme}
-                  small 
-                />
-                <SidebarLink
-                  icon={<VideoIcon className="w-5 h-5" />}
-                  text="화상 회의"
-                  href="/meeting"
-                  active={pathname?.startsWith("/meeting")}
-                  theme={theme}
-                  small
-                />
-                <SidebarLink
-                  icon={<BarChart3Icon className="w-5 h-5" />}
-                  text="보고서"
-                  href="/reports"
-                  active={pathname?.startsWith("/reports")}
-                  theme={theme}
-                  small
-                />
-            </div>
-          </div>
-        </nav>
-
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center w-full p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
-                <UserIcon className="w-6 h-6 mr-3 rounded-full bg-gray-200 dark:bg-gray-600 p-0.5 text-gray-700 dark:text-gray-300" />
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user?.name || user?.email || '사용자'}</span>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" sideOffset={5}>
-              <DropdownMenuLabel className="px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400">
-                {user?.email}
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push('/mypage')} className="cursor-pointer">
-                <UserIcon className="w-4 h-4 mr-2" />
-                <span>정보 수정</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShowNotificationPanel(!showNotificationPanel)} className="cursor-pointer">
-                <BellIcon className="w-4 h-4 mr-2" />
-                <span>알림</span>
+            <div className="flex items-center gap-2">
+            <button
+                onClick={() => setShowNotificationPanel(!showNotificationPanel)}
+                className="relative p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title="알림"
+              >
+                <BellIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                 {hasNewNotifications && (
-                  <span className="ml-auto w-2 h-2 bg-red-500 rounded-full"></span>
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
                 )}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer">
-                <SettingsIcon className="w-4 h-4 mr-2" />
-                <span>설정</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
-                {theme === 'dark' ? <SunIcon className="w-4 h-4 mr-2" /> : <MoonIcon className="w-4 h-4 mr-2" />}
-                <span>{theme === 'dark' ? "라이트 모드" : "다크 모드"}</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/50 focus:text-red-600 dark:focus:text-red-400">
-                <LogOutIcon className="w-4 h-4 mr-2" />
-                <span>로그아웃</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </aside>
-
-      {showNotificationPanel && (
-        <div 
-            className={`fixed top-0 left-0 md:left-64 h-full w-80 md:w-96 z-40 transform transition-transform duration-300 ease-in-out ${ 
-            showNotificationPanel ? 'translate-x-0' : '-translate-x-full'
-            } bg-white border-r border-gray-300 text-gray-800 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 shadow-lg flex flex-col`}
-        >
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700"> 
-                <div className="flex justify-between items-center">
-                <h3 className={`text-lg font-semibold`}>알림</h3>
-                <button 
-                    onClick={() => setShowNotificationPanel(false)} 
-                    className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
-                >
-                      <XIcon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
                     </button>
-                </div>
-                  </div>
-                  
-              <div className="flex-grow overflow-y-auto p-4">
-                    {notificationLoading && (
-                      <div className="flex justify-center items-center py-10">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-500"></div>
-                      </div>
-                    )}
-
-                    {notificationError && (
-                      <div className="text-center py-10 text-red-500">
-                        <p>{notificationError}</p>
-                      </div>
-                    )}
-
-                    {!notificationLoading && !notificationError && notifications.length === 0 && (
-                  <div className="text-center py-10 text-gray-400 dark:text-gray-500">
-                  <BellIcon className="w-10 h-10 mx-auto mb-2" />
-                        <p>새로운 알림이 없습니다.</p>
-                      </div>
-                    )}
-
-                    {!notificationLoading && !notificationError && notifications.length > 0 && (
-                  notifications.map((notification) => (
-                          <div 
-                            key={notification.id} 
-                      className="p-4 mb-1 rounded-lg flex flex-col transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-700"
-                      onClick={() => {
-                      if (notification.type !== 'invitation') {
-                          router.push(notification.link);
-                          setShowNotificationPanel(false); 
-                      }
-                      }}
-                          >
-                            <div className="flex items-start">
-                          <div className={`flex-shrink-0 p-2 rounded-full ${notification.iconBgColor || 'bg-gray-100'} dark:bg-gray-700 bg-opacity-20 mr-4`}>
-                                {notification.icon || <BellIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" />}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-semibold ${notification.iconColor || 'text-gray-900'} dark:text-gray-100`}>{notification.title}</p>
-                                  <p className="text-xs text-gray-500 dark:text-gray-300 mt-1 truncate">
-                                  {notification.message}
-                                </p>
-                                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-                                  {formatDateForNotification(notification.createdAt)}
-                                </p>
-                              </div>
-                            </div>
-                            
-                            {notification.type === 'invitation' && notification.projectId && (
-                              <div className="mt-3 flex justify-end space-x-2">
-                                {processingInvitation === notification.id ? (
-                                      <div className="text-xs flex items-center text-gray-500 dark:text-gray-400">
-                                    <div className="mr-2 w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-                                    처리 중...
-                                  </div>
-                                ) : (
-                                  <>
-                                    <button
-                                      onClick={(e) => handleRejectInvitation(notification.id, notification.projectId as string, e)}
-                                      className="px-3 py-1 rounded text-xs font-medium bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-700 dark:hover:bg-red-600 dark:text-red-100 transition-colors"
-                                    >
-                                      거절
+              <button className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                <UserIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                                     </button>
-                                    <button
-                                      onClick={(e) => handleAcceptInvitation(notification.id, notification.projectId as string, e)}
-                                      className="px-3 py-1 rounded text-xs font-medium bg-blue-100 hover:bg-blue-200 text-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 dark:text-blue-100 transition-colors"
-                                    >
-                                      수락
-                                    </button>
-                                  </>
-                                )}
                               </div>
-                            )}
-                            {(notification.type === 'task_created' || notification.type === 'task_updated') && (
-                              <div className="mt-3 flex justify-end">
-                                <button
-                                  onClick={() => {
-                                    router.push(notification.link);
-                                          setShowNotificationPanel(false);
-                                  }}
-                                  className="px-3 py-1 rounded text-xs font-medium bg-purple-100 hover:bg-purple-200 text-purple-700 dark:bg-purple-700 dark:hover:bg-purple-600 dark:text-purple-100 transition-colors"
-                                >
-                                  칸반보드로 이동
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                  ))
-                    )}
               </div>
                     
-              {/* "모든 알림 보기 페이지로" 링크 제거 */}
-                </div>
-              )}
-
-        <div className={`flex-1 flex flex-col overflow-hidden ${showNotificationPanel ? 'pl-80 md:pl-96' : ''} transition-all duration-300 ease-in-out`}>
-          {/* 상단 헤더 제거 */}
           <main className="flex flex-col flex-1 p-6 lg:p-8 overflow-y-auto bg-background">
             <div className="mb-8">
               <h2 className="text-3xl font-bold mb-2">{getGreeting()}, {user.name}님!</h2>
@@ -1649,58 +1402,7 @@ export default function Home() {
   );
 }
 
-function SidebarLink({
-  icon,
-  text,
-  href,
-  active = false,
-  small = false,
-  onClick,
-  theme = "dark", 
-  badgeCount,
-  isProject = false // 프로젝트 링크인지 여부를 확인하는 새 prop
-}: {
-  icon: React.ReactNode;
-  text: string;
-  href: string;
-  active?: boolean;
-  small?: boolean;
-  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
-  theme?: "light" | "dark";
-  badgeCount?: string | number;
-  isProject?: boolean;
-}) {
-  // 활성 상태의 프로젝트를 위한 배경색 계산
-  const activeProjectBg = theme === 'dark' 
-    ? 'bg-blue-900 bg-opacity-30' // 다크 모드: 짙은 파란색 배경 (투명도 30%)
-    : 'bg-blue-100 bg-opacity-50'; // 라이트 모드: 연한 파란색 배경 (투명도 50%)
-    
-  return (
-    <Link
-      href={href}
-      onClick={onClick}
-      className={`flex items-center justify-between px-2 py-1.5 ${small ? "text-sm" : "text-[15px]"} rounded-md transition-colors duration-150 ${
-        theme === 'dark'
-          ? active && isProject
-            ? `${activeProjectBg} text-gray-300 hover:bg-gray-700 hover:text-gray-100` // 활성 프로젝트: 투명한 파란색 배경
-            : "text-gray-300 hover:bg-gray-700 hover:text-gray-100" // 일반/활성 상태: 텍스트 색상 동일
-          : active && isProject
-            ? `${activeProjectBg} text-gray-600 hover:bg-gray-200 hover:text-gray-900` // 활성 프로젝트: 투명한 파란색 배경
-            : "text-gray-600 hover:bg-gray-200 hover:text-gray-900" // 일반/활성 상태: 텍스트 색상 동일
-      }`}
-    >
-          <div className="flex items-center">
-        <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{icon}</div>
-        <span>{text}</span>
-          </div>
-      {badgeCount && (
-        <span className={`px-1.5 py-0.5 text-xs font-semibold rounded-full ${badgeCount === 'new' ? (theme === 'dark' ? 'bg-red-500 text-white' : 'bg-red-500 text-white') : (theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-700')}`}>
-          {badgeCount === 'new' ? '' : badgeCount}
-            </span>
-          )}
-    </Link>
-  );
-}
+// SidebarLink 함수는 통합 사이드바 컴포넌트에서 처리됨
 
 function DashboardWidget({ 
   title,

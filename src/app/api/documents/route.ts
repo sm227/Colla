@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
     // URL 쿼리 파라미터 가져오기
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('projectId');
+    const folderId = searchParams.get('folderId');
     const limit = searchParams.get('limit');
     
     // 쿼리 조건 설정
@@ -62,6 +63,13 @@ export async function GET(request: NextRequest) {
     
     if (projectId) {
       // 특정 프로젝트의 문서만 가져옴
+      let whereClause = `d."projectId" = '${projectId}'`;
+      
+      // 폴더 ID로 추가 필터링
+      if (folderId) {
+        whereClause += ` AND d."folderId" = '${folderId}'`;
+      }
+      
       documentsQuery = `
         SELECT 
           d.id, 
@@ -76,7 +84,7 @@ export async function GET(request: NextRequest) {
           d."createdAt"::timestamp with time zone AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul' as "createdAt", 
           d."updatedAt"::timestamp with time zone AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul' as "updatedAt"
         FROM "Document" d
-        WHERE d."projectId" = '${projectId}'
+        WHERE ${whereClause}
         ORDER BY d."updatedAt" DESC
         ${limit ? `LIMIT ${limit}` : ''}
       `;
@@ -91,6 +99,13 @@ export async function GET(request: NextRequest) {
       
       if (userProjectIds.length > 0) {
         // 사용자의 프로젝트에 속한 모든 문서 가져오기
+        let whereClause = `d."projectId" IN (${userProjectIds.map(id => `'${id}'`).join(',')})`;
+        
+        // 폴더 ID로 추가 필터링
+        if (folderId) {
+          whereClause += ` AND d."folderId" = '${folderId}'`;
+        }
+        
         documentsQuery = `
           SELECT 
             d.id, 
@@ -105,7 +120,7 @@ export async function GET(request: NextRequest) {
             d."createdAt"::timestamp with time zone AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul' as "createdAt", 
             d."updatedAt"::timestamp with time zone AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Seoul' as "updatedAt"
           FROM "Document" d
-          WHERE d."projectId" IN (${userProjectIds.map(id => `'${id}'`).join(',')})
+          WHERE ${whereClause}
           ORDER BY d."updatedAt" DESC
           ${limit ? `LIMIT ${limit}` : ''}
         `;

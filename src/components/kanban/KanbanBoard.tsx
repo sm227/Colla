@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { KanbanColumn } from "./KanbanColumn";
 import { ClipboardListIcon } from "lucide-react";
 import { useTasks } from "@/hooks/useTasks";
+import { useNotifications } from "@/app/contexts/NotificationContext";
 import { Alert } from "@/components/ui/alert";
 import { TaskDetailDialog } from "./TaskDetailDialog";
 
@@ -35,6 +36,7 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
   // console.log("KanbanBoard 렌더링 - projectId:", projectId);
   
   const { tasks, loading, error, addTask, updateTaskStatus, updateTask, deleteTask, fetchTasks } = useTasks(projectId);
+  const { refreshNotifications } = useNotifications();
   const [tasksState, setTasksState] = useState<Task[]>([]);
   
   // 작업 상세 다이얼로그 관련 상태 추가
@@ -96,6 +98,11 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
       setTasksState(prev =>
         prev.map(t => t.id === tempId ? { ...created } : t)
       );
+      
+      // 4. 작업 추가 성공 시 알림 즉시 새로고침
+      setTimeout(() => {
+        refreshNotifications();
+      }, 1000); // 1초 후 새로고침 (서버에서 알림 처리 시간 고려)
     } catch (e) {
       // 4. 실패 시 롤백
       setTasksState(prev => prev.filter(t => t.id !== tempId));
@@ -106,6 +113,11 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
   // 태스크 상태 변경 함수
   const handleUpdateTaskStatus = async (taskId: string, newStatus: TaskStatus) => {
     await updateTaskStatus(taskId, newStatus);
+    
+    // 상태 변경 성공 시 알림 즉시 새로고침
+    setTimeout(() => {
+      refreshNotifications();
+    }, 1000); // 1초 후 새로고침 (서버에서 알림 처리 시간 고려)
   };
 
   // 작업 상세 다이얼로그 관리 함수 수정
@@ -136,6 +148,11 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
       
       if (result) {
         console.log('작업 업데이트 성공:', result);
+        
+        // 작업 업데이트 성공 시 알림 즉시 새로고침
+        setTimeout(() => {
+          refreshNotifications();
+        }, 1000); // 1초 후 새로고침 (서버에서 알림 처리 시간 고려)
       } else {
         console.error('작업 업데이트 실패');
         // 실패 시 로컬 상태 복구를 위해 다시 서버에서 데이터 가져오기

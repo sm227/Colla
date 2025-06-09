@@ -108,6 +108,25 @@ export async function POST(req: NextRequest) {
       }
     });
 
+    // 작업 생성 알림 이벤트 발생
+    try {
+      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+      await fetch(`${baseUrl}/api/notifications/task-events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventType: 'task_created',
+          taskId: newTask.id,
+          projectId: newTask.projectId,
+        }),
+      });
+    } catch (notificationError) {
+      console.error('작업 생성 알림 발생 중 오류:', notificationError);
+      // 알림 실패해도 작업 생성은 성공으로 처리
+    }
+
     return NextResponse.json(newTask);
   } catch (error) {
     console.error("작업 생성 중 오류 발생:", error);
@@ -151,6 +170,26 @@ export async function PUT(req: NextRequest) {
         updatedAt: new Date()
       }
     });
+
+    // 작업 업데이트 알림 이벤트 발생
+    try {
+      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+      await fetch(`${baseUrl}/api/notifications/task-events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventType: 'task_updated',
+          taskId: updatedTask.id,
+          projectId: updatedTask.projectId,
+          newStatus: status,
+        }),
+      });
+    } catch (notificationError) {
+      console.error('작업 업데이트 알림 발생 중 오류:', notificationError);
+      // 알림 실패해도 작업 업데이트는 성공으로 처리
+    }
 
     return NextResponse.json(updatedTask);
   } catch (error) {
