@@ -609,6 +609,11 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
   const [showFolderDropdown, setShowFolderDropdown] = useState(false);
   const [newFolderName, setNewFolderName] = useState<string>("");
   
+  // 폴더 모달 상태 추가
+  const [showFolderModal, setShowFolderModal] = useState(false);
+  const [folderModalName, setFolderModalName] = useState<string>("");
+  const [isFolderCreating, setIsFolderCreating] = useState(false);
+  
   // 사용자 프로젝트 역할 상태 추가
   const [userProjectRole, setUserProjectRole] = useState<string | null>(null);
   const [isProjectOwner, setIsProjectOwner] = useState(false);
@@ -2228,6 +2233,53 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       alert('폴더를 생성하는 중 오류가 발생했습니다.');
     }
   };
+  
+  // 사이드바에서 폴더 생성 함수
+  const createFolderFromSidebar = async () => {
+    if (!folderModalName || !folderModalName.trim() || !selectedProjectId) {
+      alert('폴더 이름을 입력해주세요.');
+      return;
+    }
+    
+    setIsFolderCreating(true);
+    
+    try {
+      const response = await fetch('/api/documents/folders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: folderModalName.trim(),
+          projectId: selectedProjectId
+        })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || '폴더 생성 실패');
+      }
+      
+      // 새 폴더 생성 성공
+      const newFolder = await response.json();
+      
+      // 폴더 목록 업데이트
+      fetchFolders();
+      
+      // 모달 닫기 및 상태 초기화
+      setShowFolderModal(false);
+      setFolderModalName('');
+      
+      // 성공 메시지
+      showToast('폴더 생성 완료', `'${newFolder.name}' 폴더가 생성되었습니다.`, 'success');
+      
+    } catch (error) {
+      console.error('새 폴더 생성 중 오류:', error);
+      alert(error instanceof Error ? error.message : '폴더를 생성하는 중 오류가 발생했습니다.');
+    } finally {
+      setIsFolderCreating(false);
+    }
+  };
 
   // 컨텐츠 변경 감지 및 자동저장 트리거
   useEffect(() => {
@@ -2491,13 +2543,17 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       if (showSecurityMenu && !target.closest('.security-menu-container')) {
         setShowSecurityMenu(false);
       }
+      if (showFolderModal && target.classList.contains('backdrop-blur-sm')) {
+        setShowFolderModal(false);
+        setFolderModalName('');
+      }
     };
     
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showSecurityMenu]);
+  }, [showSecurityMenu, showFolderModal]);
 
   // 문서 비밀번호 업데이트 함수
   const updateDocumentPassword = async (password: string | null, isProtected: boolean) => {
@@ -2681,14 +2737,77 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
                 theme={theme}
                 small
               />
-              <SidebarLink
-                icon={<FileTextIcon className="w-5 h-5" />}
-                text="문서"
-                href={projectId ? `/documents?projectId=${projectId}` : "/documents"}
-                active={pathname?.startsWith("/documents")}
-                theme={theme}
-                small
-              />
+              
+              {/* 문서 섹션 */}
+              <div>
+                <button
+                  onClick={() => setIsDocumentsSubmenuOpen(!isDocumentsSubmenuOpen)}
+                  className={`flex items-center justify-between w-full px-2 py-1.5 text-sm rounded-md transition-colors duration-150 ${
+                    theme === 'dark'
+                      ? pathname?.startsWith("/documents")
+                        ? "bg-blue-900 bg-opacity-30 text-gray-300 hover:bg-gray-700 hover:text-gray-100"
+                        : "text-gray-300 hover:bg-gray-700 hover:text-gray-100"
+                      : pathname?.startsWith("/documents")
+                        ? "bg-blue-100 bg-opacity-50 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                        : "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                      <FileTextIcon className="w-5 h-5" />
+                    </div>
+                    <span>문서</span>
+                  </div>
+                  <ChevronRightIcon 
+                    className={`w-4 h-4 transition-transform duration-200 ${
+                      isDocumentsSubmenuOpen ? 'transform rotate-90' : ''
+                    } ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}
+                  />
+                </button>
+                
+                {isDocumentsSubmenuOpen && (
+                  <div className="ml-4 mt-1 space-y-1">
+                    <SidebarLink
+                      icon={<FileTextIcon className="w-4 h-4" />}
+                      text="모든 문서"
+                      href={projectId ? `/documents?projectId=${projectId}` : "/documents"}
+                      active={pathname === "/documents"}
+                      theme={theme}
+                      small
+                    />
+                    
+                    {/* 폴더 목록 */}
+                    {availableFolders.map((folder) => (
+                      <SidebarLink
+                        key={folder.id}
+                        icon={<FolderIcon className="w-4 h-4" />}
+                        text={folder.name}
+                        href={projectId ? `/documents?projectId=${projectId}&folderId=${folder.id}` : `/documents?folderId=${folder.id}`}
+                        active={false}
+                        theme={theme}
+                        small
+                        badgeCount={folder.count}
+                      />
+                    ))}
+                    
+                    {/* 새 폴더 만들기 */}
+                    <button
+                      onClick={() => setShowFolderModal(true)}
+                      className={`flex items-center w-full px-2 py-1.5 text-sm rounded-md transition-colors duration-150 ${
+                        theme === 'dark'
+                          ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200"
+                          : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+                      }`}
+                    >
+                      <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                        <PlusIcon className="w-4 h-4" />
+                      </div>
+                      <span>새 폴더</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+              
               <SidebarLink 
                 icon={<UsersIcon className="w-5 h-5"/>} 
                 text="팀원 관리" 
@@ -2768,8 +2887,8 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
       <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#2a2a2c]">
       {/* 상단 네비게이션 바 */}
         <div className="bg-white dark:bg-[#2a2a2c] py-4 px-6">
-          <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center space-x-4 flex-1 min-w-0">
               {/* 모바일 메뉴 버튼 */}
               <button
                 className="md:hidden"
@@ -2780,7 +2899,7 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
                 </svg>
               </button>
               
-              <span className="text-gray-900 dark:text-gray-100 font-medium truncate max-w-xs">
+              <span className="text-gray-900 dark:text-gray-100 font-medium truncate max-w-[200px] sm:max-w-xs">
               {isLoading ? '문서 로딩 중...' : (title || '새 문서')}
               {isLoading && (
                   <span className={`ml-2 inline-block relative w-4 h-4 ${theme === 'dark' ? 'text-blue-500' : 'text-blue-600'}`}>
@@ -2795,166 +2914,24 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
                     </span>
                   </span>
               )}
+              
             </span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push(projectId ? `/documents?projectId=${projectId}` : '/documents')}
-                className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              돌아가기
-            </Button>
-            
-            {/* 접속 중인 사용자 표시 추가 */}
-            {connectedUsers.length > 0 && (
-                <div className="flex items-center space-x-1 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-lg">
-                  <UsersIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                  <span className="text-xs text-gray-600 dark:text-gray-300">{connectedUsers.length}명 접속 중</span>
-                <div className="flex -space-x-2">
-                  {connectedUsers.slice(0, 3).map((user, index) => (
-                    <div 
-                      key={index}
-                        className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center text-xs text-white"
-                      style={{ backgroundColor: user.color || '#888' }}
-                      title={user.name}
-                    >
-                      {user.name.charAt(0)}
-                    </div>
-                  ))}
-                  {connectedUsers.length > 3 && (
-                      <div className="w-6 h-6 rounded-full bg-gray-400 dark:bg-gray-600 border-2 border-white dark:border-gray-800 flex items-center justify-center text-xs text-white">
-                      +{connectedUsers.length - 3}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            
-            <div className="relative">
-              <button
-                onClick={() => setShowFolderDropdown(!showFolderDropdown)}
-                  className="flex items-center bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 text-sm text-gray-700 dark:text-gray-300"
-                disabled={isLoading}
-              >
-                  <FolderIcon className="w-4 h-4 mr-1 text-gray-500 dark:text-gray-400" />
-                <span className="truncate max-w-[150px]">{folder || '기본 폴더'}</span>
-                <span className="ml-1">
-                    <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                </span>
-              </button>
-              
-              {showFolderDropdown && (
-                  <div className="absolute left-0 mt-1 w-64 bg-white dark:bg-[#2a2a2c] shadow-lg rounded-xl z-10 border border-gray-200 dark:border-gray-700">
-                    <div className="py-2 px-3 border-b border-gray-200 dark:border-gray-700">
-                      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">폴더 선택</div>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="새 폴더 이름..."
-                        value={newFolderName}
-                        onChange={(e) => setNewFolderName(e.target.value)}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                      />
-                      <button
-                        onClick={() => createNewFolder(newFolderName)}
-                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                      >
-                        <PlusIcon className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div className="max-h-60 overflow-y-auto py-1">
-                    {availableFolders.length > 0 ? (
-                      availableFolders.map((f) => (
-                        <button
-                          key={f.id}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between ${f.id === folderId ? 'bg-gray-50 dark:bg-gray-700 font-medium text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}
-                          onClick={() => handleFolderChange({ id: f.id, name: f.name })}
-                        >
-                          <div className="flex items-center">
-                              <FolderIcon className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
-                            <span className="truncate">{f.name}</span>
-                          </div>
-                          {f.id === folderId && (
-                              <CheckIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                          )}
-                        </button>
-                      ))
-                    ) : (
-                        <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">폴더가 없습니다</div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-            
+            <div className="flex items-center space-x-1 flex-shrink-0">
             <button
-                className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 ${isStarred ? 'text-yellow-400' : 'text-gray-400 dark:text-gray-500'}`}
-              title={isStarred ? '즐겨찾기 해제' : '즐겨찾기 추가'}
-              onClick={() => setIsStarred(!isStarred)}
-              disabled={isLoading}
+              onClick={saveDocument}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+              disabled={isSaving || isLoading}
+              title={isSaving ? "저장 중..." : "저장"}
             >
-                <StarIcon className={`w-5 h-5 ${isStarred ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400 dark:text-gray-500'}`} />
-            </button>
-            
-              <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" disabled={isLoading}>
-                <ShareIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-            </button>
-            
-            <div className="relative security-menu-container">
-              <button 
-                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" 
-                disabled={isLoading}
-                onClick={toggleSecurityMenu}
-              >
-                  <SettingsIcon className="w-5 h-5 text-gray-600 dark:text-gray-400 mr-1" />
-                  <ChevronDown className="w-3 h-3 text-gray-500 dark:text-gray-400" />
-              </button>
-              
-              {showSecurityMenu && (
-                  <div className="absolute right-0 mt-1 w-56 bg-white dark:bg-[#2a2a2c] rounded-xl shadow-lg z-10 border border-gray-100 dark:border-gray-700 py-1 overflow-hidden">
-                  <div className="py-1">
-                    <button 
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" 
-                      onClick={() => {
-                        // 문서 접근 권한 설정
-                        setShowSecurityMenu(false);
-                      }}
-                    >
-                      <UsersIcon className="w-4 h-4 mr-2" />
-                      <span>접근 권한 설정</span>
-                    </button>
-                    
-                    <button 
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" 
-                      onClick={() => {
-                        // 문서 권한 이력
-                        setShowSecurityMenu(false);
-                      }}
-                    >
-                      <ShieldIcon className="w-4 h-4 mr-2" />
-                      <span>권한 이력 보기</span>
-                    </button>
-                    
-                    <button 
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" 
-                      onClick={() => {
-                        // 문서 암호 설정
-                        handleOpenPasswordModal();
-                      }}
-                    >
-                      <KeyIcon className="w-4 h-4 mr-2" />
-                      <span>{isPasswordProtected ? "암호 변경" : "암호 설정"}</span>
-                    </button>
-                  </div>
-                </div>
+              {isSaving ? (
+                <svg className="animate-spin h-5 w-5 text-gray-600 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : (
+                <SaveIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
               )}
-            </div>
-            
+            </button>
             {/* 읽기 전용 모드 버튼 또는 상태 표시 (관리자/소유자는 버튼, 일반 멤버는 상태 표시) */}
             {((userProjectRole && userProjectRole !== 'member') || isProjectOwner) ? (
               <button 
@@ -3011,22 +2988,155 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
                 </div>
               )
             )}
-            
-            <button
-              onClick={saveDocument}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-              disabled={isSaving || isLoading}
-              title={isSaving ? "저장 중..." : "저장"}
-            >
-              {isSaving ? (
-                <svg className="animate-spin h-5 w-5 text-gray-600 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              ) : (
-                <SaveIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              )}
+            <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" disabled={isLoading}>
+                <ShareIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
             </button>
+            <div className="relative security-menu-container">
+              <button 
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" 
+                disabled={isLoading}
+                onClick={toggleSecurityMenu}
+              >
+                  <SettingsIcon className="w-5 h-5 text-gray-600 dark:text-gray-400 mr-1" />
+                  <ChevronDown className="w-3 h-3 text-gray-500 dark:text-gray-400" />
+              </button>
+              
+              {showSecurityMenu && (
+                  <div className="absolute right-0 mt-1 w-56 bg-white dark:bg-[#2a2a2c] rounded-xl shadow-lg z-10 border border-gray-100 dark:border-gray-700 py-1 overflow-hidden">
+                  <div className="py-1">
+                    <button 
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" 
+                      onClick={() => {
+                        // 문서 접근 권한 설정
+                        setShowSecurityMenu(false);
+                      }}
+                    >
+                      <UsersIcon className="w-4 h-4 mr-2" />
+                      <span>접근 권한 설정</span>
+                    </button>
+                    
+                    <button 
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" 
+                      onClick={() => {
+                        // 문서 권한 이력
+                        setShowSecurityMenu(false);
+                      }}
+                    >
+                      <ShieldIcon className="w-4 h-4 mr-2" />
+                      <span>권한 이력 보기</span>
+                    </button>
+                    
+                    <button 
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" 
+                      onClick={() => {
+                        // 문서 암호 설정
+                        handleOpenPasswordModal();
+                      }}
+                    >
+                      <KeyIcon className="w-4 h-4 mr-2" />
+                      <span>{isPasswordProtected ? "암호 변경" : "암호 설정"}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            {/* <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(projectId ? `/documents?projectId=${projectId}` : '/documents')}
+                className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              돌아가기
+            </Button> */}
+            
+            {/* 접속 중인 사용자 표시 추가 */}
+            {connectedUsers.length > 0 && (
+                <div className="flex items-center space-x-1 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-lg">
+                  <UsersIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-xs text-gray-600 dark:text-gray-300">{connectedUsers.length}명 접속 중</span>
+                <div className="flex -space-x-2">
+                  {connectedUsers.slice(0, 3).map((user, index) => (
+                    <div 
+                      key={index}
+                        className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center text-xs text-white"
+                      style={{ backgroundColor: user.color || '#888' }}
+                      title={user.name}
+                    >
+                      {user.name.charAt(0)}
+                    </div>
+                  ))}
+                  {connectedUsers.length > 3 && (
+                      <div className="w-6 h-6 rounded-full bg-gray-400 dark:bg-gray-600 border-2 border-white dark:border-gray-800 flex items-center justify-center text-xs text-white">
+                      +{connectedUsers.length - 3}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* <div className="relative">
+              <button
+                onClick={() => setShowFolderDropdown(!showFolderDropdown)}
+                  className="flex items-center bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 text-sm text-gray-700 dark:text-gray-300"
+                disabled={isLoading}
+              >
+                  <FolderIcon className="w-4 h-4 mr-1 text-gray-500 dark:text-gray-400" />
+                <span className="truncate max-w-[150px]">{folder || '기본 폴더'}</span>
+                <span className="ml-1">
+                    <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                </span>
+              </button>
+              
+              {showFolderDropdown && (
+                  <div className="absolute left-0 mt-1 w-64 bg-white dark:bg-[#2a2a2c] shadow-lg rounded-xl z-10 border border-gray-200 dark:border-gray-700">
+                    <div className="py-2 px-3 border-b border-gray-200 dark:border-gray-700">
+                      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">폴더 선택</div>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="새 폴더 이름..."
+                        value={newFolderName}
+                        onChange={(e) => setNewFolderName(e.target.value)}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                      />
+                      <button
+                        onClick={() => createNewFolder(newFolderName)}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                      >
+                        <PlusIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="max-h-60 overflow-y-auto py-1">
+                    {availableFolders.length > 0 ? (
+                      availableFolders.map((f) => (
+                        <button
+                          key={f.id}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between ${f.id === folderId ? 'bg-gray-50 dark:bg-gray-700 font-medium text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}
+                          onClick={() => handleFolderChange({ id: f.id, name: f.name })}
+                        >
+                          <div className="flex items-center">
+                              <FolderIcon className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
+                            <span className="truncate">{f.name}</span>
+                          </div>
+                          {f.id === folderId && (
+                              <CheckIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          )}
+                        </button>
+                      ))
+                    ) : (
+                        <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">폴더가 없습니다</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div> */}
+            
           </div>
         </div>
       </div>
@@ -3623,6 +3733,79 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
         onSave={updateDocumentPassword}
         isLoading={isPasswordSaving}
       />
+      
+      {/* 폴더 생성 모달 */}
+      {showFolderModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="w-full max-w-md mx-4">
+            <div className="rounded-xl shadow-xl bg-card p-6">
+              {/* 헤더 */}
+              <div className="mb-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mr-4">
+                    <FolderIcon className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">새 폴더 만들기</h3>
+                  </div>
+                </div>
+              </div>
+              
+              {/* 본문 */}
+              <div className="mb-6">
+                <label htmlFor="folderName" className="block text-sm font-medium text-foreground mb-2">
+                  폴더 이름
+                </label>
+                <input
+                  type="text"
+                  id="folderName"
+                  value={folderModalName}
+                  onChange={(e) => setFolderModalName(e.target.value)}
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                  placeholder="폴더 이름을 입력하세요"
+                  disabled={isFolderCreating}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && !isFolderCreating) {
+                      createFolderFromSidebar();
+                    }
+                  }}
+                />
+              </div>
+              
+              {/* 버튼 */}
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setShowFolderModal(false);
+                    setFolderModalName('');
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors"
+                  disabled={isFolderCreating}
+                >
+                  취소
+                </button>
+                <button
+                  onClick={createFolderFromSidebar}
+                  disabled={isFolderCreating || !folderModalName.trim()}
+                  className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                >
+                  {isFolderCreating ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      생성 중...
+                    </>
+                  ) : (
+                    '폴더 만들기'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
         </div>
       </div>
     </div>

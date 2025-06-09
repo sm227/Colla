@@ -13,6 +13,7 @@ import {
   PlusIcon, 
   FolderIcon, 
   ChevronDownIcon, 
+  ChevronRightIcon,
   ClockIcon,
   SearchIcon,
   LayoutDashboardIcon,
@@ -324,23 +325,40 @@ export default function KanbanPage() {
               내 작업 공간
             </h3>
             <div className="mt-2 space-y-1">
-              <SidebarLink
-                icon={<Trello className="w-5 h-5" />}
-                text="칸반보드"
-                href={currentProject ? `/kanban?projectId=${currentProject.id}` : "/kanban"}
-                active={pathname?.startsWith("/kanban") || pathname?.startsWith("/timeline") || isKanbanSubmenuOpen}
-                theme={theme}
-                small
-                onClick={(e) => {
-                  e.preventDefault();
-                  setIsKanbanSubmenuOpen(!isKanbanSubmenuOpen);
-                  if (currentProject?.id && pathname && !pathname.includes(currentProject.id)) {
-                    router.push(`/kanban?projectId=${currentProject.id}`);
-                  } else if (!currentProject?.id && pathname && pathname !== "/kanban") {
-                    router.push("/kanban");
-                  }
-                }}
-              />
+              {/* 칸반보드 섹션 */}
+              <div>
+                <button
+                  onClick={() => {
+                    setIsKanbanSubmenuOpen(!isKanbanSubmenuOpen);
+                    if (currentProject?.id && pathname && !pathname.includes(currentProject.id)) {
+                      router.push(`/kanban?projectId=${currentProject.id}`);
+                    } else if (!currentProject?.id && pathname && pathname !== "/kanban") {
+                      router.push("/kanban");
+                    }
+                  }}
+                  className={`flex items-center justify-between w-full px-2 py-1.5 text-sm rounded-md transition-colors duration-150 ${
+                    theme === 'dark'
+                      ? (pathname?.startsWith("/kanban") || pathname?.startsWith("/timeline"))
+                        ? "bg-blue-900 bg-opacity-30 text-gray-300 hover:bg-gray-700 hover:text-gray-100"
+                        : "text-gray-300 hover:bg-gray-700 hover:text-gray-100"
+                      : (pathname?.startsWith("/kanban") || pathname?.startsWith("/timeline"))
+                        ? "bg-blue-100 bg-opacity-50 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                        : "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                      <Trello className="w-5 h-5" />
+                    </div>
+                    <span>칸반보드</span>
+                  </div>
+                  <ChevronRightIcon 
+                    className={`w-4 h-4 transition-transform duration-200 ${
+                      isKanbanSubmenuOpen ? 'transform rotate-90' : ''
+                    } ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}
+                  />
+                </button>
+              </div>
               
               {/* 칸반 하위 메뉴 */}
               {isKanbanSubmenuOpen && (
