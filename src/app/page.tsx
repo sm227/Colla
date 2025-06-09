@@ -29,6 +29,8 @@ import {
   CheckCircleIcon,
   ClockIcon,
   StarIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   // Edit3Icon, // 사용하지 않는 아이콘 제거
 } from "lucide-react";
 import Link from "next/link";
@@ -708,8 +710,24 @@ function TaskStatusChart({ projectId }: { projectId?: string }) {
         </div>
       </div>
       
-      {/* 차트 영역 */}
+      {/* 차트 영역 with 화살표 */}
       <div className="flex-1 relative overflow-hidden min-h-[300px]">
+        {/* 왼쪽 화살표 */}
+        <button
+          onClick={() => setChartType(chartType === 1 ? 2 : 1)}
+          className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10 p-2 rounded-full bg-gray-100/80 hover:bg-gray-200/90 dark:bg-gray-700/80 dark:hover:bg-gray-600/90 transition-colors opacity-60 hover:opacity-100"
+        >
+          <ChevronLeftIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+        </button>
+        
+        {/* 오른쪽 화살표 */}
+        <button
+          onClick={() => setChartType(chartType === 1 ? 2 : 1)}
+          className="absolute right-2 top-1/2 transform -translate-y-1/2 z-10 p-2 rounded-full bg-gray-100/80 hover:bg-gray-200/90 dark:bg-gray-700/80 dark:hover:bg-gray-600/90 transition-colors opacity-60 hover:opacity-100"
+        >
+          <ChevronRightIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+        </button>
+        
         <div className={`absolute inset-0 w-full h-full transition-all duration-500 ease-in-out transform ${
           chartType === 1 ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
         }`}>

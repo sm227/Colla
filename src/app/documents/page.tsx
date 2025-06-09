@@ -484,6 +484,21 @@ export default function DocumentsPage() {
     }
   };
   
+  // URL 파라미터에서 폴더 정보 읽기
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const folderId = urlParams.get('folderId');
+      
+      if (folderId && folders.length > 0) {
+        const folder = folders.find(f => f.id === folderId);
+        if (folder) {
+          setSelectedFolder(folder.name);
+        }
+      }
+    }
+  }, [folders]);
+  
   // 문서 데이터 불러오기
   useEffect(() => {
     if (!user && !authLoading) {
@@ -828,7 +843,7 @@ export default function DocumentsPage() {
             <span className="text-xl font-semibold text-gray-900 dark:text-gray-100">Colla</span>
           </div>
           <button
-            className="md:hidden"
+            className="md:hidden outline-none focus:outline-none"
             onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
           >
             <XIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
@@ -906,14 +921,108 @@ export default function DocumentsPage() {
                 theme={theme}
                 small
               />
-              <SidebarLink
-                icon={<FileTextIcon className="w-5 h-5" />}
-                text="문서"
-                href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
-                active={pathname?.startsWith("/documents")}
-                theme={theme}
-                small
-              />
+              {/* 문서 섹션 */}
+              <div>
+                <button
+                  onClick={() => setIsDocumentsSubmenuOpen(!isDocumentsSubmenuOpen)}
+                  className={`flex items-center justify-between w-full px-2 py-1.5 text-sm rounded-md transition-colors duration-150 outline-none focus:outline-none ${
+                    theme === 'dark'
+                      ? pathname?.startsWith("/documents")
+                        ? "bg-blue-900 bg-opacity-30 text-gray-300 hover:bg-gray-700 hover:text-gray-100"
+                        : "text-gray-300 hover:bg-gray-700 hover:text-gray-100"
+                      : pathname?.startsWith("/documents")
+                        ? "bg-blue-100 bg-opacity-50 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                        : "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                      <FileTextIcon className="w-5 h-5" />
+                    </div>
+                    <span>문서</span>
+                  </div>
+                  <ChevronRightIcon 
+                    className={`w-4 h-4 transition-transform duration-200 ${
+                      isDocumentsSubmenuOpen ? 'transform rotate-90' : ''
+                    } ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}
+                  />
+                </button>
+                
+                {isDocumentsSubmenuOpen && (
+                  <div className="ml-4 mt-1 space-y-1">
+                    <SidebarLink
+                      icon={<FileTextIcon className="w-4 h-4" />}
+                      text="모든 문서"
+                      href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
+                      active={pathname === "/documents" && !selectedFolder}
+                      theme={theme}
+                      small
+                    />
+                    
+                    {/* 폴더 목록 */}
+                    {folders.map((folder) => (
+                      <button
+                        key={folder.id}
+                        onClick={() => {
+                          setSelectedFolder(folder.name);
+                          const url = selectedProjectId 
+                            ? `/documents?projectId=${selectedProjectId}&folderId=${folder.id}`
+                            : `/documents?folderId=${folder.id}`;
+                          router.push(url);
+                        }}
+                        className={`group flex items-center justify-between w-full px-2 py-1.5 text-sm rounded-md transition-colors duration-150 outline-none focus:outline-none ${
+                          selectedFolder === folder.name
+                            ? theme === 'dark'
+                              ? "bg-blue-900 bg-opacity-30 text-gray-300"
+                              : "bg-blue-100 bg-opacity-50 text-gray-600"
+                            : theme === 'dark'
+                              ? "text-gray-300 hover:bg-gray-700 hover:text-gray-100"
+                              : "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                        }`}
+                      >
+                        <div className="flex items-center">
+                          <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                            <FolderIcon className="w-4 h-4" />
+                          </div>
+                          <span className="truncate">{folder.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {folder.count > 0 && (
+                            <span className={`px-1.5 py-0.5 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
+                              {folder.count}
+                            </span>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openDeleteFolderModal(folder.id, folder.name);
+                            }}
+                            className={`p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 outline-none focus:outline-none`}
+                            title="폴더 삭제"
+                          >
+                            <Trash2Icon className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </button>
+                    ))}
+                    
+                    {/* 새 폴더 만들기 */}
+                    <button
+                      onClick={() => setShowFolderModal(true)}
+                      className={`flex items-center w-full px-2 py-1.5 text-sm rounded-md transition-colors duration-150 outline-none focus:outline-none ${
+                        theme === 'dark'
+                          ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200"
+                          : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+                      }`}
+                    >
+                      <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                        <PlusIcon className="w-4 h-4" />
+                      </div>
+                      <span>새 폴더</span>
+                    </button>
+                  </div>
+                )}
+              </div>
               <SidebarLink 
                 icon={<UsersIcon className="w-5 h-5"/>} 
                 text="팀원 관리" 
@@ -945,7 +1054,7 @@ export default function DocumentsPage() {
         <div className="p-4 border-t border-gray-200 dark:border-gray-700">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center w-full p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
+              <button className="flex items-center w-full p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none outline-none">
                 <UserIcon className="w-6 h-6 mr-3 rounded-full bg-gray-200 dark:bg-gray-600 p-0.5 text-gray-700 dark:text-gray-300" />
                 <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user?.name || user?.email || '사용자'}</span>
               </button>
@@ -985,17 +1094,17 @@ export default function DocumentsPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
       {/* 폴더 생성 모달 */}
       {showFolderModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="w-full max-w-md mx-4">
-            <div className="rounded-xl shadow-xl bg-white dark:bg-[#2a2a2c] p-6">
+            <div className="rounded-lg shadow-xl bg-card text-card-foreground p-6">
               {/* 헤더 */}
               <div className="mb-6">
                 <div className="flex items-center">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mr-4">
-                    <FolderIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mr-4">
+                    <FolderIcon className="w-5 h-5 text-primary" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">새 폴더 만들기</h3>
+                    <h3 className="text-lg font-semibold text-foreground">새 폴더 만들기</h3>
                   </div>
                 </div>
               </div>
@@ -1004,29 +1113,29 @@ export default function DocumentsPage() {
               <div className="mb-6">
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       폴더 이름
                     </label>
                     <input
                       type="text"
-                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                      className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground outline-none focus:outline-none transition-colors"
                       placeholder="폴더 이름을 입력하세요"
                       value={newFolderName}
                       onChange={(e) => setNewFolderName(e.target.value)}
                       autoFocus
                     />
                     {folderError && (
-                      <p className="mt-2 text-sm text-red-500 dark:text-red-400">{folderError}</p>
+                      <p className="mt-2 text-sm text-destructive">{folderError}</p>
                     )}
                   </div>
                 </div>
               </div>
               
               {/* 푸터 */}
-              <div className="flex justify-end space-x-3">
+              <div className="flex justify-end gap-3">
                 <button
                   type="button"
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground bg-secondary hover:bg-secondary/80 rounded-lg transition-colors outline-none focus:outline-none"
                   onClick={() => {
                     setShowFolderModal(false);
                     setNewFolderName("");
@@ -1038,13 +1147,13 @@ export default function DocumentsPage() {
                 </button>
                 <button
                   type="button"
-                  className={`px-4 py-2 text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 dark:bg-gray-600 dark:hover:bg-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors ${isFolderCreating ? 'opacity-75 cursor-not-allowed' : ''}`}
+                  className={`px-4 py-2 text-sm font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors outline-none focus:outline-none ${isFolderCreating ? 'opacity-75 cursor-not-allowed' : ''}`}
                   onClick={createFolder}
                   disabled={isFolderCreating}
                 >
                   {isFolderCreating ? (
-                    <span className="flex items-center">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    <span className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
                       생성 중...
                     </span>
                   ) : (
@@ -1059,17 +1168,17 @@ export default function DocumentsPage() {
       
       {/* 문서 삭제 모달 */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="w-full max-w-md mx-4">
-            <div className="rounded-xl shadow-xl bg-white dark:bg-[#2a2a2c] p-6">
+            <div className="rounded-lg shadow-xl bg-card text-card-foreground p-6">
               {/* 헤더 */}
               <div className="mb-6">
                 <div className="flex items-center">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mr-4">
-                    <AlertCircleIcon className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center mr-4">
+                    <AlertCircleIcon className="w-5 h-5 text-destructive" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">문서 삭제</h3>
+                    <h3 className="text-lg font-semibold text-foreground">문서 삭제</h3>
                   </div>
                 </div>
               </div>
@@ -1077,27 +1186,27 @@ export default function DocumentsPage() {
               {/* 본문 */}
               <div className="mb-6">
                 <div className="space-y-4">
-                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      <span className="font-semibold text-red-600 dark:text-red-400">"{documentToDelete?.title}"</span> 문서를 삭제하시겠습니까?
+                  <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4">
+                    <p className="text-sm text-foreground">
+                      <span className="font-semibold text-destructive">"{documentToDelete?.title}"</span> 문서를 삭제하시겠습니까?
                     </p>
-                    <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                    <p className="text-sm text-destructive mt-2">
                       이 작업은 되돌릴 수 없습니다.
                     </p>
                   </div>
                   {deleteError && (
-                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-                      <p className="text-sm text-red-600 dark:text-red-400">{deleteError}</p>
+                    <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3">
+                      <p className="text-sm text-destructive">{deleteError}</p>
                     </div>
                   )}
                 </div>
               </div>
               
               {/* 푸터 */}
-              <div className="flex justify-end space-x-3">
+              <div className="flex justify-end gap-3">
                 <button
                   type="button"
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground bg-secondary hover:bg-secondary/80 rounded-lg transition-colors outline-none focus:outline-none"
                   onClick={() => {
                     setShowDeleteModal(false);
                     setDocumentToDelete(null);
@@ -1109,13 +1218,13 @@ export default function DocumentsPage() {
                 </button>
                 <button
                   type="button"
-                  className={`px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors ${isDeleting ? 'opacity-75 cursor-not-allowed' : ''}`}
+                  className={`px-4 py-2 text-sm font-medium bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-lg transition-colors outline-none focus:outline-none ${isDeleting ? 'opacity-75 cursor-not-allowed' : ''}`}
                   onClick={handleDeleteDocument}
                   disabled={isDeleting}
                 >
                   {isDeleting ? (
-                    <span className="flex items-center">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    <span className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
                       삭제 중...
                     </span>
                   ) : (
@@ -1130,17 +1239,17 @@ export default function DocumentsPage() {
       
       {/* 폴더 삭제 모달 */}
       {showDeleteFolderModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="w-full max-w-md mx-4">
-            <div className="rounded-xl shadow-xl bg-white dark:bg-[#2a2a2c] p-6">
+            <div className="rounded-lg shadow-xl bg-card text-card-foreground p-6">
               {/* 헤더 */}
               <div className="mb-6">
                 <div className="flex items-center">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mr-4">
-                    <AlertCircleIcon className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center mr-4">
+                    <AlertCircleIcon className="w-5 h-5 text-destructive" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">폴더 삭제</h3>
+                    <h3 className="text-lg font-semibold text-foreground">폴더 삭제</h3>
                   </div>
                 </div>
               </div>
@@ -1148,27 +1257,27 @@ export default function DocumentsPage() {
               {/* 본문 */}
               <div className="mb-6">
                 <div className="space-y-4">
-                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      <span className="font-semibold text-red-600 dark:text-red-400">"{folderToDelete}"</span> 폴더를 삭제하시겠습니까?
+                  <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4">
+                    <p className="text-sm text-foreground">
+                      <span className="font-semibold text-destructive">"{folderToDelete}"</span> 폴더를 삭제하시겠습니까?
                     </p>
-                    <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                    <p className="text-sm text-destructive mt-2">
                       폴더의 모든 문서는 '기본 폴더'로 이동되며, 이 작업은 되돌릴 수 없습니다.
                     </p>
                   </div>
                   {deleteFolderError && (
-                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-                      <p className="text-sm text-red-600 dark:text-red-400">{deleteFolderError}</p>
+                    <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3">
+                      <p className="text-sm text-destructive">{deleteFolderError}</p>
                     </div>
                   )}
                 </div>
               </div>
               
               {/* 푸터 */}
-              <div className="flex justify-end space-x-3">
+              <div className="flex justify-end gap-3">
                 <button
                   type="button"
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground bg-secondary hover:bg-secondary/80 rounded-lg transition-colors outline-none focus:outline-none"
                   onClick={() => {
                     setShowDeleteFolderModal(false);
                     setFolderToDelete(null);
@@ -1180,13 +1289,13 @@ export default function DocumentsPage() {
                 </button>
                 <button
                   type="button"
-                  className={`px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors ${isDeletingFolder ? 'opacity-75 cursor-not-allowed' : ''}`}
+                  className={`px-4 py-2 text-sm font-medium bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-lg transition-colors outline-none focus:outline-none ${isDeletingFolder ? 'opacity-75 cursor-not-allowed' : ''}`}
                   onClick={deleteFolder}
                   disabled={isDeletingFolder}
                 >
                   {isDeletingFolder ? (
-                    <span className="flex items-center">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    <span className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
                       삭제 중...
                     </span>
                   ) : (
@@ -1203,48 +1312,54 @@ export default function DocumentsPage() {
         <main className="flex flex-col flex-1 p-6 lg:p-8 overflow-y-auto bg-background">
         {/* 페이지 헤더 */}
         <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2 flex items-center">
-            <FileTextIcon className="w-8 h-8 text-gray-600 dark:text-gray-400 mr-3" />
-            문서
-          </h2>
-          <p className={`text-lg ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <FileTextIcon className="w-6 h-6 text-primary" />
+            </div>
+            <h1 className="text-3xl font-bold text-foreground">문서</h1>
+          </div>
+          <p className="text-lg text-muted-foreground">
             {selectedFolder ? `'${selectedFolder}' 폴더의 문서를 관리하세요` : (selectedProjectId ? '프로젝트 문서를 관리하고 공유하세요' : '팀의 지식을 체계적으로 관리하고 공유하세요')}
           </p>
         </div>
         
         {/* 검색 및 필터 위젯 */}
-        <div className="rounded-xl shadow-sm bg-white border border-gray-200 dark:bg-[#2a2a2c] dark:border-gray-700 p-6 mb-8">
+        <div className="bg-card text-card-foreground rounded-lg p-6 mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="relative flex-1">
-              <input
+                              <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="문서 검색..."
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-background text-foreground placeholder:text-muted-foreground border border-border outline-none focus:outline-none transition-colors"
               />
-              <SearchIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400 dark:text-gray-500" />
+              <SearchIcon className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
             </div>
             
-            <div className="flex items-center gap-3">
-              <button 
-                className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-                onClick={() => setViewMode('grid')}
-              >
-                <GridIcon className="w-5 h-5" />
-              </button>
-              <button 
-                className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-                onClick={() => setViewMode('list')}
-              >
-                <ListIcon className="w-5 h-5" />
-              </button>
-              <div className="h-6 border-l border-gray-300 dark:border-gray-600"></div>
-              <button className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center bg-muted rounded-lg p-1">
+                <button 
+                  className={`p-2 rounded-md transition-colors outline-none focus:outline-none ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => setViewMode('grid')}
+                >
+                  <GridIcon className="w-4 h-4" />
+                </button>
+                <button 
+                  className={`p-2 rounded-md transition-colors outline-none focus:outline-none ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => setViewMode('list')}
+                >
+                  <ListIcon className="w-4 h-4" />
+                </button>
+              </div>
+              
+              <div className="h-6 w-px bg-border"></div>
+              
+              <button className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors outline-none focus:outline-none">
                 <SortAscIcon className="w-4 h-4" />
                 <span>정렬</span>
               </button>
-              <button className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
+              <button className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors outline-none focus:outline-none">
                 <FilterIcon className="w-4 h-4" />
                 <span>필터</span>
               </button>
@@ -1253,18 +1368,18 @@ export default function DocumentsPage() {
         </div>
         
         {/* 문서 목록 위젯 */}
-        <div className="rounded-xl shadow-sm bg-white border border-gray-200 dark:bg-[#2a2a2c] dark:border-gray-700 p-6 flex flex-col">
-          <div className="flex justify-between items-center mb-5">
+        <div className="bg-card text-card-foreground rounded-lg p-6 flex flex-col">
+          <div className="flex justify-between items-center mb-6">
             <div className="flex items-center">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+              <h3 className="text-xl font-semibold text-foreground">
                 {selectedFolder ? selectedFolder : "모든 문서"}
-                <span className="text-base font-normal text-gray-500 dark:text-gray-400 ml-2">({filteredDocuments.length})</span>
+                <span className="text-base font-normal text-muted-foreground ml-2">({filteredDocuments.length})</span>
               </h3>
             </div>
             <Button
               size="sm"
               onClick={createNewDocument}
-              className="flex items-center space-x-1 bg-gray-600 hover:bg-gray-700 dark:bg-gray-600 dark:hover:bg-gray-500 text-white"
+              className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground outline-none focus:outline-none"
             >
               <PlusIcon className="w-4 h-4" />
               <span>새 문서</span>
@@ -1281,114 +1396,122 @@ export default function DocumentsPage() {
             )}
             
             {filteredDocuments.length === 0 ? (
-              <div className="text-center py-8">
-                <FileTextIcon className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">문서가 없습니다</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
+              <div className="text-center py-12">
+                <FileTextIcon className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">문서가 없습니다</h3>
+                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                   {selectedProjectId 
                     ? `${selectedFolder ? `'${selectedFolder}' 폴더에` : ''} 문서가 없거나 검색 조건에 맞는 문서가 없습니다.` 
                     : '검색 조건에 맞는 문서가 없거나 아직 문서를 작성하지 않았습니다.'}
                 </p>
                 <Button 
                   onClick={createNewDocument}
-                  className="flex items-center space-x-1 mx-auto bg-gray-600 hover:bg-gray-700 dark:bg-gray-600 dark:hover:bg-gray-500"
+                  className="flex items-center gap-2 mx-auto bg-primary hover:bg-primary/90 text-primary-foreground outline-none focus:outline-none"
                 >
                   <PlusIcon className="w-4 h-4" />
                   <span>새 문서</span>
                 </Button>
               </div>
             ) : viewMode === "grid" ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filteredDocuments.map(doc => (
                   <Link key={doc.id} href={`/documents/${doc.id}${doc.projectId ? `?projectId=${doc.projectId}` : ''}`}>
-                    <div className="bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg p-4 transition-colors h-full flex flex-col relative group border border-gray-200 dark:border-gray-600">
+                    <div className="bg-muted/30 hover:bg-muted/50 rounded-lg p-4 transition-colors h-full flex flex-col relative group">
                       <div className="flex justify-between items-start mb-3">
-                        <div className="text-3xl">{doc.emoji || "📄"}</div>
+                        <div className="text-2xl">{doc.emoji || "📄"}</div>
                         <div className="flex items-center space-x-1">
-                          {doc.isStarred && <StarIcon className="w-5 h-5 text-yellow-400" />}
+                          {doc.isStarred && <StarIcon className="w-4 h-4 text-yellow-500 fill-current" />}
                         </div>
                       </div>
-                      <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">{doc.title}</h3>
-                      <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-2">
+                      <h3 className="font-medium text-foreground mb-2 line-clamp-2 text-sm">{doc.title}</h3>
+                      <div className="flex items-center text-xs text-muted-foreground mb-2">
                         <FolderIcon className="w-3 h-3 mr-1" />
                         <span>{doc.folder || "기본 폴더"}</span>
                       </div>
-                      <div className="flex flex-wrap gap-1 mt-2 mb-3">
-                        {parseTags(doc.tags).map((tag, index) => (
-                          <span key={index} className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="mt-auto pt-3 border-t border-gray-200 dark:border-gray-600 flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                      {parseTags(doc.tags).length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {parseTags(doc.tags).slice(0, 2).map((tag, index) => (
+                            <span key={index} className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                              {tag}
+                            </span>
+                          ))}
+                          {parseTags(doc.tags).length > 2 && (
+                            <span className="text-xs text-muted-foreground">+{parseTags(doc.tags).length - 2}</span>
+                          )}
+                        </div>
+                      )}
+                      <div className="mt-auto pt-2 border-t border-border flex justify-between items-center text-xs text-muted-foreground">
                         <span>{formatDate(doc.updatedAt)}</span>
                       </div>
                       
                       {/* 삭제 버튼 */}
                       <button 
                         onClick={(e) => openDeleteModal(e, doc)}
-                        className="absolute top-3 right-3 p-1.5 rounded-full bg-white dark:bg-gray-800 shadow hover:bg-red-50 dark:hover:bg-red-900/20 z-10 border border-gray-200 dark:border-gray-600"
+                        className="absolute top-3 right-3 p-1.5 rounded-md bg-background/80 hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 outline-none focus:outline-none"
                       >
-                        <Trash2Icon className="w-4 h-4 text-red-500" />
+                        <Trash2Icon className="w-3 h-3" />
                       </button>
                     </div>
                   </Link>
                 ))}
               </div>
             ) : (
-              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
-                  <thead className="bg-gray-100 dark:bg-gray-700">
+              <div className="bg-muted/30 rounded-lg overflow-hidden">
+                <table className="min-w-full divide-y divide-border">
+                  <thead className="bg-muted">
                     <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">문서</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">폴더</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">태그</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">수정일</th>
-                      <th scope="col" className="relative px-6 py-3">
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">문서</th>
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">폴더</th>
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">태그</th>
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">수정일</th>
+                      <th scope="col" className="relative px-6 py-4">
                         <span className="sr-only">Actions</span>
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white dark:bg-gray-700/50 divide-y divide-gray-200 dark:divide-gray-600">
+                  <tbody className="bg-background/50 divide-y divide-border">
                     {filteredDocuments.map(doc => (
-                      <tr key={doc.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <tr key={doc.id} className="hover:bg-muted/20 transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <Link href={`/documents/${doc.id}${doc.projectId ? `?projectId=${doc.projectId}` : ''}`} className="flex items-center">
                             <span className="text-xl mr-3">{doc.emoji || "📄"}</span>
                             <div className="flex items-center">
-                              <span className="font-medium text-gray-900 dark:text-gray-100">{doc.title}</span>
-                              {doc.isStarred && <StarIcon className="w-4 h-4 text-yellow-400 ml-2" />}
+                              <span className="font-medium text-foreground">{doc.title}</span>
+                              {doc.isStarred && <StarIcon className="w-4 h-4 text-yellow-500 ml-2 fill-current" />}
                             </div>
                           </Link>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                            <FolderIcon className="w-4 h-4 mr-1" />
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            <FolderIcon className="w-4 h-4 mr-2" />
                             <span>{doc.folder || "기본 폴더"}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex flex-wrap gap-1">
-                            {parseTags(doc.tags).map((tag, index) => (
-                              <span key={index} className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                            {parseTags(doc.tags).slice(0, 2).map((tag, index) => (
+                              <span key={index} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-md">
                                 {tag}
                               </span>
                             ))}
+                            {parseTags(doc.tags).length > 2 && (
+                              <span className="text-xs text-muted-foreground">+{parseTags(doc.tags).length - 2}</span>
+                            )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                           {formatDate(doc.updatedAt)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center justify-end space-x-2">
                             <button 
                               onClick={(e) => openDeleteModal(e, doc)}
-                              className="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                              className="text-muted-foreground hover:text-destructive transition-colors outline-none focus:outline-none"
                             >
-                              <Trash2Icon className="w-5 h-5" />
+                              <Trash2Icon className="w-4 h-4" />
                             </button>
-                            <button className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">
-                              <MoreHorizontalIcon className="w-5 h-5" />
+                            <button className="text-muted-foreground hover:text-foreground transition-colors outline-none focus:outline-none">
+                              <MoreHorizontalIcon className="w-4 h-4" />
                             </button>
                           </div>
                         </td>
