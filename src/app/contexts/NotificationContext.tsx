@@ -23,9 +23,11 @@ interface NotificationContextType {
   showNotificationPanel: boolean;
   setShowNotificationPanel: (show: boolean) => void;
   hasNewNotifications: boolean;
-  processingInvitation: string;
+  processingInvitation: string | null;
   fetchNotifications: () => void;
   refreshNotifications: () => void;
+  markAllAsRead: () => void;
+  markAsRead: (notificationId: string) => void;
   acceptInvitation: (invitationId: string, projectId: string, e: React.MouseEvent) => void;
   rejectInvitation: (invitationId: string, projectId: string, e: React.MouseEvent) => void;
 }
@@ -35,35 +37,69 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
-  const [processingInvitation, setProcessingInvitation] = useState("");
+  const [processingInvitation, setProcessingInvitation] = useState<string | null>(null);
+  const [hasNewNotifications, setHasNewNotifications] = useState(false);
 
-  // 새로운 알림이 있는지 확인
-  const hasNewNotifications = notifications.some(notification => !notification.isRead);
+  // localStorage에서 읽은 알림 ID들을 가져오는 함수
+  const getReadNotificationIds = (): Set<string> => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      const readIds = localStorage.getItem('readNotificationIds');
+      return readIds ? new Set(JSON.parse(readIds)) : new Set();
+    } catch (error) {
+      console.error('읽은 알림 ID 가져오기 오류:', error);
+      return new Set();
+    }
+  };
+
+  // localStorage에 읽은 알림 ID들을 저장하는 함수
+  const saveReadNotificationIds = (readIds: Set<string>) => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('readNotificationIds', JSON.stringify(Array.from(readIds)));
+    } catch (error) {
+      console.error('읽은 알림 ID 저장 오류:', error);
+    }
+  };
 
   // 알림 데이터 가져오기
   const fetchNotifications = async () => {
     try {
+      console.log("=== 알림 가져오기 시작 ===");
+      
+      // 읽은 알림 ID 목록 가져오기
+      const readNotificationIds = getReadNotificationIds();
+      console.log('localStorage에서 읽은 알림 ID:', Array.from(readNotificationIds));
+
       // 프로젝트 초대 알림 가져오기
       const fetchProjectInvitationsAsNotifications = async (): Promise<Notification[]> => {
         try {
-          const response = await fetch("/api/invitations", { method: "GET" });
+          const response = await fetch("/api/projects/invitations", { 
+            method: "GET",
+            headers: {
+              "Cache-Control": "no-cache",
+            },
+          });
           if (!response.ok) {
             console.error("Failed to fetch invitations:", response.status);
             return [];
           }
           const invitations: any[] = await response.json();
-          return invitations.map((invitation) => ({
+          
+          const invitationNotifications = invitations.map((invitation) => ({
             id: invitation.id,
             type: "invitation" as const,
             title: "프로젝트 초대",
             message: `${invitation.project.name} 프로젝트에 초대되었습니다.`,
-            link: "/",
+            link: "/projects/invitations",
             createdAt: invitation.createdAt,
-            isRead: false,
+            isRead: readNotificationIds.has(invitation.id), // localStorage에서 읽음 상태 확인
             projectId: invitation.projectId,
           }));
+          
+          return invitationNotifications;
         } catch (error) {
-          console.error("Error fetching project invitations:", error);
+          console.error("Error fetching invitations:", error);
           return [];
         }
       };
@@ -71,10 +107,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       // 작업 알림 가져오기
       const fetchTaskNotifications = async (): Promise<Notification[]> => {
         try {
+          console.log("=== 작업 알림 가져오기 시작 ===");
+          
           const response = await fetch("/api/notifications/tasks", {
             method: "GET",
             headers: { "Content-Type": "application/json" },
           });
+          
+          // 401 Unauthorized 에러인 경우 빈 배열 반환
+          if (response.status === 401) {
+            console.log("사용자가 인증되지 않았습니다. 작업 알림을 건너뜁니다.");
+            return [];
+          }
           
           if (!response.ok) {
             console.error("Failed to fetch task notifications:", response.status, await response.text());
@@ -82,41 +126,44 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           }
           
           const taskNotifications: any[] = await response.json();
+          console.log(`📋 작업 알림 ${taskNotifications.length}개 조회됨:`, taskNotifications);
           
           return taskNotifications.map((notification) => {
-            const createdDate = new Date(notification.createdAt);
-            const now = new Date();
-            const diffInHours = (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60);
-            
             return {
               id: notification.id,
-              type: (notification.type || "generic") as Notification["type"],
-              title: notification.title || "작업 알림",
-              message: notification.content || "새로운 작업 알림이 있습니다.",
-              link: notification.link || `/`,
+              type: notification.type,
+              title: notification.title,
+              message: notification.message,
+              link: notification.link,
               createdAt: notification.createdAt,
-              isRead: notification.isRead || false,
+              isRead: readNotificationIds.has(notification.id), // localStorage에서 읽음 상태 확인
               projectId: notification.projectId,
-              taskId: notification.taskId,
             };
           });
+          
         } catch (error) {
-          console.error("Error fetching or processing task notifications:", error);
+          console.error("작업 알림 가져오기 오류:", error);
           return [];
         }
       };
 
       // 모든 알림 합치기
-      const invitationNotifications = await fetchProjectInvitationsAsNotifications();
-      const taskNotifications = await fetchTaskNotifications();
-      const allNotifications = [...invitationNotifications, ...taskNotifications];
+      const [invitations, taskNotifications] = await Promise.all([
+        fetchProjectInvitationsAsNotifications(),
+        fetchTaskNotifications()
+      ]);
 
-      // 생성일시 기준으로 정렬 (최신순)
-      const sortedNotifications = allNotifications.sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      const allNotifications = [...invitations, ...taskNotifications];
+      
+      // 시간순 정렬 (최신이 위에)
+      const sortedNotifications = allNotifications.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
 
+      console.log(`총 ${sortedNotifications.length}개의 알림을 가져왔습니다.`);
+      
       setNotifications(sortedNotifications);
+      setHasNewNotifications(sortedNotifications.some(notification => !notification.isRead));
     } catch (error) {
       console.error('알림을 가져오는 중 오류:', error);
     }
@@ -130,12 +177,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setProcessingInvitation(invitationId);
     
     try {
-      const response = await fetch(`/api/notifications/${invitationId}/accept`, {
+      const response = await fetch(`/api/projects/${projectId}/invitations/accept`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ projectId }),
       });
       
       if (response.ok) {
@@ -151,7 +197,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       console.error('초대 수락 오류:', error);
       alert('초대 수락 중 오류가 발생했습니다.');
     } finally {
-      setProcessingInvitation("");
+      setProcessingInvitation(null);
     }
   };
 
@@ -163,17 +209,17 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setProcessingInvitation(invitationId);
     
     try {
-      const response = await fetch(`/api/notifications/${invitationId}/reject`, {
+      const response = await fetch(`/api/projects/${projectId}/invitations/reject`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ projectId }),
       });
       
       if (response.ok) {
         // 알림 목록에서 제거
         setNotifications(prev => prev.filter(n => n.id !== invitationId));
+        alert('초대를 거절했습니다.');
       } else {
         alert('초대 거절 중 오류가 발생했습니다.');
       }
@@ -181,8 +227,68 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       console.error('초대 거절 오류:', error);
       alert('초대 거절 중 오류가 발생했습니다.');
     } finally {
-      setProcessingInvitation("");
+      setProcessingInvitation(null);
     }
+  };
+
+  // 모든 알림을 읽음 처리하는 함수
+  const markAllAsRead = () => {
+    // 현재 읽은 알림 ID 목록 가져오기
+    const readNotificationIds = getReadNotificationIds();
+    
+    // 모든 알림 ID를 읽음 목록에 추가
+    notifications.forEach(notification => {
+      readNotificationIds.add(notification.id);
+    });
+    
+    // localStorage에 저장
+    saveReadNotificationIds(readNotificationIds);
+    
+    // 상태 업데이트
+    setNotifications(prevNotifications => 
+      prevNotifications.map(notification => ({
+        ...notification,
+        isRead: true
+      }))
+    );
+    
+    // 새 알림 없음으로 설정
+    setHasNewNotifications(false);
+    
+    console.log("✅ 모든 알림을 읽음 처리하고 localStorage에 저장했습니다.");
+  };
+
+  // 개별 알림을 읽음 처리하는 함수
+  const markAsRead = (notificationId: string) => {
+    // 현재 읽은 알림 ID 목록 가져오기
+    const readNotificationIds = getReadNotificationIds();
+    
+    // 해당 알림 ID를 읽음 목록에 추가
+    readNotificationIds.add(notificationId);
+    
+    // localStorage에 저장
+    saveReadNotificationIds(readNotificationIds);
+    
+    // 해당 알림만 읽음 처리
+    setNotifications(prevNotifications => 
+      prevNotifications.map(notification => 
+        notification.id === notificationId 
+          ? { ...notification, isRead: true }
+          : notification
+      )
+    );
+    
+    // 새 알림 여부 재계산
+    setHasNewNotifications(prev => {
+      const updatedNotifications = notifications.map(notification => 
+        notification.id === notificationId 
+          ? { ...notification, isRead: true }
+          : notification
+      );
+      return updatedNotifications.some(notification => !notification.isRead);
+    });
+    
+    console.log(`✅ 알림 ${notificationId}을 읽음 처리했습니다.`);
   };
 
   // 컴포넌트 마운트 시 알림 가져오기
@@ -203,6 +309,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     processingInvitation,
     fetchNotifications,
     refreshNotifications: fetchNotifications,
+    markAllAsRead,
+    markAsRead,
     acceptInvitation,
     rejectInvitation,
   };

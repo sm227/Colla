@@ -998,6 +998,19 @@ function HomeContent() {
   const previousNotificationsRef = useRef<Notification[]>([]);
   const initialLoadDoneRef = useRef(false);
 
+  // URL 파라미터에서 프로젝트 ID 가져오기
+  const urlProjectId = searchParams?.get('projectId');
+
+  // URL 파라미터의 프로젝트 ID에 따라 현재 프로젝트 설정
+  useEffect(() => {
+    if (urlProjectId && projects.length > 0) {
+      const projectFromUrl = projects.find(project => project.id === urlProjectId);
+      if (projectFromUrl && projectFromUrl !== currentProject) {
+        setCurrentProject(projectFromUrl);
+      }
+    }
+  }, [urlProjectId, projects, currentProject, setCurrentProject]);
+
   const loadNotifications = async (isPanelOpening?: boolean) => {
     if (user) { 
       let shouldShowLoadingOuter = false;
@@ -1220,7 +1233,7 @@ function HomeContent() {
       
       const createdTask = await response.json();
       
-      // 작업 생성 이벤트 트리거 (새 작업 알림 용도)
+      // 작업 생성 이벤트 트리거 (새 작업 알림 용도, 담당자 정보 포함)
       try {
         await fetch("/api/notifications/task-events", {
           method: "POST",
@@ -1231,6 +1244,7 @@ function HomeContent() {
             eventType: "task_created",
             taskId: createdTask.id,
             projectId: createdTask.projectId,
+            newAssignee: createdTask.assignee, // 담당자 정보 추가
           }),
         });
       } catch (notificationError) {
@@ -1308,7 +1322,7 @@ function HomeContent() {
             <div className="mb-8">
               <h2 className="text-3xl font-bold mb-2">{getGreeting()}, {user.name}님!</h2>
               <p className={`text-lg ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                {currentProject ? `${currentProject.name} 에 대한 요약을 확인하세요.` : '프로젝트를 선택하면 요약 정보를 확인할 수 있습니다.'}
+                {currentProject ? `${currentProject.name} 프로젝트의 요약을 확인하세요.` : '프로젝트를 선택하면 요약 정보를 확인할 수 있습니다.'}
               </p>
             </div>
 
@@ -1340,7 +1354,7 @@ function HomeContent() {
                   }
                   withScroll={true}
                 >
-                  <SimplifiedKanbanBoard /> {/* theme prop 제거 */}
+                  <SimplifiedKanbanBoard projectId={currentProject?.id} />
                 </DashboardWidget>
               </div>
 
@@ -1507,7 +1521,7 @@ function RecentMeetings({ /* theme prop 제거 */ }: { /* theme prop 타입 제�
   );
 }
 
-function SimplifiedKanbanBoard({ /* theme prop 제거 */ }: { /* theme prop 타입 제거 */ }) {
+function SimplifiedKanbanBoard({ projectId }: { projectId?: string }) {
   const { currentProject } = useProject();
   const { user } = useAuth();
   const [assignedTasks, setAssignedTasks] = useState<TaskWithProjectInfo[]>([]);
@@ -1531,10 +1545,10 @@ function SimplifiedKanbanBoard({ /* theme prop 제거 */ }: { /* theme prop 타�
         
         const data = await response.json();
         
-        // 현재 프로젝트의 작업만 필터링
+        // 프로젝트 ID가 있는 경우 해당 프로젝트의 작업만 필터링
         let filteredTasks = data as TaskWithProjectInfo[];
-        if (currentProject?.id) {
-          filteredTasks = filteredTasks.filter(task => task.projectId === currentProject.id);
+        if (projectId) {
+          filteredTasks = filteredTasks.filter(task => task.projectId === projectId);
         }
         
         setAssignedTasks(filteredTasks);
@@ -1548,7 +1562,7 @@ function SimplifiedKanbanBoard({ /* theme prop 제거 */ }: { /* theme prop 타�
     };
     
     fetchAssignedTasks();
-  }, [user, currentProject?.id]);
+  }, [user, projectId]);
 
   // 마감일 관련 함수 추가
   const getDueDateInfo = (dueDate: string | Date | null | undefined) => {

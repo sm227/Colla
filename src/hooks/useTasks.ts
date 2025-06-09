@@ -80,7 +80,7 @@ export function useTasks(projectId?: string | null) {
       const createdTask = await response.json();
       setTasks((prevTasks) => [...prevTasks, createdTask]);
       
-      // 작업 생성 이벤트 트리거 (새 작업 알림 용도)
+      // 작업 생성 이벤트 트리거 (새 작업 알림 용도, 담당자 정보 포함)
       try {
         await fetch("/api/notifications/task-events", {
           method: "POST",
@@ -91,6 +91,7 @@ export function useTasks(projectId?: string | null) {
             eventType: "task_created",
             taskId: createdTask.id,
             projectId: createdTask.projectId,
+            newAssignee: createdTask.assignee, // 담당자 정보 추가
           }),
         });
       } catch (notificationError) {
@@ -112,6 +113,10 @@ export function useTasks(projectId?: string | null) {
   const updateTaskStatus = async (taskId: string, newStatus: TaskStatus) => {
     try {
       setLoading(true);
+      
+      // 현재 작업 정보 조회 (변경 전 담당자 확인용)
+      const currentTask = tasks.find(task => task.id === taskId);
+      
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: "PATCH",
         headers: {
@@ -141,6 +146,9 @@ export function useTasks(projectId?: string | null) {
             taskId: updatedTask.id,
             projectId: updatedTask.projectId,
             newStatus: newStatus,
+            assigneeChanged: false, // 상태 변경만이므로 담당자 변경 없음
+            previousAssignee: currentTask?.assignee,
+            newAssignee: updatedTask.assignee,
           }),
         });
       } catch (notificationError) {

@@ -42,6 +42,53 @@ import {
 
 import { useNotifications } from "@/app/contexts/NotificationContext";
 
+// 알림 패널 커스텀 스크롤바 스타일
+const NotificationScrollbarStyles = () => (
+  <style jsx global>{`
+    /* 알림 패널 스크롤바 스타일 */
+    html.dark .notifications-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    html:not(.dark) .notifications-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    html.dark .notifications-scrollbar::-webkit-scrollbar-track {
+      background: #1f2937; /* gray-800 */
+      border-radius: 3px;
+    }
+    html:not(.dark) .notifications-scrollbar::-webkit-scrollbar-track {
+      background: #f3f4f6; /* gray-100 */
+      border-radius: 3px;
+    }
+    html.dark .notifications-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #4b5563; /* gray-600 */
+      border-radius: 3px;
+      border: 1px solid #1f2937; /* gray-800, creates padding */
+    }
+    html:not(.dark) .notifications-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #d1d5db; /* gray-300 */
+      border-radius: 3px;
+      border: 1px solid #f3f4f6; /* gray-100, creates padding */
+    }
+    html.dark .notifications-scrollbar::-webkit-scrollbar-thumb:hover {
+      background-color: #6b7280; /* gray-500 */
+    }
+    html:not(.dark) .notifications-scrollbar::-webkit-scrollbar-thumb:hover {
+      background-color: #9ca3af; /* gray-400 */
+    }
+    html.dark .notifications-scrollbar {
+      scrollbar-width: thin;
+      scrollbar-color: #4b5563 #1f2937; /* thumb track for Firefox */
+    }
+    html:not(.dark) .notifications-scrollbar {
+      scrollbar-width: thin;
+      scrollbar-color: #d1d5db #f3f4f6; /* thumb track for Firefox */
+    }
+  `}</style>
+);
+
 // 폴더 인터페이스
 interface Folder {
   id: string;
@@ -147,6 +194,8 @@ const Sidebar = memo(function Sidebar({
     setShowNotificationPanel,
     hasNewNotifications,
     processingInvitation,
+    markAllAsRead,
+    markAsRead,
     acceptInvitation,
     rejectInvitation
   } = useNotifications();
@@ -319,7 +368,22 @@ const Sidebar = memo(function Sidebar({
     }
   };
 
-  const handleNotificationClick = () => {
+  // 알림 클릭 핸들러
+  const handleNotificationClick = (notification: Notification) => {
+    // 읽지 않은 알림이면 읽음 처리
+    if (!notification.isRead) {
+      markAsRead(notification.id);
+    }
+    
+    // 링크가 있으면 이동
+    if (notification.link) {
+      router.push(notification.link);
+      setShowNotificationPanel(false);
+    }
+  };
+
+  // 알림 패널 열기
+  const handleNotificationPanelToggle = () => {
     if (setShowNotificationPanel) {
       setShowNotificationPanel(!showNotificationPanel);
     } else {
@@ -330,8 +394,6 @@ const Sidebar = memo(function Sidebar({
   const handleSettingsClick = () => {
     if (onSettingsClick) {
       onSettingsClick();
-    } else {
-      router.push('/settings');
     }
   };
 
@@ -341,6 +403,9 @@ const Sidebar = memo(function Sidebar({
 
   return (
     <>
+      {/* 커스텀 스크롤바 스타일 */}
+      <NotificationScrollbarStyles />
+      
       {/* 폴더 생성 모달 */}
       {showFolderModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -459,12 +524,12 @@ const Sidebar = memo(function Sidebar({
                   key={project.id}
                   icon={<FolderIcon className="w-5 h-5" />}
                   text={project.name}
-                  href={`/documents?projectId=${project.id}`}
+                  href={`/?projectId=${project.id}`}
                   small
                   active={selectedProjectId === project.id}
                   onClick={(e) => {
                     e.preventDefault();
-                    const newUrl = `/documents?projectId=${project.id}`;
+                    const newUrl = `/?projectId=${project.id}`;
                     router.push(newUrl);
                   }}
                   theme={theme}
@@ -769,7 +834,7 @@ const Sidebar = memo(function Sidebar({
             
             {/* 알림 버튼 */}
             <button 
-              onClick={handleNotificationClick}
+              onClick={handleNotificationPanelToggle}
               className="relative p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none outline-none transition-colors"
               title="알림"
             >
@@ -787,15 +852,27 @@ const Sidebar = memo(function Sidebar({
         <div className="fixed inset-0 z-50 md:inset-auto md:left-64 md:top-0 md:h-full md:w-80 lg:w-96 bg-white dark:bg-[#1f1f21] shadow-xl border-r border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">알림</h2>
-            <button
-              onClick={() => setShowNotificationPanel(false)}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
-            >
-              <XIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-            </button>
+            <div className="flex items-center gap-2">
+              {/* 모두 읽기 버튼 */}
+              {notifications.length > 0 && hasNewNotifications && (
+                <button
+                  onClick={markAllAsRead}
+                  className="px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+                >
+                  모두 읽기
+                </button>
+              )}
+              {/* 닫기 버튼 */}
+              <button
+                onClick={() => setShowNotificationPanel(false)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+              >
+                <XIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+              </button>
+            </div>
           </div>
           
-          <div className="overflow-y-auto h-full pb-16">
+          <div className="overflow-y-auto h-full pb-16 notifications-scrollbar">
             {notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-gray-500 dark:text-gray-400">
                 <BellIcon className="w-12 h-12 mb-4 opacity-50" />
@@ -806,7 +883,8 @@ const Sidebar = memo(function Sidebar({
                 {notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-4 rounded-lg border transition-colors ${
+                    onClick={() => handleNotificationClick(notification)}
+                    className={`p-4 rounded-lg border transition-colors cursor-pointer hover:shadow-md ${
                       notification.isRead
                         ? "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700"
                         : "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
@@ -832,8 +910,8 @@ const Sidebar = memo(function Sidebar({
                         </p>
                         
                         {/* 초대 알림인 경우 수락/거절 버튼 표시 */}
-                        {notification.type === "invitation" && acceptInvitation && rejectInvitation && (
-                          <div className="flex space-x-2 mt-3">
+                        {notification.type === "invitation" && notification.projectId && (
+                          <div className="flex space-x-2 mt-3" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={(e) => acceptInvitation(notification.id, notification.projectId!, e)}
                               disabled={processingInvitation === notification.id}
@@ -851,16 +929,12 @@ const Sidebar = memo(function Sidebar({
                           </div>
                         )}
                         
-                        {/* 다른 타입의 알림인 경우 링크 버튼 */}
+                        {/* 다른 타입의 알림인 경우 링크 표시 */}
                         {notification.type !== "invitation" && notification.link && (
                           <div className="mt-3">
-                            <Link
-                              href={notification.link}
-                              onClick={() => setShowNotificationPanel(false)}
-                              className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
-                            >
+                            <span className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">
                               자세히 보기 →
-                            </Link>
+                            </span>
                           </div>
                         )}
                       </div>
