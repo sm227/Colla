@@ -1,7 +1,7 @@
 // app/page.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 // import { v4 as uuidv4 } from "uuid"; // uuidv4 주석 처리
@@ -281,9 +281,9 @@ function TaskStatusChart({ projectId }: { projectId?: string }) {
         const tasks = await response.json();
         
         const stats = {
-          todo: tasks.filter((task: any) => task.status === 'todo').length,
-          inProgress: tasks.filter((task: any) => task.status === 'in-progress').length,
-          done: tasks.filter((task: any) => task.status === 'done' || task.status === 'review').length,
+          todo: tasks.filter((task: TaskWithProjectInfo) => task.status === 'todo').length,
+          inProgress: tasks.filter((task: TaskWithProjectInfo) => task.status === 'in-progress').length,
+          done: tasks.filter((task: TaskWithProjectInfo) => task.status === 'done' || task.status === 'review').length,
           total: tasks.length
         };
         
@@ -954,7 +954,7 @@ function TaskCreateModal({
   );
 }
 
-export default function Home() {
+function HomeContent() {
   const router = useRouter();
   const { user, loading: authLoading, logout } = useAuth();
   const searchParams = useSearchParams();
@@ -2477,3 +2477,27 @@ const ModernScrollbarStyles = () => (
     }
   `}</style>
 );
+
+// HomeContent 컴포넌트를 Suspense로 감싸는 기본 export
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
+        <div className="text-center flex flex-col items-center">
+          <div className="relative w-24 h-24 text-blue-500">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-16 h-16 border-4 border-current border-solid rounded-full opacity-20 border-blue-500"></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-12 h-12 border-4 border-current border-solid rounded-full animate-spin border-t-transparent"></div>
+            </div>
+          </div>
+          <p className="text-lg font-medium mt-4">로딩 중...</p>
+          <p className="text-sm text-muted-foreground">잠시만 기다려주세요</p>
+        </div>
+      </div>
+    }>
+      <HomeContent />
+    </Suspense>
+  );
+}

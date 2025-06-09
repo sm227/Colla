@@ -7,7 +7,7 @@
     "dev": "npx nodemon",
     "build": "next build && npm run build:server",
     "build:server": "tsc --project tsconfig.server.json",
-    "start": "NODE_ENV=production node dist/server.js",
+    "start": "cross-env NODE_ENV=production node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "hocuspocus": "node hocuspocus-server.js",

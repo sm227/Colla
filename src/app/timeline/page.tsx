@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useProject } from "@/app/contexts/ProjectContext";
@@ -97,7 +97,7 @@ function SidebarLink({
   );
 }
 
-export default function TimelinePage() {
+function TimelinePageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -505,5 +505,29 @@ export default function TimelinePage() {
         </main>
       </div>
     </div>
+  );
+}
+
+// TimelinePageContent 컴포넌트를 Suspense로 감싸는 기본 export
+export default function TimelinePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
+        <div className="text-center flex flex-col items-center">
+          <div className="relative w-24 h-24 text-blue-500">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-16 h-16 border-4 border-current border-solid rounded-full opacity-20 border-blue-500"></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-12 h-12 border-4 border-current border-solid rounded-full animate-spin border-t-transparent"></div>
+            </div>
+          </div>
+          <p className="text-lg font-medium mt-4">타임라인 로딩 중...</p>
+          <p className="text-sm text-muted-foreground">잠시만 기다려주세요</p>
+        </div>
+      </div>
+    }>
+      <TimelinePageContent />
+    </Suspense>
   );
 } 
