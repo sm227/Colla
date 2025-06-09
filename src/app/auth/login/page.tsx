@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { LayoutDashboardIcon, UserIcon, LockIcon, EyeIcon, EyeOffIcon } from "lucide-react";
 import { useAuth } from "@/app/contexts/AuthContext";
 
-export default function LoginPage() {
+function LoginPageContent() {
   const searchParams = useSearchParams();
   // 콜백 URL이 복잡한 경우 기본값으로 홈 페이지 사용
   const callbackUrl = '/';
@@ -227,5 +227,31 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// LoginPageContent 컴포넌트를 Suspense로 감싸는 기본 export
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 dark:bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="flex justify-center">
+            <div className="text-3xl font-bold text-blue-600 dark:text-primary flex items-center">
+              <div className="w-8 h-8 mr-2 bg-blue-600 dark:bg-primary rounded animate-pulse"></div>
+              워크스페이스
+            </div>
+          </div>
+          <h2 className="mt-6 text-center text-2xl font-bold text-gray-900 dark:text-foreground">
+            로그인 페이지 로딩 중...
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600 dark:text-muted-foreground">
+            잠시만 기다려주세요
+          </p>
+        </div>
+      </div>
+    }>
+      <LoginPageContent />
+    </Suspense>
   );
 } 

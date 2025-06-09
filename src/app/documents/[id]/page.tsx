@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { 
   ArrowLeftIcon as ArrowLeft, 
   StarIcon, 
@@ -536,7 +536,7 @@ const showToast = (title: string, description: string, status: 'success' | 'erro
   }, 3000);
 };
 
-export default function DocumentPage({ params }: { params: { id: string } }) {
+function DocumentPageContent({ params }: { params: { id: string } }) {
   const router = useRouter();
   const pathname = usePathname();
   const { user } = useAuth(); // AuthContext에서 사용자 정보 가져오기
@@ -3814,5 +3814,29 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// DocumentPageContent 컴포넌트를 Suspense로 감싸는 기본 export
+export default function DocumentPage({ params }: { params: { id: string } }) {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
+        <div className="text-center flex flex-col items-center">
+          <div className="relative w-24 h-24 text-blue-500">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-16 h-16 border-4 border-current border-solid rounded-full opacity-20 border-blue-500"></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-12 h-12 border-4 border-current border-solid rounded-full animate-spin border-t-transparent"></div>
+            </div>
+          </div>
+          <p className="text-lg font-medium mt-4">문서 에디터 로딩 중...</p>
+          <p className="text-sm text-muted-foreground">잠시만 기다려주세요</p>
+        </div>
+      </div>
+    }>
+      <DocumentPageContent params={params} />
+    </Suspense>
   );
 }

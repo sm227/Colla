@@ -4,9 +4,9 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 interface Params {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 // 현재 사용자 ID 가져오기 (실제 인증 로직으로 대체 필요)
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     // 캘린더 이벤트 조회
     const event = await prisma.calendar.findUnique({
@@ -112,7 +112,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const data = await request.json();
 
     // 기존 이벤트 확인
@@ -125,7 +125,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     // 권한 체크 없이 바로 업데이트
-    const updateData: any = {};
+    const updateData: Record<string, any> = {};
     if (data.title !== undefined) updateData.title = data.title;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.startDate !== undefined) updateData.startDate = new Date(data.startDate);
@@ -172,7 +172,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     // 삭제할 이벤트 확인
     const existingEvent = await prisma.calendar.findUnique({

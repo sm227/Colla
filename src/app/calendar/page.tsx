@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo, useContext, useCallback } from 'react';
+import { useState, useEffect, useMemo, useContext, useCallback, Suspense } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay, differenceInDays, getDay, addDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, HomeIcon, CalendarIcon, PlusIcon, X, MoreHorizontal, SunIcon, MoonIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, HomeIcon, CalendarIcon, PlusIcon, X, SunIcon, MoonIcon } from "lucide-react";
 import { useProject } from "@/app/contexts/ProjectContext";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -66,7 +66,7 @@ interface EditEventDialog {
   event: Task | null;
 }
 
-const CalendarPage: React.FC = () => {
+const CalendarPageContent: React.FC = () => {
   // 모든 hooks를 최상단으로 이동
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1093,7 +1093,6 @@ const CalendarPage: React.FC = () => {
               <Button size="sm" variant={calendarView==='week'?'default':'outline'} onClick={()=>setCalendarView('week')}>주</Button>
               <Button size="sm" variant={calendarView==='day'?'default':'outline'} onClick={()=>setCalendarView('day')}>일</Button>
             </div>
-            <MoreHorizontal className="w-5 h-5 text-gray-400" />
           </div>
         </div>
         {/* 월/주/일 달력 뷰 */}
@@ -1124,7 +1123,7 @@ const CalendarPage: React.FC = () => {
                     onDrop={(e) => {
                       e.preventDefault();
                       if (draggedTask && !draggedTask.isCalendarEvent && !draggedTask.isHoliday) {
-                        handleDrop(selectedDate || currentDate)(e);
+                        handleDrop(day)(e);
                       }
                     }}
                   >
@@ -2178,7 +2177,7 @@ const CalendarPage: React.FC = () => {
       {/* 예약되지 않은 업무 사이드바 (드래그 앤 드롭) */}
       {isSidebarOpen && (
         <div 
-          className="fixed top-0 bottom-0 right-0 w-80 bg-card text-card-foreground shadow-lg border-l border-border p-4 transition-transform duration-300 z-20 mt-0"
+          className="fixed top-0 bottom-0 right-0 w-80 bg-card text-card-foreground shadow-lg border-l border-border p-4 transition-transform duration-300 z-20 mt-0 flex flex-col"
           style={{marginTop:0}}
           onDragOver={(e) => {
             e.preventDefault();
@@ -2206,53 +2205,101 @@ const CalendarPage: React.FC = () => {
             </p>
           </div>
           
-          <div className="space-y-2">
-            {sidebarTasks.length === 0 ? (
-              <div className="text-muted-foreground text-center py-4">
-                예약되지 않은 업무가 없습니다
-              </div>
-            ) : (
-              sidebarTasks.map(task => {
-                // 테마에 따른 칸반 태스크 색상 적용
-                const taskClasses = getKanbanTaskClasses();
-                const statusBg = !mounted ? 'bg-gray-100' : theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100';
-                const statusText = !mounted ? 'text-gray-700' : theme === 'dark' ? 'text-gray-300' : 'text-gray-700';
-                const priorityText = 'text-muted-foreground';
+          {/* 스크롤 가능한 업무 목록 */}
+          <div className="flex-1 overflow-y-auto unscheduled-tasks-scrollbar">
+            <div className="space-y-2">
+              {sidebarTasks.length === 0 ? (
+                <div className="text-muted-foreground text-center py-4">
+                  예약되지 않은 업무가 없습니다
+                </div>
+              ) : (
+                sidebarTasks.map(task => {
+                  // 테마에 따른 칸반 태스크 색상 적용
+                  const taskClasses = getKanbanTaskClasses();
+                  const statusBg = !mounted ? 'bg-gray-100' : theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100';
+                  const statusText = !mounted ? 'text-gray-700' : theme === 'dark' ? 'text-gray-300' : 'text-gray-700';
+                  const priorityText = 'text-muted-foreground';
 
-                return (
-                  <div
-                    key={task.id}
-                    className={`${taskClasses} rounded-md p-3 shadow-sm cursor-move border transition-all duration-200 hover:shadow-md`}
-                    draggable
-                    onDragStart={handleDragStart(task)}
-                    onDragEnd={handleDragEnd}
-                    onClick={(e) => {
-                      // 드래그 시작 후 클릭 이벤트가 발생하지 않도록 방지
-                      if (!e.defaultPrevented) {
-                        handleEventClick(task);
-                      }
-                    }}
-                    title="클릭하여 상세 정보 보기 또는 캘린더로 드래그하여 일정 설정"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-medium text-sm">{task.title}</h4>
-                      <span className={`text-xs px-2 py-1 rounded-full ${statusBg} ${statusText}`}>
-                        {task.status === 'todo' ? '할 일' : 
-                         task.status === 'in-progress' ? '진행 중' : 
-                         task.status === 'done' ? '완료' : '검토'}
-                      </span>
+                  return (
+                    <div
+                      key={task.id}
+                      className={`${taskClasses} rounded-md p-3 shadow-sm cursor-move border transition-all duration-200 hover:shadow-md`}
+                      draggable
+                      onDragStart={handleDragStart(task)}
+                      onDragEnd={handleDragEnd}
+                      onClick={(e) => {
+                        // 드래그 시작 후 클릭 이벤트가 발생하지 않도록 방지
+                        if (!e.defaultPrevented) {
+                          handleEventClick(task);
+                        }
+                      }}
+                      title="클릭하여 상세 정보 보기 또는 캘린더로 드래그하여 일정 설정"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-medium text-sm">{task.title}</h4>
+                        <span className={`text-xs px-2 py-1 rounded-full ${statusBg} ${statusText}`}>
+                          {task.status === 'todo' ? '할 일' : 
+                           task.status === 'in-progress' ? '진행 중' : 
+                           task.status === 'done' ? '완료' : '검토'}
+                        </span>
+                      </div>
+                      <div className={`text-xs ${priorityText}`}>
+                        {task.priority === 'high' ? '높은 우선순위' : 
+                         task.priority === 'medium' ? '중간 우선순위' : '낮은 우선순위'}
+                      </div>
                     </div>
-                    <div className={`text-xs ${priorityText}`}>
-                      {task.priority === 'high' ? '높은 우선순위' : 
-                       task.priority === 'medium' ? '중간 우선순위' : '낮은 우선순위'}
-                    </div>
-                  </div>
-                );
-              })
-            )}
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
       )}
+
+      {/* 예약되지 않은 업무 사이드바 스크롤바 스타일 */}
+      <style jsx global>{`
+        /* 예약되지 않은 업무 스크롤바 스타일 */
+        html.dark .unscheduled-tasks-scrollbar::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        html:not(.dark) .unscheduled-tasks-scrollbar::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        html.dark .unscheduled-tasks-scrollbar::-webkit-scrollbar-track {
+          background: #1f2937; /* gray-800 */
+          border-radius: 3px;
+        }
+        html:not(.dark) .unscheduled-tasks-scrollbar::-webkit-scrollbar-track {
+          background: #f3f4f6; /* gray-100 */
+          border-radius: 3px;
+        }
+        html.dark .unscheduled-tasks-scrollbar::-webkit-scrollbar-thumb {
+          background-color: #4b5563; /* gray-600 */
+          border-radius: 3px;
+          border: 1px solid #1f2937; /* gray-800, creates padding */
+        }
+        html:not(.dark) .unscheduled-tasks-scrollbar::-webkit-scrollbar-thumb {
+          background-color: #d1d5db; /* gray-300 */
+          border-radius: 3px;
+          border: 1px solid #f3f4f6; /* gray-100, creates padding */
+        }
+        html.dark .unscheduled-tasks-scrollbar::-webkit-scrollbar-thumb:hover {
+          background-color: #6b7280; /* gray-500 */
+        }
+        html:not(.dark) .unscheduled-tasks-scrollbar::-webkit-scrollbar-thumb:hover {
+          background-color: #9ca3af; /* gray-400 */
+        }
+        html.dark .unscheduled-tasks-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: #4b5563 #1f2937; /* thumb track for Firefox */
+        }
+        html:not(.dark) .unscheduled-tasks-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: #d1d5db #f3f4f6; /* thumb track for Firefox */
+        }
+      `}</style>
     </div>
   );
 }
@@ -2269,4 +2316,26 @@ const CalendarPage: React.FC = () => {
   }
 `}</style>
 
-export default CalendarPage;
+// CalendarPageContent 컴포넌트를 Suspense로 감싸는 기본 export
+export default function CalendarPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
+        <div className="text-center flex flex-col items-center">
+          <div className="relative w-24 h-24 text-blue-500">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-16 h-16 border-4 border-current border-solid rounded-full opacity-20 border-blue-500"></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-12 h-12 border-4 border-current border-solid rounded-full animate-spin border-t-transparent"></div>
+            </div>
+          </div>
+          <p className="text-lg font-medium mt-4">캘린더 로딩 중...</p>
+          <p className="text-sm text-muted-foreground">잠시만 기다려주세요</p>
+        </div>
+      </div>
+    }>
+      <CalendarPageContent />
+    </Suspense>
+  );
+}

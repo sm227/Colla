@@ -112,6 +112,7 @@ export function useDrop({ onDrop }: UseDropProps) {
       node.removeEventListener("dragleave", handleDragLeave);
       node.removeEventListener("drop", handleDrop);
     };
+    // @ts-ignore
   }, [onDrop]);
 
   return {
