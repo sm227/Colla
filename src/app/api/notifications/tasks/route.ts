@@ -56,23 +56,30 @@ export async function GET(req: NextRequest) {
     twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
 
     try {
-      // TaskEvent 테이블에서 이벤트 조회 시도
-      const taskEvents = await prisma.taskEvent.findMany({
-        where: {
-          projectId: { in: projectIds },
-          createdAt: { gte: twentyFourHoursAgo }
-        },
-        include: {
-          task: { select: { title: true, projectId: true } },
-          project: { select: { name: true } },
-          previousUser: { select: { name: true } },
-          newUser: { select: { name: true } }
-        },
-        orderBy: { createdAt: "desc" },
-        take: 50
-      });
-
-      console.log(`TaskEvent에서 ${taskEvents.length}개의 이벤트를 찾았습니다.`);
+      // TaskEvent 테이블 존재 여부 확인 후 조회 시도
+      let taskEvents: any[] = [];
+      
+      try {
+        taskEvents = await prisma.taskEvent.findMany({
+          where: {
+            projectId: { in: projectIds },
+            createdAt: { gte: twentyFourHoursAgo }
+          },
+          include: {
+            task: { select: { title: true, projectId: true } },
+            project: { select: { name: true } },
+            previousUser: { select: { name: true } },
+            newUser: { select: { name: true } }
+          },
+          orderBy: { createdAt: "desc" },
+          take: 50
+        });
+        
+        console.log(`TaskEvent에서 ${taskEvents.length}개의 이벤트를 찾았습니다.`);
+      } catch (taskEventError) {
+        console.log("TaskEvent 테이블이 존재하지 않거나 조회 실패:", taskEventError);
+        taskEvents = [];
+      }
 
       // TaskEvent가 없거나 적으면 기존 방식도 함께 사용
       if (taskEvents.length === 0) {
@@ -80,48 +87,65 @@ export async function GET(req: NextRequest) {
         throw new Error("TaskEvent가 비어있음");
       }
 
-      // TaskEvent에서 알림 생성
-      const notifications = taskEvents.map((event) => {
-        let title = "";
-        let message = "";
-
-        switch (event.eventType) {
-          case "task_created":
-            title = `새 작업: ${event.task.title}`;
-            message = event.project?.name ? `프로젝트: ${event.project.name}` : "프로젝트 정보 없음";
-            if (event.newUser) {
-              message += ` | 담당자: ${event.newUser.name}`;
+      // TaskEvent에서 알림 생성 (본인 할당 작업 + 담당자 없는 새 작업)
+      const notifications = taskEvents
+        .filter((event) => {
+          try {
+            // 담당자 변경 이벤트인 경우 본인이 새 담당자일 때만 알림
+            if (event.eventType === "assignee_changed") {
+              return event.newAssignee === currentUser.id;
             }
+            
+            // 작업 생성 이벤트인 경우: 본인에게 할당되었거나 담당자가 없는 경우
+            if (event.eventType === "task_created") {
+              return event.newAssignee === currentUser.id || !event.newAssignee;
+            }
+            
+            // 기타 이벤트는 본인에게 할당된 경우만
+            return event.newAssignee === currentUser.id;
+          } catch (filterError) {
+            console.log("TaskEvent 필터링 중 오류:", filterError);
+            return false;
+          }
+        })
+        .map((event) => {
+          let title = "";
+          let message = "";
+
+                  switch (event.eventType) {
+          case "task_created":
+            if (event.newAssignee === currentUser.id) {
+              title = `새 작업이 할당됨: ${event.task.title}`;
+            } else {
+              title = `새 작업 생성됨: ${event.task.title}`;
+            }
+            message = event.project?.name ? `프로젝트: ${event.project.name}` : "프로젝트 정보 없음";
             break;
           
           case "assignee_changed":
-            title = `담당자 변경: ${event.task.title}`;
-            if (!event.previousAssignee && event.newAssignee) {
-              message = `${event.newUser?.name || '알 수 없는 사용자'}에게 할당됨`;
-            } else if (event.previousAssignee && !event.newAssignee) {
-              message = `${event.previousUser?.name || '알 수 없는 사용자'} 할당 해제`;
-            } else if (event.previousAssignee && event.newAssignee) {
-              message = `${event.previousUser?.name || '알 수 없는 사용자'} → ${event.newUser?.name || '알 수 없는 사용자'}`;
-            }
+            title = `작업이 할당됨: ${event.task.title}`;
+            message = event.project?.name ? `프로젝트: ${event.project.name}` : "프로젝트 정보 없음";
             break;
           
           default:
-            title = `작업 업데이트: ${event.task.title}`;
+            title = `할당된 작업 업데이트: ${event.task.title}`;
             message = event.description || (event.project?.name ? `프로젝트: ${event.project.name}` : "프로젝트 정보 없음");
         }
 
-        return {
+                  return {
           id: event.id, // 이벤트의 고유 ID 사용
-          type: event.eventType === "task_created" ? "task_created" : "task_updated",
-          title,
-          message,
-          link: `/kanban?projectId=${event.task.projectId}`,
-          createdAt: event.createdAt,
-          isRead: false,
-          projectId: event.projectId,
-          taskId: event.taskId,
-        };
-      });
+          type: event.eventType === "task_created" 
+            ? (event.newAssignee === currentUser.id ? "task_assigned" : "task_created")
+            : "task_updated",
+            title,
+            message,
+            link: `/kanban?projectId=${event.task.projectId}`,
+            createdAt: event.createdAt,
+            isRead: false,
+            projectId: event.projectId,
+            taskId: event.taskId,
+          };
+        });
 
       console.log(`TaskEvent에서 ${notifications.length}개의 알림을 생성했습니다.`);
       return NextResponse.json(notifications);
@@ -143,9 +167,20 @@ export async function GET(req: NextRequest) {
       });
 
       console.log(`기존 방식에서 ${recentTasks.length}개의 작업을 찾았습니다.`);
+      
+      // 본인에게 할당된 작업 + 담당자 없는 작업 필터링
+      const relevantTasks = recentTasks.filter(task => {
+        const createdDate = new Date(task.createdAt);
+        const updatedDate = new Date(task.updatedAt);
+        const isNewTask = Math.abs(createdDate.getTime() - updatedDate.getTime()) < 60000; // 1분 이내면 새 작업
+        
+        // 새로 생성된 작업이면서 담당자가 없는 경우 OR 본인에게 할당된 작업
+        return (isNewTask && !task.assignee) || task.assignee === currentUser.id;
+      });
+      console.log(`그 중 관련된 ${relevantTasks.length}개의 작업을 찾았습니다.`);
 
       // 담당자 정보 조회를 위해 고유한 담당자 ID 목록 추출
-      const assigneeIds = Array.from(new Set(recentTasks.map(task => task.assignee).filter(Boolean))) as string[];
+      const assigneeIds = Array.from(new Set(relevantTasks.map((task: any) => task.assignee).filter(Boolean))) as string[];
       
       // 담당자 정보 일괄 조회
       const assigneeUsers = await prisma.user.findMany({
@@ -156,7 +191,7 @@ export async function GET(req: NextRequest) {
       const assigneeMap = new Map(assigneeUsers.map(user => [user.id, user.name]));
 
       // 알림 형태로 변환하면서 담당자 변경 정보 추가
-      const notifications = recentTasks.map((task) => {
+      const notifications = relevantTasks.map((task: any) => {
         const createdDate = new Date(task.createdAt);
         const updatedDate = new Date(task.updatedAt);
         const isNewTask = Math.abs(createdDate.getTime() - updatedDate.getTime()) < 60000; // 1분 이내면 새 작업
@@ -169,33 +204,28 @@ export async function GET(req: NextRequest) {
         const uniqueId = `${task.id}-${task.updatedAt.getTime()}`;
 
         if (isNewTask) {
-          notificationType = "task_created";
-          title = `새 작업: ${task.title}`;
+          if (task.assignee === currentUser.id) {
+            notificationType = "task_assigned";
+            title = `새 작업이 할당됨: ${task.title}`;
+          } else {
+            notificationType = "task_created";
+            title = `새 작업 생성됨: ${task.title}`;
+          }
           message = task.project?.name 
             ? `프로젝트: ${task.project.name}` 
             : "프로젝트 정보 없음";
-          
-          if (task.assignee && assigneeMap.has(task.assignee)) {
-            message += ` | 담당자: ${assigneeMap.get(task.assignee)}`;
-          }
         } else {
-          // 작업 업데이트의 경우 - 담당자 변경 여부 확인
+          // 작업 업데이트의 경우
           notificationType = "task_updated";
-          
-          if (task.assignee && assigneeMap.has(task.assignee)) {
-            title = `담당자 설정: ${task.title}`;
-            message = `${assigneeMap.get(task.assignee)}에게 할당됨`;
-          } else {
-            title = `작업 업데이트: ${task.title}`;
-            message = task.project?.name 
-              ? `프로젝트: ${task.project.name}` 
-              : "프로젝트 정보 없음";
-          }
+          title = `할당된 작업 업데이트: ${task.title}`;
+          message = task.project?.name 
+            ? `프로젝트: ${task.project.name}` 
+            : "프로젝트 정보 없음";
         }
 
         return {
           id: uniqueId, // 고유한 ID 사용
-          type: notificationType as "task_created" | "task_updated",
+          type: notificationType as "task_assigned" | "task_created" | "task_updated",
           title,
           message,
           link: `/kanban?projectId=${task.projectId}`,

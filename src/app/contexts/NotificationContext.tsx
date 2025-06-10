@@ -30,6 +30,7 @@ interface NotificationContextType {
   refreshNotifications: () => void;
   markAllAsRead: () => void;
   markAsRead: (notificationId: string) => void;
+  clearAllNotifications: () => void;
   acceptInvitation: (invitationId: string, projectId: string, e: React.MouseEvent) => void;
   rejectInvitation: (invitationId: string, projectId: string, e: React.MouseEvent) => void;
 }
@@ -79,14 +80,38 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // localStorage에서 삭제된 알림 ID들을 가져오는 함수
+  const getDeletedNotificationIds = (): Set<string> => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      const deletedIds = localStorage.getItem('deletedNotificationIds');
+      return deletedIds ? new Set(JSON.parse(deletedIds)) : new Set();
+    } catch (error) {
+      console.error('삭제된 알림 ID 가져오기 오류:', error);
+      return new Set();
+    }
+  };
+
+  // localStorage에 삭제된 알림 ID들을 저장하는 함수
+  const saveDeletedNotificationIds = (deletedIds: Set<string>) => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('deletedNotificationIds', JSON.stringify(Array.from(deletedIds)));
+    } catch (error) {
+      console.error('삭제된 알림 ID 저장 오류:', error);
+    }
+  };
+
   // 알림 데이터 가져오기
   const fetchNotifications = async () => {
     try {
       console.log("=== 알림 가져오기 시작 ===");
       
-      // 읽은 알림 ID 목록 가져오기
+      // 읽은 알림 ID 및 삭제된 알림 ID 목록 가져오기
       const readNotificationIds = getReadNotificationIds();
+      const deletedNotificationIds = getDeletedNotificationIds();
       console.log('localStorage에서 읽은 알림 ID:', Array.from(readNotificationIds));
+      console.log('localStorage에서 삭제된 알림 ID:', Array.from(deletedNotificationIds));
 
       // 프로젝트 초대 알림 가져오기
       const fetchProjectInvitationsAsNotifications = async (): Promise<Notification[]> => {
@@ -103,16 +128,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           }
           const invitations: any[] = await response.json();
           
-          const invitationNotifications = invitations.map((invitation) => ({
-            id: invitation.id,
-            type: "invitation" as const,
-            title: "프로젝트 초대",
-            message: `${invitation.project.name} 프로젝트에 초대되었습니다.`,
-            link: "/projects/invitations",
-            createdAt: invitation.createdAt,
-            isRead: readNotificationIds.has(invitation.id), // localStorage에서 읽음 상태 확인
-            projectId: invitation.projectId,
-          }));
+          const invitationNotifications = invitations
+            .filter((invitation) => !deletedNotificationIds.has(invitation.id)) // 삭제된 알림 제외
+            .map((invitation) => ({
+              id: invitation.id,
+              type: "invitation" as const,
+              title: "프로젝트 초대",
+              message: `${invitation.project.name} 프로젝트에 초대되었습니다.`,
+              link: "/projects/invitations",
+              createdAt: invitation.createdAt,
+              isRead: readNotificationIds.has(invitation.id), // localStorage에서 읽음 상태 확인
+              projectId: invitation.projectId,
+            }));
           
           return invitationNotifications;
         } catch (error) {
@@ -145,18 +172,20 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           const taskNotifications: any[] = await response.json();
           console.log(`📋 작업 알림 ${taskNotifications.length}개 조회됨:`, taskNotifications);
           
-          return taskNotifications.map((notification) => {
-            return {
-              id: notification.id,
-              type: notification.type,
-              title: notification.title,
-              message: notification.message,
-              link: notification.link,
-              createdAt: notification.createdAt,
-              isRead: readNotificationIds.has(notification.id), // localStorage에서 읽음 상태 확인
-              projectId: notification.projectId,
-            };
-          });
+          return taskNotifications
+            .filter((notification) => !deletedNotificationIds.has(notification.id)) // 삭제된 알림 제외
+            .map((notification) => {
+              return {
+                id: notification.id,
+                type: notification.type,
+                title: notification.title,
+                message: notification.message,
+                link: notification.link,
+                createdAt: notification.createdAt,
+                isRead: readNotificationIds.has(notification.id), // localStorage에서 읽음 상태 확인
+                projectId: notification.projectId,
+              };
+            });
           
         } catch (error) {
           console.error("작업 알림 가져오기 오류:", error);
@@ -317,6 +346,24 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     console.log(`✅ 알림 ${notificationId}을 읽음 처리했습니다.`);
   };
 
+  // 모든 알림을 지우는 함수
+  const clearAllNotifications = () => {
+    // 현재 알림들의 ID를 삭제된 목록에 추가
+    const deletedNotificationIds = getDeletedNotificationIds();
+    notifications.forEach(notification => {
+      deletedNotificationIds.add(notification.id);
+    });
+    saveDeletedNotificationIds(deletedNotificationIds);
+    
+    // 알림 목록 비우기
+    setNotifications([]);
+    
+    // 새 알림 없음으로 설정
+    setHasNewNotifications(false);
+    
+    console.log(`🗑️ ${notifications.length}개의 알림을 지웠습니다.`);
+  };
+
   // 컴포넌트 마운트 시 알림 가져오기 및 사운드 설정 로드
   useEffect(() => {
     fetchNotifications();
@@ -350,6 +397,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     refreshNotifications: fetchNotifications,
     markAllAsRead,
     markAsRead,
+    clearAllNotifications,
     acceptInvitation,
     rejectInvitation,
   };

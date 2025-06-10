@@ -1284,7 +1284,7 @@ function HomeContent() {
           onSettingsClick={() => setShowTaskModal(true)}
         />
 
-        <div className={`flex-1 flex flex-col overflow-hidden ${showNotificationPanel ? 'pl-80 md:pl-96' : ''} transition-all duration-300 ease-in-out`}>
+        <div className="flex-1 flex flex-col overflow-hidden">
           {/* 모바일 헤더 */}
           <div className="md:hidden bg-background border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
             <button

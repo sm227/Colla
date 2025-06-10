@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, Suspense } from "react";
 import { 
   FileTextIcon, 
   FolderIcon, 
@@ -240,9 +240,11 @@ function DocumentsPageContent() {
   
   // URL의 projectId 파라미터가 변경될 때 상태 업데이트 (초기 로드시에만)
   useEffect(() => {
-    const urlProjectId = searchParams?.get('projectId');
-    if (urlProjectId !== selectedProjectId) {
-      setSelectedProjectId(urlProjectId);
+    if (searchParams) {
+      const urlProjectId = searchParams.get('projectId');
+      if (urlProjectId !== selectedProjectId) {
+        setSelectedProjectId(urlProjectId);
+      }
     }
   }, [searchParams, selectedProjectId]);
 

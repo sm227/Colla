@@ -213,6 +213,7 @@ const Sidebar = memo(function Sidebar({
     setSoundEnabled,
     markAllAsRead,
     markAsRead,
+    clearAllNotifications,
     acceptInvitation,
     rejectInvitation
   } = useNotifications();
@@ -872,7 +873,7 @@ const Sidebar = memo(function Sidebar({
 
       {/* 알림 패널 */}
       {showNotificationPanel && setShowNotificationPanel && (
-        <div className="fixed inset-0 z-50 md:inset-auto md:left-64 md:top-0 md:h-full md:w-80 lg:w-96 bg-white dark:bg-[#1f1f21] shadow-xl border-r border-gray-200 dark:border-gray-700">
+        <div className="fixed inset-0 z-50 md:inset-auto md:left-64 md:top-0 md:h-full md:w-80 lg:w-96 bg-white dark:bg-[#1f1f21] shadow-xl border-r border-gray-200 dark:border-gray-700 notification-panel-enter">
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">알림</h2>
             <div className="flex items-center gap-2">
@@ -897,14 +898,25 @@ const Sidebar = memo(function Sidebar({
                   </svg>
                 )}
               </button>
-              {/* 모두 읽기 버튼 */}
-              {notifications.length > 0 && hasNewNotifications && (
-                <button
-                  onClick={markAllAsRead}
-                  className="px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
-                >
-                  모두 읽기
-                </button>
+              {/* 모두 읽기 및 알림 지우기 버튼 */}
+              {notifications.length > 0 && (
+                <div className="flex items-center gap-1">
+                  {hasNewNotifications && (
+                    <button
+                      onClick={markAllAsRead}
+                      className="px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+                    >
+                      모두 읽기
+                    </button>
+                  )}
+                  <button
+                    onClick={clearAllNotifications}
+                    className="px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                    title="모든 알림 지우기"
+                  >
+                    알림 지우기
+                  </button>
+                </div>
               )}
               {/* 닫기 버튼 */}
               <button
