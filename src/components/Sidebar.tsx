@@ -230,6 +230,10 @@ const Sidebar = memo(function Sidebar({
   const [showDeleteFolderModal, setShowDeleteFolderModal] = useState(false);
   const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
   const [folderIdToDelete, setFolderIdToDelete] = useState<string | null>(null);
+  
+  // 알림 패널 애니메이션 상태
+  const [isNotificationPanelVisible, setIsNotificationPanelVisible] = useState(false);
+  const [isNotificationPanelClosing, setIsNotificationPanelClosing] = useState(false);
 
   const { user, logout } = useAuth();
   const { 
@@ -400,12 +404,41 @@ const Sidebar = memo(function Sidebar({
     }
   };
 
-  // 알림 패널 열기
+  // 알림 패널 열기/닫기 핸들러
   const handleNotificationPanelToggle = () => {
-    if (setShowNotificationPanel) {
-      setShowNotificationPanel(!showNotificationPanel);
-    } else {
+    if (!setShowNotificationPanel) {
       alert('알림 기능은 대시보드에서 확인해주세요.');
+      return;
+    }
+
+    if (showNotificationPanel) {
+      // 닫기 애니메이션 시작
+      setIsNotificationPanelClosing(true);
+      setTimeout(() => {
+        setShowNotificationPanel(false);
+        setIsNotificationPanelVisible(false);
+        setIsNotificationPanelClosing(false);
+      }, 500); // 애니메이션 시간에 맞춰 조정
+    } else {
+      // 열기 애니메이션 시작
+      setShowNotificationPanel(true);
+      setIsNotificationPanelClosing(false);
+      // 다음 프레임에서 visible 상태 변경 (부드러운 애니메이션을 위해)
+      requestAnimationFrame(() => {
+        setIsNotificationPanelVisible(true);
+      });
+    }
+  };
+
+  // 알림 패널 닫기 (외부에서 호출용)
+  const handleNotificationPanelClose = () => {
+    if (showNotificationPanel && setShowNotificationPanel) {
+      setIsNotificationPanelClosing(true);
+      setTimeout(() => {
+        setShowNotificationPanel(false);
+        setIsNotificationPanelVisible(false);
+        setIsNotificationPanelClosing(false);
+      }, 500);
     }
   };
 
@@ -497,7 +530,7 @@ const Sidebar = memo(function Sidebar({
 
       {/* 사이드바 */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 border-r border-gray-200 bg-background dark:border-gray-700 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-gray-200 bg-background dark:border-gray-700 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         } md:relative md:flex-shrink-0 flex flex-col`}
       >
@@ -871,9 +904,27 @@ const Sidebar = memo(function Sidebar({
         </div>
       </aside>
 
+      {/* 알림 패널 배경 오버레이 */}
+      {showNotificationPanel && (
+        <div 
+          className={`fixed inset-0 z-40 bg-black/20 backdrop-blur-sm transition-opacity duration-500 ease-out md:hidden ${
+            !isNotificationPanelVisible || isNotificationPanelClosing ? 'opacity-0' : 'opacity-100'
+          }`}
+          onClick={handleNotificationPanelClose}
+        />
+      )}
+
       {/* 알림 패널 */}
-      {showNotificationPanel && setShowNotificationPanel && (
-        <div className="fixed inset-0 z-50 md:inset-auto md:left-64 md:top-0 md:h-full md:w-80 lg:w-96 bg-white dark:bg-[#1f1f21] shadow-xl border-r border-gray-200 dark:border-gray-700 notification-panel-enter">
+      {showNotificationPanel && (
+        <div className={`fixed z-40 bg-white dark:bg-[#1f1f21] shadow-xl border-r border-gray-200 dark:border-gray-700 transform smooth-slide-transition
+          ${/* 모바일: 전체 화면, 데스크톱: 사이드바 뒤에서 슬라이드 */ ''}
+          md:top-0 md:h-full md:w-80 lg:w-96 md:left-0
+          ${!isNotificationPanelVisible 
+            ? 'inset-0 -translate-x-full md:inset-auto md:-translate-x-full opacity-0' 
+            : isNotificationPanelClosing 
+              ? 'inset-0 translate-x-full md:inset-auto md:-translate-x-full opacity-0' 
+              : 'inset-0 translate-x-0 md:inset-auto md:translate-x-64 opacity-100'
+        }`}>
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">알림</h2>
             <div className="flex items-center gap-2">
@@ -920,7 +971,7 @@ const Sidebar = memo(function Sidebar({
               )}
               {/* 닫기 버튼 */}
               <button
-                onClick={() => setShowNotificationPanel(false)}
+                onClick={handleNotificationPanelClose}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
               >
                 <XIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" />

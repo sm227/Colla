@@ -59,6 +59,12 @@
   .text-balance {
     text-wrap: balance;
   }
+  
+  /* 부드러운 알림 패널 애니메이션을 위한 커스텀 easing */
+  .smooth-slide-transition {
+    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), 
+                opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
 }
 
 /* 알림 바운스 애니메이션 v2 */
@@ -104,10 +110,10 @@ button.notification-bounce {
   animation: notificationBounce 2s ease-in-out infinite !important;
 }
 
-/* 노션 스타일 알림 패널 애니메이션 - 심플하게 */
-@keyframes notionSlideFromLeft {
+/* 모던한 알림 패널 애니메이션 - 사이드바에서 나오는 방식 */
+@keyframes smoothSlideInFromSidebar {
   0% {
-    transform: translateX(-40px);
+    transform: translateX(-100%);
     opacity: 0;
   }
   100% {
@@ -116,9 +122,21 @@ button.notification-bounce {
   }
 }
 
-@keyframes notionFadeIn {
+@keyframes smoothSlideOutToSidebar {
   0% {
-    transform: translateX(-15px);
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+/* 모바일용 - 오른쪽에서 슬라이드 */
+@keyframes smoothSlideInMobile {
+  0% {
+    transform: translateX(100%);
     opacity: 0;
   }
   100% {
@@ -127,16 +145,58 @@ button.notification-bounce {
   }
 }
 
-.notification-panel-enter {
-  animation: notionSlideFromLeft 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+@keyframes smoothSlideOutMobile {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
 }
 
-.notification-panel-enter-mobile {
-  animation: notionFadeIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+@keyframes smoothFadeIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
-@media (max-width: 768px) {
-  .notification-panel-enter {
-    animation: notionFadeIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+@keyframes smoothFadeOut {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+}
+
+/* 부드러운 백드롭 애니메이션 */
+@keyframes backdropFadeIn {
+  0% {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    backdrop-filter: blur(4px);
+  }
+}
+
+@keyframes backdropFadeOut {
+  0% {
+    opacity: 1;
+    backdrop-filter: blur(4px);
+  }
+  100% {
+    opacity: 0;
+    backdrop-filter: blur(0px);
   }
 }
