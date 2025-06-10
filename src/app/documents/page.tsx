@@ -12,99 +12,24 @@ import {
   ListIcon,
   SortAscIcon,
   FilterIcon,
-  ChevronRightIcon,
-  ClockIcon,
-  UsersIcon,
-  TagIcon,
-  BookmarkIcon,
   Trash2Icon,
   XIcon,
   AlertCircleIcon,
-  HomeIcon,
-  ArrowLeftIcon,
-  LayoutDashboardIcon,
-  BellIcon,
-  SettingsIcon,
-  LogOutIcon,
   MenuIcon,
-  VideoIcon,
-  CalendarIcon,
-  Trello,
+  SettingsIcon,
   SunIcon,
   MoonIcon,
+  BellIcon,
   UserIcon,
-  BarChart3Icon,
 } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useProject } from "@/app/contexts/ProjectContext";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
-
-// shadcn/ui DropdownMenu 컴포넌트 임포트
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-// SidebarLink 컴포넌트 (page.tsx에서 가져옴)
-function SidebarLink({
-  icon,
-  text,
-  href,
-  active = false,
-  small = false,
-  onClick,
-  theme = "dark", 
-  badgeCount,
-  isProject = false 
-}: {
-  icon: React.ReactNode;
-  text: string;
-  href: string;
-  active?: boolean;
-  small?: boolean;
-  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
-  theme?: "light" | "dark";
-  badgeCount?: string | number;
-  isProject?: boolean;
-}) {
-  const activeProjectBg = theme === 'dark' 
-    ? 'bg-blue-900 bg-opacity-30' 
-    : 'bg-blue-100 bg-opacity-50'; 
-    
-  return (
-    <Link
-      href={href}
-      onClick={onClick}
-      className={`flex items-center justify-between px-2 py-1.5 ${small ? "text-sm" : "text-[15px]"} rounded-md transition-colors duration-150 ${
-        theme === 'dark'
-          ? active && isProject
-            ? `${activeProjectBg} text-gray-300 hover:bg-gray-700 hover:text-gray-100` 
-            : "text-gray-300 hover:bg-gray-700 hover:text-gray-100"
-          : active && isProject
-            ? `${activeProjectBg} text-gray-600 hover:bg-gray-200 hover:text-gray-900`
-            : "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-      }`}
-    >
-      <div className="flex items-center">
-        <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{icon}</div>
-        <span>{text}</span>
-      </div>
-      {badgeCount && (
-        <span className={`px-1.5 py-0.5 text-xs font-semibold rounded-full ${badgeCount === 'new' ? (theme === 'dark' ? 'bg-red-500 text-white' : 'bg-red-500 text-white') : (theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-700')}`}>
-          {badgeCount === 'new' ? '' : badgeCount}
-        </span>
-      )}
-    </Link>
-  );
-}
+import Sidebar from "@/components/Sidebar";
+import { useNotifications } from "@/app/contexts/NotificationContext";
 
 // 문서 인터페이스 정의
 interface Document {
@@ -265,12 +190,11 @@ const ModernScrollbarStyles = () => (
 
 function DocumentsPageContent() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false); // 모바일 사이드바 상태
-  const [isDocumentsSubmenuOpen, setIsDocumentsSubmenuOpen] = useState(true); // 문서 하위 메뉴 상태 추가
   const [mounted, setMounted] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
 
   const router = useRouter();
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const { 
@@ -280,6 +204,7 @@ function DocumentsPageContent() {
     loading: projectLoading,
     hasProjects
   } = useProject();
+  const { showNotificationPanel, setShowNotificationPanel, hasNewNotifications } = useNotifications();
   
   // 테마 관련 코드 수정 (next-themes 사용)
   const { theme: currentTheme, setTheme } = useTheme();
@@ -291,10 +216,6 @@ function DocumentsPageContent() {
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  const toggleTheme = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light');
-  };
   
   // URL에서 projectId 가져오기
   const getProjectIdFromUrl = () => {
@@ -314,20 +235,20 @@ function DocumentsPageContent() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   
-  // URL 파라미터에서 초기값 설정 (window 객체가 있을 때만)
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() => {
-    if (projectIdParam) return projectIdParam;
-    
-    // URL에서 직접 확인 (window 객체가 있을 때만)
-    if (typeof window !== 'undefined') {
-      const urlProjectId = new URLSearchParams(window.location.search).get('projectId');
-      return urlProjectId;
-    }
-    
-    return null;
-  });
+  // URL 파라미터에서 초기값 설정
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(projectIdParam);
   
-  const [documents, setDocuments] = useState<Document[]>([]);
+  // URL의 projectId 파라미터가 변경될 때 상태 업데이트 (초기 로드시에만)
+  useEffect(() => {
+    const urlProjectId = searchParams?.get('projectId');
+    if (urlProjectId !== selectedProjectId) {
+      setSelectedProjectId(urlProjectId);
+    }
+  }, [searchParams, selectedProjectId]);
+
+  // 브라우저 뒤로가기/앞으로가기 감지는 나중에 folders 선언 후에 정의
+  
+
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string | null>(null);
@@ -350,8 +271,53 @@ function DocumentsPageContent() {
   const [isDeletingFolder, setIsDeletingFolder] = useState(false);
   const [deleteFolderError, setDeleteFolderError] = useState<string | null>(null);
   
+  // 설정 모달 관련 상태
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [tempSettings, setTempSettings] = useState({
+    theme: theme,
+    language: 'ko',
+    notifications: {
+      email: true,
+      push: true,
+      desktop: true,
+    },
+    privacy: {
+      profileVisible: true,
+      activityVisible: true,
+    }
+  });
+  
   // 고유한 폴더 목록 가져오기
   const [folders, setFolders] = useState<Folder[]>([]);
+  
+  // 브라우저 뒤로가기/앞으로가기 감지 (사이드바에서 직접 호출하지 않는 경우용)
+  useEffect(() => {
+    const handlePopState = () => {
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const newProjectId = urlParams.get('projectId');
+        const newFolderId = urlParams.get('folderId');
+        
+        if (newProjectId !== selectedProjectId) {
+          setSelectedProjectId(newProjectId);
+        }
+        
+        if (folders.length > 0) {
+          if (newFolderId) {
+            const folder = folders.find(f => f.id === newFolderId);
+            if (folder && folder.name !== selectedFolder) {
+              setSelectedFolder(folder.name);
+            }
+          } else if (selectedFolder) {
+            setSelectedFolder(null);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [selectedProjectId, selectedFolder, folders]);
   
   // 프로젝트 ID로 프로젝트 정보 가져오기
   useEffect(() => {
@@ -457,15 +423,21 @@ function DocumentsPageContent() {
     }
   };
   
-  // 문서 데이터 가져오는 함수 (외부로 분리)
+  // 모든 문서 데이터 저장 (필터링 전)
+  const [allDocuments, setAllDocuments] = useState<Document[]>([]);
+  
+  // 문서 데이터 가져오는 함수 (프로젝트별 모든 문서 한번에 로드)
   const fetchDocuments = async () => {
     try {
       setLoading(true);
       
-      // 프로젝트 ID가 있고 모든 문서 보기가 아닐 때만 프로젝트 필터링
-      const url = (selectedProjectId && !showAllDocuments)
-        ? `/api/documents?projectId=${selectedProjectId}`
-        : '/api/documents';
+      // 프로젝트별 모든 문서를 한번에 가져옴 (폴더 필터링 없이)
+      const urlParams = new URLSearchParams();
+      if (selectedProjectId && !showAllDocuments) {
+        urlParams.append('projectId', selectedProjectId);
+      }
+      
+      const url = `/api/documents${urlParams.toString() ? `?${urlParams.toString()}` : ''}`;
       
       const response = await fetch(url);
       
@@ -474,17 +446,30 @@ function DocumentsPageContent() {
       }
       
       const data = await response.json();
-      setDocuments(data);
+      setAllDocuments(data); // 모든 문서 저장
       setError(null);
     } catch (err) {
       setError('문서를 불러오는 중 오류가 발생했습니다');
-      setDocuments([]);
+      setAllDocuments([]);
     } finally {
       setLoading(false);
     }
   };
   
-  // URL 파라미터에서 폴더 정보 읽기
+  // 클라이언트 사이드 필터링으로 표시할 문서 계산
+  const documents = useMemo(() => {
+    let filtered = [...allDocuments];
+    
+    // 폴더별 필터링
+    if (selectedFolder && selectedFolder !== "즐겨찾기") {
+      const selectedFolderId = folders.find(f => f.name === selectedFolder)?.id;
+      filtered = filtered.filter(doc => doc.folderId === selectedFolderId);
+    }
+    
+    return filtered;
+  }, [allDocuments, selectedFolder, folders]);
+  
+  // URL 파라미터에서 폴더 정보 읽기 및 상태 업데이트 (초기 로드시에만)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
@@ -495,11 +480,14 @@ function DocumentsPageContent() {
         if (folder) {
           setSelectedFolder(folder.name);
         }
+      } else {
+        // folderId가 없으면 모든 문서 표시
+        setSelectedFolder(null);
       }
     }
   }, [folders]);
   
-  // 문서 데이터 불러오기
+  // 문서 데이터 불러오기 (폴더 변경 시에는 다시 불러오지 않음)
   useEffect(() => {
     if (!user && !authLoading) {
       router.push('/auth/login?callbackUrl=/documents');
@@ -511,16 +499,13 @@ function DocumentsPageContent() {
     }
   }, [user, authLoading, router, selectedProjectId, showAllDocuments]);
   
-  // 폴더별 문서 필터링
+  // 최종 문서 필터링 (폴더 + 즐겨찾기 + 검색어)
   const filteredDocuments = useMemo(() => {
     let filtered = [...documents];
     
+    // 즐겨찾기 필터링
     if (selectedFolder === "즐겨찾기") {
       filtered = filtered.filter(doc => doc.isStarred);
-    } else if (selectedFolder) {
-      // 선택된 폴더 이름으로 필터링
-      const selectedFolderId = folders.find(f => f.name === selectedFolder)?.id;
-      filtered = filtered.filter(doc => doc.folderId === selectedFolderId);
     }
     
     // 검색어로 필터링
@@ -535,7 +520,29 @@ function DocumentsPageContent() {
     }
     
     return filtered;
-  }, [documents, selectedFolder, searchQuery, folders]);
+  }, [documents, selectedFolder, searchQuery]);
+
+  // 폴더 선택 핸들러 (useCallback으로 최적화)
+  const handleFolderSelect = useCallback((folderId: string, folderName: string) => {
+    // URL 업데이트 (페이지 새로고침 없이)
+    const url = selectedProjectId 
+      ? `/documents?projectId=${selectedProjectId}&folderId=${folderId}`
+      : `/documents?folderId=${folderId}`;
+    window.history.pushState({}, '', url);
+    
+    // 상태 직접 업데이트 (즉시 필터링됨)
+    setSelectedFolder(folderName);
+  }, [selectedProjectId]);
+
+  // 모든 문서 선택 핸들러 (useCallback으로 최적화)
+  const handleAllDocumentsSelect = useCallback(() => {
+    // URL 업데이트 (페이지 새로고침 없이)
+    const url = selectedProjectId ? `/documents?projectId=${selectedProjectId}` : "/documents";
+    window.history.pushState({}, '', url);
+    
+    // 상태 직접 업데이트 (즉시 필터링됨)
+    setSelectedFolder(null);
+  }, [selectedProjectId]);
   
   const createNewDocument = () => {
     setIsNavigating(true);
@@ -598,7 +605,7 @@ function DocumentsPageContent() {
       }
       
       // 삭제 성공 시 문서 목록에서 제거
-      setDocuments(documents.filter(doc => doc.id !== documentToDelete.id));
+      setAllDocuments(allDocuments.filter(doc => doc.id !== documentToDelete.id));
       
       // 폴더 목록도 다시 가져와서 문서 수를 업데이트
       await fetchFolders();
@@ -774,14 +781,36 @@ function DocumentsPageContent() {
     }
   };
   
-  // 로그아웃 함수 (page.tsx에서 가져옴)
-  const handleLogout = async () => {
-    try {
-      await logout();
-      router.push("/auth/login"); // 로그아웃 후 로그인 페이지로 이동
-    } catch (error) {
-      console.error("로그아웃 오류:", error);
+  // 설정 저장 함수
+  const handleSaveSettings = () => {
+    // 테마 변경
+    if (tempSettings.theme !== theme) {
+      setTheme(tempSettings.theme);
     }
+    
+    // 다른 설정들도 여기서 저장 처리
+    // localStorage나 API를 통해 저장할 수 있음
+    localStorage.setItem('userSettings', JSON.stringify(tempSettings));
+    
+    setShowSettingsModal(false);
+  };
+  
+  // 설정 모달 열기
+  const openSettingsModal = () => {
+    setTempSettings({
+      theme: theme,
+      language: 'ko',
+      notifications: {
+        email: true,
+        push: true,
+        desktop: true,
+      },
+      privacy: {
+        profileVisible: true,
+        activityVisible: true,
+      }
+    });
+    setShowSettingsModal(true);
   };
   
   // hydration mismatch 방지
@@ -829,266 +858,15 @@ function DocumentsPageContent() {
       {/* 스크롤바 스타일 적용 */}
       <ModernScrollbarStyles />
       
-      {/* 사이드바 (page.tsx에서 가져옴) */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64  border-r border-gray-200 bg-background dark:border-gray-700 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
-          mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } md:relative md:flex-shrink-0 flex flex-col`}
-      >
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-black dark:bg-blue-600 rounded-lg flex items-center justify-center mr-2">
-              <span className="text-white font-bold text-lg">C</span>
-            </div>
-            <span className="text-xl font-semibold text-gray-900 dark:text-gray-100">Colla</span>
-          </div>
-          <button
-            className="md:hidden outline-none focus:outline-none"
-            onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-          >
-            <XIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
-          </button>
-          </div>
-          
-        <nav className="flex-grow px-4 py-4 space-y-2 overflow-y-auto">
-          <SidebarLink
-            icon={<SearchIcon className="w-5 h-5" />}
-            text="검색"
-            href="#" 
-            theme={theme}
-            onClick={(e) => { e.preventDefault(); alert('검색 기능 구현 예정'); }}
-          />
-          <SidebarLink
-            icon={<LayoutDashboardIcon className="w-5 h-5" />}
-            text="대시보드"
-            href="/"
-            active={pathname === "/"}
-            theme={theme}
-          />
-          
-          <div className="pt-4">
-            <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              프로젝트
-            </h3>
-            <nav className="mt-2 space-y-1">
-              {projects.map((project) => (
-                <SidebarLink
-                  key={project.id}
-                  icon={<FolderIcon className="w-5 h-5" />}
-                  text={project.name}
-                  href={`/documents?projectId=${project.id}`}
-                  small
-                  active={selectedProjectId === project.id}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    const newUrl = `/documents?projectId=${project.id}`;
-                    router.push(newUrl);
-                  }}
-                  theme={theme}
-                  isProject={true}
-                />
-              ))}
-              <SidebarLink
-                icon={<PlusIcon className="w-5 h-5" />}
-                text="새 프로젝트"
-                href="/projects/new"
-                active={pathname === "/projects/new"}
-                theme={theme}
-                small
-                onClick={() => router.push("/projects/new")}
-              />
-            </nav>
-          </div>
-
-          <div className="pt-4">
-            <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              내 작업 공간
-            </h3>
-            <div className="mt-2 space-y-1">
-              <SidebarLink
-                icon={<Trello className="w-5 h-5" />}
-                text="칸반보드"
-                href={currentProject ? `/kanban?projectId=${currentProject.id}` : "/kanban"}
-                active={pathname?.startsWith("/kanban")}
-                theme={theme}
-                small
-              />
-              <SidebarLink
-                icon={<CalendarIcon className="w-5 h-5" />}
-                text="캘린더"
-                href={currentProject ? `/calendar?projectId=${currentProject.id}` : "/calendar"}
-                active={pathname?.startsWith("/calendar")}
-                theme={theme}
-                small
-              />
-              {/* 문서 섹션 */}
-              <div>
-                <button
-                  onClick={() => setIsDocumentsSubmenuOpen(!isDocumentsSubmenuOpen)}
-                  className={`flex items-center justify-between w-full px-2 py-1.5 text-sm rounded-md transition-colors duration-150 outline-none focus:outline-none ${
-                    theme === 'dark'
-                      ? pathname?.startsWith("/documents")
-                        ? "bg-blue-900 bg-opacity-30 text-gray-300 hover:bg-gray-700 hover:text-gray-100"
-                        : "text-gray-300 hover:bg-gray-700 hover:text-gray-100"
-                      : pathname?.startsWith("/documents")
-                        ? "bg-blue-100 bg-opacity-50 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                        : "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                      <FileTextIcon className="w-5 h-5" />
-                    </div>
-                    <span>문서</span>
-                  </div>
-                  <ChevronRightIcon 
-                    className={`w-4 h-4 transition-transform duration-200 ${
-                      isDocumentsSubmenuOpen ? 'transform rotate-90' : ''
-                    } ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}
-                  />
-                </button>
-                
-                {isDocumentsSubmenuOpen && (
-                  <div className="ml-4 mt-1 space-y-1">
-                    <SidebarLink
-                      icon={<FileTextIcon className="w-4 h-4" />}
-                      text="모든 문서"
-                      href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
-                      active={pathname === "/documents" && !selectedFolder}
-                      theme={theme}
-                      small
-                    />
-                    
-                    {/* 폴더 목록 */}
-                    {folders.map((folder) => (
-                      <button
-                        key={folder.id}
-                        onClick={() => {
-                          setSelectedFolder(folder.name);
-                          const url = selectedProjectId 
-                            ? `/documents?projectId=${selectedProjectId}&folderId=${folder.id}`
-                            : `/documents?folderId=${folder.id}`;
-                          router.push(url);
-                        }}
-                        className={`group flex items-center justify-between w-full px-2 py-1.5 text-sm rounded-md transition-colors duration-150 outline-none focus:outline-none ${
-                          selectedFolder === folder.name
-                            ? theme === 'dark'
-                              ? "bg-blue-900 bg-opacity-30 text-gray-300"
-                              : "bg-blue-100 bg-opacity-50 text-gray-600"
-                            : theme === 'dark'
-                              ? "text-gray-300 hover:bg-gray-700 hover:text-gray-100"
-                              : "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                        }`}
-                      >
-                        <div className="flex items-center">
-                          <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                            <FolderIcon className="w-4 h-4" />
-                          </div>
-                          <span className="truncate">{folder.name}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {folder.count > 0 && (
-                            <span className={`px-1.5 py-0.5 text-xs font-semibold rounded-full ${theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
-                              {folder.count}
-                            </span>
-                          )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openDeleteFolderModal(folder.id, folder.name);
-                            }}
-                            className={`p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 outline-none focus:outline-none`}
-                            title="폴더 삭제"
-                          >
-                            <Trash2Icon className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </button>
-                    ))}
-                    
-                    {/* 새 폴더 만들기 */}
-                    <button
-                      onClick={() => setShowFolderModal(true)}
-                      className={`flex items-center w-full px-2 py-1.5 text-sm rounded-md transition-colors duration-150 outline-none focus:outline-none ${
-                        theme === 'dark'
-                          ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200"
-                          : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"
-                      }`}
-                    >
-                      <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                        <PlusIcon className="w-4 h-4" />
-                      </div>
-                      <span>새 폴더</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-              <SidebarLink 
-                icon={<UsersIcon className="w-5 h-5"/>} 
-                text="팀원 관리" 
-                href={currentProject ? `/projects/${currentProject.id}/members` : "/projects"}
-                active={pathname?.includes("/projects") && pathname?.includes("/members")}
-                theme={theme}
-                small 
-              />
-              <SidebarLink
-                icon={<VideoIcon className="w-5 h-5" />}
-                text="화상 회의"
-                href="/meeting"
-                active={pathname?.startsWith("/meeting")}
-                theme={theme}
-                small
-              />
-              <SidebarLink
-                icon={<BarChart3Icon className="w-5 h-5" />}
-                text="보고서"
-                href="/reports"
-                active={pathname?.startsWith("/reports")}
-                theme={theme}
-                small
-              />
-            </div>
-          </div>
-        </nav>
-
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center w-full p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none outline-none">
-                <UserIcon className="w-6 h-6 mr-3 rounded-full bg-gray-200 dark:bg-gray-600 p-0.5 text-gray-700 dark:text-gray-300" />
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user?.name || user?.email || '사용자'}</span>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" sideOffset={5}>
-              <DropdownMenuLabel className="px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400">
-                {user?.email}
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push('/mypage')} className="cursor-pointer">
-                <UserIcon className="w-4 h-4 mr-2" />
-                <span>정보 수정</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => alert('알림 기능은 대시보드에서 확인해주세요.')} className="cursor-pointer">
-                <BellIcon className="w-4 h-4 mr-2" />
-                <span>알림</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer">
-                <SettingsIcon className="w-4 h-4 mr-2" />
-                <span>설정</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
-                {theme === 'dark' ? <SunIcon className="w-4 h-4 mr-2" /> : <MoonIcon className="w-4 h-4 mr-2" />}
-                <span>{theme === 'dark' ? "라이트 모드" : "다크 모드"}</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/50 focus:text-red-600 dark:focus:text-red-400">
-                <LogOutIcon className="w-4 h-4 mr-2" />
-                <span>로그아웃</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </aside>
+      {/* 사이드바 */}
+      <Sidebar
+        mobileSidebarOpen={mobileSidebarOpen}
+        setMobileSidebarOpen={setMobileSidebarOpen}
+        onSettingsClick={openSettingsModal}
+        currentPage="documents"
+        onFolderSelect={handleFolderSelect}
+        onAllDocumentsSelect={handleAllDocumentsSelect}
+      />
 
       {/* 메인 콘텐츠 영역 */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -1308,6 +1086,254 @@ function DocumentsPageContent() {
         </div>
       )}
       
+      {/* 설정 모달 */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="rounded-lg shadow-xl bg-card text-card-foreground">
+              {/* 헤더 */}
+              <div className="flex items-center justify-between p-6 border-b border-border">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mr-4">
+                    <SettingsIcon className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">설정</h3>
+                    <p className="text-sm text-muted-foreground">앱 설정을 관리하세요</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowSettingsModal(false)}
+                  className="p-2 rounded-md hover:bg-muted transition-colors"
+                >
+                  <XIcon className="w-5 h-5 text-muted-foreground" />
+                </button>
+              </div>
+              
+              {/* 본문 */}
+              <div className="p-6 space-y-6">
+                {/* 외관 설정 */}
+                <div>
+                  <h4 className="text-base font-medium text-foreground mb-4 flex items-center">
+                    <div className="w-5 h-5 rounded bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mr-2">
+                      {theme === 'dark' ? <MoonIcon className="w-3 h-3 text-blue-600 dark:text-blue-400" /> : <SunIcon className="w-3 h-3 text-blue-600" />}
+                    </div>
+                    외관
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-sm font-medium text-foreground">테마</label>
+                        <p className="text-xs text-muted-foreground">다크 모드와 라이트 모드를 선택하세요</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setTempSettings({...tempSettings, theme: 'light'})}
+                          className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                            tempSettings.theme === 'light' 
+                              ? 'bg-primary text-primary-foreground' 
+                              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          }`}
+                        >
+                          <SunIcon className="w-4 h-4 mr-1 inline" />
+                          라이트
+                        </button>
+                        <button
+                          onClick={() => setTempSettings({...tempSettings, theme: 'dark'})}
+                          className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                            tempSettings.theme === 'dark' 
+                              ? 'bg-primary text-primary-foreground' 
+                              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          }`}
+                        >
+                          <MoonIcon className="w-4 h-4 mr-1 inline" />
+                          다크
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* 알림 설정 */}
+                <div>
+                  <h4 className="text-base font-medium text-foreground mb-4 flex items-center">
+                    <div className="w-5 h-5 rounded bg-green-100 dark:bg-green-900/30 flex items-center justify-center mr-2">
+                      <BellIcon className="w-3 h-3 text-green-600 dark:text-green-400" />
+                    </div>
+                    알림
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-sm font-medium text-foreground">이메일 알림</label>
+                        <p className="text-xs text-muted-foreground">중요한 업데이트를 이메일로 받기</p>
+                      </div>
+                      <button
+                        onClick={() => setTempSettings({
+                          ...tempSettings,
+                          notifications: {...tempSettings.notifications, email: !tempSettings.notifications.email}
+                        })}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          tempSettings.notifications.email ? 'bg-primary' : 'bg-muted'
+                        }`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          tempSettings.notifications.email ? 'translate-x-6' : 'translate-x-1'
+                        }`} />
+                      </button>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-sm font-medium text-foreground">푸시 알림</label>
+                        <p className="text-xs text-muted-foreground">브라우저 푸시 알림 받기</p>
+                      </div>
+                      <button
+                        onClick={() => setTempSettings({
+                          ...tempSettings,
+                          notifications: {...tempSettings.notifications, push: !tempSettings.notifications.push}
+                        })}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          tempSettings.notifications.push ? 'bg-primary' : 'bg-muted'
+                        }`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          tempSettings.notifications.push ? 'translate-x-6' : 'translate-x-1'
+                        }`} />
+                      </button>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-sm font-medium text-foreground">데스크톱 알림</label>
+                        <p className="text-xs text-muted-foreground">데스크톱 알림 표시</p>
+                      </div>
+                      <button
+                        onClick={() => setTempSettings({
+                          ...tempSettings,
+                          notifications: {...tempSettings.notifications, desktop: !tempSettings.notifications.desktop}
+                        })}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          tempSettings.notifications.desktop ? 'bg-primary' : 'bg-muted'
+                        }`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          tempSettings.notifications.desktop ? 'translate-x-6' : 'translate-x-1'
+                        }`} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* 개인정보 설정 */}
+                <div>
+                  <h4 className="text-base font-medium text-foreground mb-4 flex items-center">
+                    <div className="w-5 h-5 rounded bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mr-2">
+                      <UserIcon className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    개인정보
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-sm font-medium text-foreground">프로필 공개</label>
+                        <p className="text-xs text-muted-foreground">다른 사용자에게 프로필 정보 공개</p>
+                      </div>
+                      <button
+                        onClick={() => setTempSettings({
+                          ...tempSettings,
+                          privacy: {...tempSettings.privacy, profileVisible: !tempSettings.privacy.profileVisible}
+                        })}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          tempSettings.privacy.profileVisible ? 'bg-primary' : 'bg-muted'
+                        }`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          tempSettings.privacy.profileVisible ? 'translate-x-6' : 'translate-x-1'
+                        }`} />
+                      </button>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-sm font-medium text-foreground">활동 내역 공개</label>
+                        <p className="text-xs text-muted-foreground">프로젝트 활동 내역 공개</p>
+                      </div>
+                      <button
+                        onClick={() => setTempSettings({
+                          ...tempSettings,
+                          privacy: {...tempSettings.privacy, activityVisible: !tempSettings.privacy.activityVisible}
+                        })}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          tempSettings.privacy.activityVisible ? 'bg-primary' : 'bg-muted'
+                        }`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          tempSettings.privacy.activityVisible ? 'translate-x-6' : 'translate-x-1'
+                        }`} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* 푸터 */}
+              <div className="flex justify-end gap-3 p-6 border-t border-border">
+                <button
+                  type="button"
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground bg-secondary hover:bg-secondary/80 rounded-lg transition-colors"
+                  onClick={() => setShowSettingsModal(false)}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  className="px-4 py-2 text-sm font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors"
+                  onClick={handleSaveSettings}
+                >
+                  설정 저장
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+              {/* 모바일 헤더 */}
+        <div className="md:hidden bg-background border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+          >
+            <MenuIcon className="w-6 h-6" />
+          </button>
+          
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-black dark:bg-blue-600 rounded-lg flex items-center justify-center mr-2">
+              <span className="text-white font-bold text-lg">C</span>
+            </div>
+            <span className="text-xl font-semibold text-gray-900 dark:text-gray-100">Colla</span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setShowNotificationPanel(!showNotificationPanel)}
+              className={`relative p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                hasNewNotifications ? 'notification-bounce' : ''
+              }`}
+              title="알림"
+            >
+              <BellIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              {hasNewNotifications && (
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              )}
+            </button>
+            <button className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+              <UserIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            </button>
+          </div>
+        </div>
+      
               {/* 메인 콘텐츠 */}
         <main className="flex flex-col flex-1 p-6 lg:p-8 overflow-y-auto bg-background">
         {/* 페이지 헤더 */}
@@ -1324,7 +1350,7 @@ function DocumentsPageContent() {
         </div>
         
         {/* 검색 및 필터 위젯 */}
-        <div className="bg-card text-card-foreground rounded-lg p-6 mb-8">
+        <div className="bg-background rounded-lg p-6 mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="relative flex-1">
                               <input
@@ -1332,7 +1358,7 @@ function DocumentsPageContent() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="문서 검색..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-background text-foreground placeholder:text-muted-foreground border border-border outline-none focus:outline-none transition-colors"
+                className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-muted/30 text-foreground placeholder:text-muted-foreground border border-border outline-none focus:outline-none transition-colors"
               />
               <SearchIcon className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
             </div>
@@ -1368,7 +1394,7 @@ function DocumentsPageContent() {
         </div>
         
         {/* 문서 목록 위젯 */}
-        <div className="bg-card text-card-foreground rounded-lg p-6 flex flex-col">
+        <div className="bg-background rounded-lg p-6 flex flex-col">
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center">
               <h3 className="text-xl font-semibold text-foreground">

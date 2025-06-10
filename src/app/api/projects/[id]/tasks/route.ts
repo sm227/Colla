@@ -101,6 +101,26 @@ export async function POST(
       },
     });
     
+    // 작업 생성 알림 이벤트 발생 (담당자 정보 포함)
+    try {
+      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+      await fetch(`${baseUrl}/api/notifications/task-events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventType: 'task_created',
+          taskId: task.id,
+          projectId: task.projectId,
+          newAssignee: assignee, // 담당자 정보 추가
+        }),
+      });
+    } catch (notificationError) {
+      console.error('작업 생성 알림 발생 중 오류:', notificationError);
+      // 알림 실패해도 작업 생성은 성공으로 처리
+    }
+    
     return NextResponse.json(task, { status: 201 });
   } catch (error) {
     console.error('태스크 생성 오류:', error);

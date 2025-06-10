@@ -60,3 +60,46 @@
     text-wrap: balance;
   }
 }
+
+/* 알림 바운스 애니메이션 v2 */
+@keyframes notificationBounce {
+  0%, 100% { 
+    transform: scale(1) translateY(0); 
+    animation-timing-function: ease-in-out;
+  }
+  10% { 
+    transform: scale(1.05) translateY(-3px); 
+    animation-timing-function: ease-out;
+  }
+  20% { 
+    transform: scale(0.98) translateY(0); 
+    animation-timing-function: ease-in;
+  }
+  30% { 
+    transform: scale(1.02) translateY(-1px); 
+    animation-timing-function: ease-out;
+  }
+  40%, 60%, 80% { 
+    transform: scale(1) translateY(0); 
+    animation-timing-function: ease-in-out;
+  }
+}
+
+/* 우선순위 높은 선택자들 */
+button[data-bounce="true"] {
+  animation: notificationBounce 2s ease-in-out infinite !important;
+}
+
+button.notification-bounce {
+  animation: notificationBounce 2s ease-in-out infinite !important;
+}
+
+/* 백업 선택자 */
+.notification-bounce {
+  animation: notificationBounce 2s ease-in-out infinite !important;
+}
+
+/* 추가 디버깅을 위한 선택자 */
+[data-bounce="true"] {
+  animation: notificationBounce 2s ease-in-out infinite !important;
+}

@@ -2651,7 +2651,7 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         } md:relative md:flex-shrink-0 flex flex-col`}
       >
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between h-16 px-4">
           <div className="flex items-center">
             <div className="w-8 h-8 bg-black dark:bg-blue-600 rounded-lg flex items-center justify-center mr-2">
               <span className="text-white font-bold text-lg">C</span>
@@ -2836,42 +2836,47 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
           </div>
         </nav>
 
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center w-full p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
-                <UserIcon className="w-6 h-6 mr-3 rounded-full bg-gray-200 dark:bg-gray-600 p-0.5 text-gray-700 dark:text-gray-300" />
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user?.name || user?.email || '사용자'}</span>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" sideOffset={5}>
-              <DropdownMenuLabel className="px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400">
-                {user?.email}
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push('/mypage')} className="cursor-pointer">
-                <UserIcon className="w-4 h-4 mr-2" />
-                <span>정보 수정</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => alert('알림 기능은 대시보드에서 확인해주세요.')} className="cursor-pointer">
-                <BellIcon className="w-4 h-4 mr-2" />
-                <span>알림</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer">
-                <SettingsIcon className="w-4 h-4 mr-2" />
-                <span>설정</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
-                {theme === 'dark' ? <SunIcon className="w-4 h-4 mr-2" /> : <MoonIcon className="w-4 h-4 mr-2" />}
-                <span>{theme === 'dark' ? "라이트 모드" : "다크 모드"}</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/50 focus:text-red-600 dark:focus:text-red-400">
-                <LogOutIcon className="w-4 h-4 mr-2" />
-                <span>로그아웃</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div className="p-4">
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center flex-1 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
+                  <UserIcon className="w-6 h-6 mr-3 rounded-full bg-gray-200 dark:bg-gray-600 p-0.5 text-gray-700 dark:text-gray-300" />
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user?.name || user?.email || '사용자'}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" sideOffset={5}>
+                <DropdownMenuLabel className="px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {user?.email}
+                </DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => router.push('/mypage')} className="cursor-pointer">
+                  <UserIcon className="w-4 h-4 mr-2" />
+                  <span>정보 수정</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer">
+                  <SettingsIcon className="w-4 h-4 mr-2" />
+                  <span>설정</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
+                  {theme === 'dark' ? <SunIcon className="w-4 h-4 mr-2" /> : <MoonIcon className="w-4 h-4 mr-2" />}
+                  <span>{theme === 'dark' ? "라이트 모드" : "다크 모드"}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/50 focus:text-red-600 dark:focus:text-red-400">
+                  <LogOutIcon className="w-4 h-4 mr-2" />
+                  <span>로그아웃</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {/* 알림 버튼 */}
+            <button 
+              onClick={() => alert('알림 기능은 대시보드에서 확인해주세요.')}
+              className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none outline-none transition-colors"
+              title="알림"
+            >
+              <BellIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -3093,7 +3098,7 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
               
               {showFolderDropdown && (
                   <div className="absolute left-0 mt-1 w-64 bg-white dark:bg-[#2a2a2c] shadow-lg rounded-xl z-10 border border-gray-200 dark:border-gray-700">
-                    <div className="py-2 px-3 border-b border-gray-200 dark:border-gray-700">
+                    <div className="py-2 px-3">
                       <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">폴더 선택</div>
                     <div className="relative">
                       <input

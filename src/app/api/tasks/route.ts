@@ -108,6 +108,26 @@ export async function POST(req: NextRequest) {
       }
     });
 
+    // 작업 생성 알림 이벤트 발생 (담당자 정보 포함)
+    try {
+      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+      await fetch(`${baseUrl}/api/notifications/task-events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventType: 'task_created',
+          taskId: newTask.id,
+          projectId: newTask.projectId,
+          newAssignee: assignee, // 담당자 정보 추가
+        }),
+      });
+    } catch (notificationError) {
+      console.error('작업 생성 알림 발생 중 오류:', notificationError);
+      // 알림 실패해도 작업 생성은 성공으로 처리
+    }
+
     return NextResponse.json(newTask);
   } catch (error) {
     console.error("작업 생성 중 오류 발생:", error);
@@ -134,6 +154,23 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "작업 ID가 필요합니다." }, { status: 400 });
     }
 
+    // 변경 전 작업 정보 조회 (담당자 변경 추적용)
+    const previousTask = await prisma.task.findUnique({
+      where: { id },
+      include: {
+        project: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
+    });
+
+    if (!previousTask) {
+      return NextResponse.json({ error: "작업을 찾을 수 없습니다." }, { status: 404 });
+    }
+
     // 작업 업데이트
     const updatedTask = await prisma.task.update({
       where: { id },
@@ -151,6 +188,32 @@ export async function PUT(req: NextRequest) {
         updatedAt: new Date()
       }
     });
+
+    // 담당자 변경 여부 확인
+    const assigneeChanged = previousTask.assignee !== assignee;
+    
+    // 작업 업데이트 알림 이벤트 발생
+    try {
+      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+      await fetch(`${baseUrl}/api/notifications/task-events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventType: 'task_updated',
+          taskId: updatedTask.id,
+          projectId: updatedTask.projectId,
+          newStatus: status,
+          assigneeChanged,
+          previousAssignee: previousTask.assignee,
+          newAssignee: assignee,
+        }),
+      });
+    } catch (notificationError) {
+      console.error('작업 업데이트 알림 발생 중 오류:', notificationError);
+      // 알림 실패해도 작업 업데이트는 성공으로 처리
+    }
 
     return NextResponse.json(updatedTask);
   } catch (error) {

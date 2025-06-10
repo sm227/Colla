@@ -42,6 +42,18 @@ export async function PATCH(
     
     const { title, description, status, priority, assignee, dueDate } = body;
     
+    // 변경 전 작업 정보 조회 (담당자 변경 추적용)
+    const previousTask = await prisma.task.findUnique({
+      where: { id }
+    });
+
+    if (!previousTask) {
+      return NextResponse.json(
+        { error: '작업을 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+    
     // HTML 태그 제거
     const cleanDescription = description !== undefined 
       ? stripHtmlTags(description) 
@@ -58,6 +70,32 @@ export async function PATCH(
         ...(dueDate !== undefined && { dueDate: dueDate ? new Date(dueDate) : null }),
       },
     });
+
+    // 담당자 변경 여부 확인
+    const assigneeChanged = previousTask.assignee !== assignee && assignee !== undefined;
+    
+    // 알림 이벤트 트리거 (담당자가 변경된 경우에만)
+    if (assigneeChanged) {
+      try {
+        const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+        await fetch(`${baseUrl}/api/notifications/task-events`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            eventType: 'task_updated',
+            taskId: updatedTask.id,
+            projectId: updatedTask.projectId,
+            assigneeChanged: true,
+            previousAssignee: previousTask.assignee,
+            newAssignee: assignee,
+          }),
+        });
+      } catch (notificationError) {
+        console.error('담당자 변경 알림 발생 중 오류:', notificationError);
+      }
+    }
     
     return NextResponse.json(updatedTask);
   } catch (error) {
@@ -83,6 +121,18 @@ export async function PUT(
       return NextResponse.json(
         { error: '필수 필드가 누락되었습니다 (title, status, priority)' },
         { status: 400 }
+      );
+    }
+
+    // 변경 전 작업 정보 조회 (담당자 변경 추적용)
+    const previousTask = await prisma.task.findUnique({
+      where: { id }
+    });
+
+    if (!previousTask) {
+      return NextResponse.json(
+        { error: '작업을 찾을 수 없습니다.' },
+        { status: 404 }
       );
     }
     
@@ -114,6 +164,32 @@ export async function PUT(
         projectId: body.projectId || null,
       },
     });
+
+    // 담당자 변경 여부 확인
+    const assigneeChanged = previousTask.assignee !== (body.assignee || null);
+    
+    // 알림 이벤트 트리거 (담당자가 변경된 경우에만)
+    if (assigneeChanged) {
+      try {
+        const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+        await fetch(`${baseUrl}/api/notifications/task-events`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            eventType: 'task_updated',
+            taskId: updatedTask.id,
+            projectId: updatedTask.projectId,
+            assigneeChanged: true,
+            previousAssignee: previousTask.assignee,
+            newAssignee: body.assignee || null,
+          }),
+        });
+      } catch (notificationError) {
+        console.error('담당자 변경 알림 발생 중 오류:', notificationError);
+      }
+    }
     
     return NextResponse.json(updatedTask);
   } catch (error) {

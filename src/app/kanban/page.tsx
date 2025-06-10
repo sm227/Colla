@@ -34,69 +34,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
+import { useNotifications } from "@/app/contexts/NotificationContext";
 
-// shadcn/ui DropdownMenu 컴포넌트 임포트
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+// 통합 사이드바 컴포넌트 임포트
+import Sidebar from "@/components/Sidebar";
 
-// SidebarLink 컴포넌트 (다른 페이지와 동일)
-function SidebarLink({
-  icon,
-  text,
-  href,
-  active = false,
-  small = false,
-  onClick,
-  theme = "dark", 
-  badgeCount,
-  isProject = false 
-}: {
-  icon: React.ReactNode;
-  text: string;
-  href: string;
-  active?: boolean;
-  small?: boolean;
-  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
-  theme?: "light" | "dark";
-  badgeCount?: string | number;
-  isProject?: boolean;
-}) {
-  const activeProjectBg = theme === 'dark' 
-    ? 'bg-blue-900 bg-opacity-30' 
-    : 'bg-blue-100 bg-opacity-50'; 
-    
-  return (
-    <Link
-      href={href}
-      onClick={onClick}
-      className={`flex items-center justify-between px-2 py-1.5 ${small ? "text-sm" : "text-[15px]"} rounded-md transition-colors duration-150 ${
-        theme === 'dark'
-          ? active && isProject
-            ? `${activeProjectBg} text-gray-300 hover:bg-gray-700 hover:text-gray-100` 
-            : "text-gray-300 hover:bg-gray-700 hover:text-gray-100"
-          : active && isProject
-            ? `${activeProjectBg} text-gray-600 hover:bg-gray-200 hover:text-gray-900`
-            : "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-      }`}
-    >
-      <div className="flex items-center">
-        <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{icon}</div>
-        <span>{text}</span>
-      </div>
-      {badgeCount && (
-        <span className={`px-1.5 py-0.5 text-xs font-semibold rounded-full ${badgeCount === 'new' ? (theme === 'dark' ? 'bg-red-500 text-white' : 'bg-red-500 text-white') : (theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-700')}`}>
-          {badgeCount === 'new' ? '' : badgeCount}
-        </span>
-      )}
-    </Link>
-  );
-}
+// SidebarLink 컴포넌트는 통합 사이드바에서 처리됨
 
 // useSearchParams를 사용하는 컴포넌트를 별도로 분리
 function KanbanPageContent() {
@@ -113,6 +56,7 @@ function KanbanPageContent() {
     loading: projectLoading,
     hasProjects
   } = useProject();
+  const { showNotificationPanel, setShowNotificationPanel, hasNewNotifications } = useNotifications();
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isKanbanSubmenuOpen, setIsKanbanSubmenuOpen] = useState(true); // 칸반 하위 메뉴 상태
@@ -250,243 +194,17 @@ function KanbanPageContent() {
 
   return (
     <div className="flex h-screen bg-background text-foreground">
-      {/* 사이드바 */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64  border-r border-gray-200 bg-background dark:border-gray-700 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
-          mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } md:relative md:flex-shrink-0 flex flex-col`}
-      >
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-black dark:bg-blue-600 rounded-lg flex items-center justify-center mr-2">
-              <span className="text-white font-bold text-lg">C</span>
-            </div>
-            <span className="text-xl font-semibold text-gray-900 dark:text-gray-100">Colla</span>
-          </div>
-          <button
-            className="md:hidden"
-            onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-          >
-            <XIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
-          </button>
-        </div>
-
-        <nav className="flex-grow px-4 py-4 space-y-2 overflow-y-auto">
-          <SidebarLink
-            icon={<SearchIcon className="w-5 h-5" />}
-            text="검색"
-            href="#" 
-            theme={theme}
-            onClick={(e) => { e.preventDefault(); alert('검색 기능 구현 예정'); }}
-          />
-          <SidebarLink
-            icon={<LayoutDashboardIcon className="w-5 h-5" />}
-            text="대시보드"
-            href="/"
-            active={pathname === "/"}
-            theme={theme}
-          />
-          
-          <div className="pt-4">
-            <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              프로젝트
-            </h3>
-            <nav className="mt-2 space-y-1">
-              {projects.map((project) => (
-                <SidebarLink
-                  key={project.id}
-                  icon={<FolderIcon className="w-5 h-5" />}
-                  text={project.name}
-                  href={`/kanban?projectId=${project.id}`}
-                  small
-                  active={currentProject?.id === project.id && pathname === "/kanban"}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setCurrentProject(project);
-                    router.push(`/kanban?projectId=${project.id}`);
-                  }}
-                  theme={theme}
-                  isProject={true}
-                />
-              ))}
-              <SidebarLink
-                icon={<PlusIcon className="w-5 h-5" />}
-                text="새 프로젝트"
-                href="/projects/new"
-                active={pathname === "/projects/new"}
-                theme={theme}
-                small
-                onClick={() => router.push("/projects/new")}
-              />
-            </nav>
-          </div>
-
-          <div className="pt-4">
-            <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              내 작업 공간
-            </h3>
-            <div className="mt-2 space-y-1">
-              {/* 칸반보드 섹션 */}
-              <div>
-                <button
-                  onClick={() => {
-                    setIsKanbanSubmenuOpen(!isKanbanSubmenuOpen);
-                    if (currentProject?.id && pathname && !pathname.includes(currentProject.id)) {
-                      router.push(`/kanban?projectId=${currentProject.id}`);
-                    } else if (!currentProject?.id && pathname && pathname !== "/kanban") {
-                      router.push("/kanban");
-                    }
-                  }}
-                  className={`flex items-center justify-between w-full px-2 py-1.5 text-sm rounded-md transition-colors duration-150 ${
-                    theme === 'dark'
-                      ? (pathname?.startsWith("/kanban") || pathname?.startsWith("/timeline"))
-                        ? "bg-blue-900 bg-opacity-30 text-gray-300 hover:bg-gray-700 hover:text-gray-100"
-                        : "text-gray-300 hover:bg-gray-700 hover:text-gray-100"
-                      : (pathname?.startsWith("/kanban") || pathname?.startsWith("/timeline"))
-                        ? "bg-blue-100 bg-opacity-50 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                        : "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                      <Trello className="w-5 h-5" />
-                    </div>
-                    <span>칸반보드</span>
-                  </div>
-                  <ChevronRightIcon 
-                    className={`w-4 h-4 transition-transform duration-200 ${
-                      isKanbanSubmenuOpen ? 'transform rotate-90' : ''
-                    } ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}
-                  />
-                </button>
-              </div>
-              
-              {/* 칸반 하위 메뉴 */}
-              {isKanbanSubmenuOpen && (
-                <div className={`pl-4 pt-1 space-y-1 ml-2.5 transition-all duration-300 ease-in-out ${
-                  isKanbanSubmenuOpen ? 'max-h-[20rem] opacity-100' : 'max-h-0 opacity-0'
-                }`}>
-                  <div className="transform transition-all duration-300 ease-in-out" 
-                       style={{ 
-                         opacity: isKanbanSubmenuOpen ? 1 : 0, 
-                         transform: isKanbanSubmenuOpen ? 'translateY(0)' : 'translateY(-10px)',
-                         transition: 'opacity 300ms ease-in-out, transform 300ms ease-in-out'
-                       }}>
-                    <SidebarLink
-                      icon={<Trello className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
-                      text="칸반보드"
-                      href={currentProject ? `/kanban?projectId=${currentProject.id}` : "/kanban"}
-                      active={pathname?.startsWith("/kanban") && !pathname?.includes("/timeline")}
-                      theme={theme}
-                      small
-                    />
-                  </div>
-                  
-                  <div className="transform transition-all duration-300 ease-in-out" 
-                       style={{ 
-                         opacity: isKanbanSubmenuOpen ? 1 : 0, 
-                         transform: isKanbanSubmenuOpen ? 'translateY(0)' : 'translateY(-10px)',
-                         transition: 'opacity 300ms ease-in-out 100ms, transform 300ms ease-in-out 100ms'
-                       }}>
-                    <SidebarLink
-                      icon={<ClockIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
-                      text="타임라인"
-                      href={currentProject ? `/timeline?projectId=${currentProject.id}` : "/timeline"}
-                      active={pathname?.startsWith("/timeline")}
-                      theme={theme}
-                      small
-                    />
-                  </div>
-                </div>
-              )}
-              
-              <SidebarLink
-                icon={<CalendarIcon className="w-5 h-5" />}
-                text="캘린더"
-                href={currentProject ? `/calendar?projectId=${currentProject.id}` : "/calendar"}
-                active={pathname?.startsWith("/calendar")}
-                theme={theme}
-                small
-              />
-              <SidebarLink
-                icon={<FileTextIcon className="w-5 h-5" />}
-                text="문서"
-                href={currentProject?.id ? `/documents?projectId=${currentProject.id}` : "/documents"}
-                active={pathname?.startsWith("/documents")}
-                theme={theme}
-                small
-              />
-              <SidebarLink 
-                icon={<UsersIcon className="w-5 h-5"/>} 
-                text="팀원 관리" 
-                href={currentProject ? `/projects/${currentProject.id}/members` : "/projects"}
-                active={pathname?.includes("/projects") && pathname?.includes("/members")}
-                theme={theme}
-                small 
-              />
-              <SidebarLink
-                icon={<VideoIcon className="w-5 h-5" />}
-                text="화상 회의"
-                href="/meeting"
-                active={pathname?.startsWith("/meeting")}
-                theme={theme}
-                small
-              />
-              <SidebarLink
-                icon={<BarChart3Icon className="w-5 h-5" />}
-                text="보고서"
-                href="/reports"
-                active={pathname?.startsWith("/reports")}
-                theme={theme}
-                small
-              />
-            </div>
-          </div>
-        </nav>
-
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center w-full p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
-                <UserIcon className="w-6 h-6 mr-3 rounded-full bg-gray-200 dark:bg-gray-600 p-0.5 text-gray-700 dark:text-gray-300" />
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user?.name}</span>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" sideOffset={5}>
-              <DropdownMenuLabel className="px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400">
-                {user?.email}
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push('/mypage')} className="cursor-pointer">
-                <UserIcon className="w-4 h-4 mr-2" />
-                <span>정보 수정</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => alert('알림 기능은 대시보드에서 확인해주세요.')} className="cursor-pointer">
-                <BellIcon className="w-4 h-4 mr-2" />
-                <span>알림</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer">
-                <SettingsIcon className="w-4 h-4 mr-2" />
-                <span>설정</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
-                {theme === 'dark' ? <SunIcon className="w-4 h-4 mr-2" /> : <MoonIcon className="w-4 h-4 mr-2" />}
-                <span>{theme === 'dark' ? "라이트 모드" : "다크 모드"}</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/50 focus:text-red-600 dark:focus:text-red-400">
-                <LogOutIcon className="w-4 h-4 mr-2" />
-                <span>로그아웃</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </aside>
+      {/* 통합 사이드바 */}
+      <Sidebar
+        mobileSidebarOpen={mobileSidebarOpen}
+        setMobileSidebarOpen={setMobileSidebarOpen}
+        currentPage="kanban"
+      />
 
       {/* 메인 콘텐츠 영역 */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* 모바일 헤더 */}
-        <div className="md:hidden flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700 bg-background">
+        <div className="md:hidden flex items-center justify-between h-16 px-4 bg-background">
           <button
             onClick={() => setMobileSidebarOpen(true)}
             className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -499,7 +217,24 @@ function KanbanPageContent() {
             </div>
             <span className="text-xl font-semibold text-gray-900 dark:text-gray-100">Colla</span>
           </div>
-          <div className="w-10"></div> {/* 균형을 위한 빈 공간 */}
+          
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setShowNotificationPanel(!showNotificationPanel)}
+              className={`relative p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                hasNewNotifications ? 'notification-bounce' : ''
+              }`}
+              title="알림"
+            >
+              <BellIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              {hasNewNotifications && (
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              )}
+            </button>
+            <button className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+              <UserIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            </button>
+          </div>
         </div>
 
         {/* 메인 콘텐츠 */}

@@ -7,6 +7,7 @@ import { ProjectProvider } from './contexts/ProjectContext';
 import { UserProvider } from './contexts/UserContext';
 import { ChatButton } from '@/components/ChatButton';
 import { ThemeProvider } from 'next-themes';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -31,7 +32,9 @@ export default function RootLayout({
                 defaultTheme="dark" 
                 enableSystem
               >
-                {children}
+                <NotificationProvider>
+                  {children}
+                </NotificationProvider>
               </ThemeProvider>
               <ChatButton />
             </UserProvider>
