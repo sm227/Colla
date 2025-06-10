@@ -1304,7 +1304,9 @@ function HomeContent() {
             <div className="flex items-center gap-2">
             <button
                 onClick={() => setShowNotificationPanel(!showNotificationPanel)}
-                className="relative p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className={`relative p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                  hasNewNotifications ? 'notification-bounce' : ''
+                }`}
                 title="알림"
               >
                 <BellIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
@@ -2014,6 +2016,21 @@ const CalendarStyles = () => (
     .calendar-container .react-calendar__decade-view .react-calendar__tile,
     .calendar-container .react-calendar__century-view .react-calendar__tile {
         padding: 1em 0.5em; /* 년/월 보기 패딩 조정 */
+    }
+
+    /* 알림 바운스 애니메이션 */
+    @keyframes notificationBounce {
+      0% { transform: scale(1) translateY(0); }
+      15% { transform: scale(1.1) translateY(-4px); }
+      30% { transform: scale(0.95) translateY(0); }
+      45% { transform: scale(1.05) translateY(-2px); }
+      60% { transform: scale(0.98) translateY(0); }
+      75% { transform: scale(1.02) translateY(-1px); }
+      100% { transform: scale(1) translateY(0); }
+    }
+
+    .notification-bounce {
+      animation: notificationBounce 0.6s ease-in-out;
     }
   `}</style>
 );

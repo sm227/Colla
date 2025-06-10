@@ -42,7 +42,7 @@ import {
 
 import { useNotifications } from "@/app/contexts/NotificationContext";
 
-// 알림 패널 커스텀 스크롤바 스타일
+// 알림 패널 커스텀 스크롤바 스타일 및 바운스 애니메이션
 const NotificationScrollbarStyles = () => (
   <style jsx global>{`
     /* 알림 패널 스크롤바 스타일 */
@@ -85,6 +85,21 @@ const NotificationScrollbarStyles = () => (
     html:not(.dark) .notifications-scrollbar {
       scrollbar-width: thin;
       scrollbar-color: #d1d5db #f3f4f6; /* thumb track for Firefox */
+    }
+
+    /* 알림 바운스 애니메이션 */
+    @keyframes notificationBounce {
+      0% { transform: scale(1) translateY(0); }
+      15% { transform: scale(1.1) translateY(-4px); }
+      30% { transform: scale(0.95) translateY(0); }
+      45% { transform: scale(1.05) translateY(-2px); }
+      60% { transform: scale(0.98) translateY(0); }
+      75% { transform: scale(1.02) translateY(-1px); }
+      100% { transform: scale(1) translateY(0); }
+    }
+
+    .notification-bounce {
+      animation: notificationBounce 0.6s ease-in-out;
     }
   `}</style>
 );
@@ -194,6 +209,8 @@ const Sidebar = memo(function Sidebar({
     setShowNotificationPanel,
     hasNewNotifications,
     processingInvitation,
+    soundEnabled,
+    setSoundEnabled,
     markAllAsRead,
     markAsRead,
     acceptInvitation,
@@ -835,8 +852,14 @@ const Sidebar = memo(function Sidebar({
             {/* 알림 버튼 */}
             <button 
               onClick={handleNotificationPanelToggle}
-              className="relative p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none outline-none transition-colors"
+              className={`relative p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none outline-none transition-colors ${
+                hasNewNotifications ? 'notification-bounce' : ''
+              }`}
+              style={hasNewNotifications ? {
+                animation: 'notificationBounce 2s ease-in-out infinite'
+              } : {}}
               title="알림"
+              data-bounce={hasNewNotifications ? 'true' : 'false'}
             >
               <BellIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
               {hasNewNotifications && (
@@ -853,6 +876,27 @@ const Sidebar = memo(function Sidebar({
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">알림</h2>
             <div className="flex items-center gap-2">
+              {/* 소리 설정 버튼 */}
+              <button
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                className={`p-2 rounded-md transition-colors ${
+                  soundEnabled 
+                    ? "text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20" 
+                    : "text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                }`}
+                title={soundEnabled ? "알림 소리 끄기" : "알림 소리 켜기"}
+              >
+                {soundEnabled ? (
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.815L4.435 13.168c-.31-.235-.726-.368-1.155-.368H2a1 1 0 01-1-1V8.2a1 1 0 011-1h1.28c.429 0 .845-.133 1.155-.368L8.383 3.076zm5.085 2.048a1 1 0 111.546 1.275A4.978 4.978 0 0117 10c0 1.344-.53 2.564-1.386 3.466a1 1 0 01-1.546-1.275A2.98 2.98 0 0015 10a2.98 2.98 0 00-.932-2.124z" clipRule="evenodd" />
+                    <path d="M16.025 3.61a1 1 0 111.45 1.378A8.959 8.959 0 0119 10a8.96 8.96 0 01-1.525 4.988 1 1 0 01-1.45-1.378A6.959 6.959 0 0017 10c0-1.86-.73-3.549-1.975-4.39z" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.815L4.435 13.168c-.31-.235-.726-.368-1.155-.368H2a1 1 0 01-1-1V8.2a1 1 0 011-1h1.28c.429 0 .845-.133 1.155-.368L8.383 3.076zm4.617 4.617l-3 3m0-3l3 3" clipRule="evenodd" />
+                  </svg>
+                )}
+              </button>
               {/* 모두 읽기 버튼 */}
               {notifications.length > 0 && hasNewNotifications && (
                 <button

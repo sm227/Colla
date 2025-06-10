@@ -24,6 +24,8 @@ interface NotificationContextType {
   setShowNotificationPanel: (show: boolean) => void;
   hasNewNotifications: boolean;
   processingInvitation: string | null;
+  soundEnabled: boolean;
+  setSoundEnabled: (enabled: boolean) => void;
   fetchNotifications: () => void;
   refreshNotifications: () => void;
   markAllAsRead: () => void;
@@ -34,11 +36,26 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
+// 알림 소리 재생 함수
+const playNotificationSound = () => {
+  try {
+    // public 폴더의 sounds 디렉토리에서 알림 소리 파일 재생
+    const audio = new Audio('/sounds/notification.wav');
+    audio.volume = 0.5; // 볼륨 조절 (0.0 ~ 1.0)
+    audio.play().catch(error => {
+      console.warn('알림 소리 재생 실패:', error);
+    });
+  } catch (error) {
+    console.warn('알림 소리 재생 중 오류:', error);
+  }
+};
+
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
   const [processingInvitation, setProcessingInvitation] = useState<string | null>(null);
   const [hasNewNotifications, setHasNewNotifications] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
   // localStorage에서 읽은 알림 ID들을 가져오는 함수
   const getReadNotificationIds = (): Set<string> => {
@@ -161,6 +178,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       );
 
       console.log(`총 ${sortedNotifications.length}개의 알림을 가져왔습니다.`);
+      
+      // 이전 알림과 비교하여 새로운 알림이 있는지 확인
+      const prevNotificationIds = notifications.map(n => n.id);
+      const newNotifications = sortedNotifications.filter(n => !prevNotificationIds.includes(n.id));
+      
+              // 새로운 알림이 있고, 읽지 않은 상태라면 소리 재생
+        if (newNotifications.length > 0 && newNotifications.some(n => !n.isRead) && soundEnabled) {
+          playNotificationSound();
+        }
       
       setNotifications(sortedNotifications);
       setHasNewNotifications(sortedNotifications.some(notification => !notification.isRead));
@@ -291,9 +317,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     console.log(`✅ 알림 ${notificationId}을 읽음 처리했습니다.`);
   };
 
-  // 컴포넌트 마운트 시 알림 가져오기
+  // 컴포넌트 마운트 시 알림 가져오기 및 사운드 설정 로드
   useEffect(() => {
     fetchNotifications();
+    
+    // localStorage에서 사운드 설정 로드
+    const savedSoundSetting = localStorage.getItem('notificationSoundEnabled');
+    if (savedSoundSetting !== null) {
+      setSoundEnabled(savedSoundSetting === 'true');
+    }
     
     // 5분마다 알림 새로고침
     const interval = setInterval(fetchNotifications, 5 * 60 * 1000);
@@ -301,12 +333,19 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
+  // 사운드 설정이 변경될 때 localStorage에 저장
+  useEffect(() => {
+    localStorage.setItem('notificationSoundEnabled', soundEnabled.toString());
+  }, [soundEnabled]);
+
   const value = {
     notifications,
     showNotificationPanel,
     setShowNotificationPanel,
     hasNewNotifications,
     processingInvitation,
+    soundEnabled,
+    setSoundEnabled,
     fetchNotifications,
     refreshNotifications: fetchNotifications,
     markAllAsRead,
