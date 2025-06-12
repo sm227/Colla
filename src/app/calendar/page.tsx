@@ -1165,7 +1165,9 @@ const CalendarPageContent: React.FC = () => {
                                 : '';
                               return (
                                 <div key={task.id+''+i} 
-                                  className={`truncate px-2 py-0.5 rounded text-xs font-medium cursor-move ${
+                                  className={`truncate px-2 py-0.5 rounded text-xs font-medium ${
+                                    !task.isCalendarEvent ? 'cursor-move' : 'cursor-pointer'
+                                  } ${
                                     task.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()
                                   }`}
                                   style={{whiteSpace:'normal',maxHeight:48,overflowY:'auto',wordBreak:'break-all',marginBottom:2}}
@@ -1572,7 +1574,10 @@ const CalendarPageContent: React.FC = () => {
                             return (
                               <div
                                 key={processedTask.id + '' + processedTask.originalIndex}
-                                className={`absolute rounded px-1 py-0.5 text-xs font-medium cursor-pointer border-2 shadow-sm ${
+                                className={`absolute rounded px-1 py-0.5 text-xs font-medium border-2 shadow-sm ${
+                                  processedTask.isHoliday ? 'cursor-default' : 
+                                  !processedTask.isCalendarEvent ? 'cursor-move' : 'cursor-pointer'
+                                } ${
                                   processedTask.isHoliday ? getHolidayClasses() :
                                   processedTask.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()
                                 }`}
@@ -1873,7 +1878,10 @@ const CalendarPageContent: React.FC = () => {
                       return (
                         <div
                           key={processedTask.id + '' + processedTask.originalIndex}
-                          className={`absolute rounded px-2 py-1 text-xs font-medium cursor-pointer border-2 shadow-sm ${
+                          className={`absolute rounded px-2 py-1 text-xs font-medium border-2 shadow-sm ${
+                            processedTask.isHoliday ? 'cursor-default' : 
+                            !processedTask.isCalendarEvent ? 'cursor-move' : 'cursor-pointer'
+                          } ${
                             processedTask.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()
                           }`}
                           style={{
