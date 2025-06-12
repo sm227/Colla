@@ -148,7 +148,14 @@ const CalendarPageContent: React.FC = () => {
       }
       
       // 캘린더 이벤트 포맷팅
-      const calendarEvents = calendarData.map((event: any) => ({
+      const calendarEvents = calendarData.map((event: {
+        id: number;
+        title: string;
+        description: string;
+        startDate: string;
+        endDate: string;
+        createdAt: string;
+      }) => ({
         ...event,
         id: event.id.toString(),
         startDate: event.startDate ? new Date(event.startDate) : undefined,
@@ -160,7 +167,16 @@ const CalendarPageContent: React.FC = () => {
       
       // 마감일이 있는 칸반 태스크 포맷팅 (dueDate 기준으로 표시)
       const taskEvents = tasksData
-        .map((task: any) => {
+        .map((task: {
+          id: number;
+          title: string;
+          description: string;
+          status: string;
+          priority: string;
+          dueDate: string;
+          createdAt: string;
+          projectId?: string;
+        }) => {
           return {
             ...task,
             id: task.id.toString(),
@@ -173,7 +189,11 @@ const CalendarPageContent: React.FC = () => {
         });
       
       // 공휴일 이벤트 포맷팅
-      const holidayEvents = holidaysData.map((holiday: any) => ({
+      const holidayEvents = holidaysData.map((holiday: {
+        id: string;
+        title: string;
+        date: string;
+      }) => ({
         ...holiday,
         id: holiday.id,
         startDate: new Date(holiday.date),
@@ -210,10 +230,22 @@ const CalendarPageContent: React.FC = () => {
       
       // 마감일이 없는 태스크만 필터링 (API에서 이미 필터링되지만 추가 확인)
       const kanbanTasks = data
-        .filter((task: any) => {
+        .filter((task: {
+          dueDate?: string;
+        }) => {
           return !task.dueDate;
         })
-        .map((task: any) => ({
+                  .map((task: {
+            id: number;
+            title: string;
+            description: string;
+            status: string;
+            priority: string;
+            startDate?: string;
+            endDate?: string;
+            createdAt: string;
+            projectId?: string;
+          }) => ({
           ...task,
           id: task.id.toString(),
           startDate: task.startDate ? new Date(task.startDate) : undefined,
@@ -441,7 +473,13 @@ const CalendarPageContent: React.FC = () => {
   }
 
   // 일정 추가 함수
-  const addCalendarEvent = async (event: any) => {
+  const addCalendarEvent = async (event: {
+    title: string;
+    description: string;
+    startDate: string;
+    endDate: string;
+    projectId: string;
+  }) => {
     if (!event.title.trim()) {
       alert("제목이 필요합니다. 이벤트에 제목을 추가해주세요.");
       return;
@@ -779,7 +817,14 @@ const CalendarPageContent: React.FC = () => {
     : "모든 프로젝트";
 
   // 일정 수정 함수
-  const updateCalendarEvent = async (event: any) => {
+  const updateCalendarEvent = async (event: {
+    id: string;
+    title: string;
+    description: string;
+    startDate: string;
+    endDate: string;
+    projectId: string;
+  }) => {
     if (!event.title.trim()) {
       alert("제목이 필요합니다. 이벤트에 제목을 추가해주세요.");
       return;
@@ -1199,434 +1244,264 @@ const CalendarPageContent: React.FC = () => {
         )}
         {calendarView === 'week' && (
           <div className="bg-card text-card-foreground rounded-lg shadow border border-border overflow-hidden w-full h-full flex flex-col">
-            {/* 주별 뷰 헤더 */}
-            <div className="flex border-b border-border bg-muted text-muted-foreground">
-              {/* 시간 열 헤더 */}
-              <div className="w-16 border-r border-border py-2 text-center text-sm font-medium">
-                시간
-              </div>
-              {/* 요일 헤더 */}
-              {(() => {
-                const curr = selectedDate || currentDate;
-                const weekStart = addDays(curr, -getDay(curr));
-                
-                // 각 날짜별 최대 겹치는 일정 수 계산 (헤더용)
-                const getMaxColumnsForDay = (day: Date) => {
-                  const dateKey = format(day, 'yyyy-MM-dd');
-                  const events = tasksByDate.get(dateKey) || [];
-                  
-                  // 공휴일이 아닌 이벤트만 필터링
-                  const nonHolidayEvents = events.filter(event => !event.isHoliday);
-                  if (nonHolidayEvents.length === 0) return 1;
-                  
-                  const eventsWithTime = nonHolidayEvents.map(task => {
-                    const start = task.startDate ? new Date(task.startDate) : undefined;
-                    const end = task.endDate ? new Date(task.endDate) : undefined;
-                    
-                    let startMinute = 0;
-                    let endMinute = 1440;
-                    
-                    if (start && end) {
-                      startMinute = start.getHours() * 60 + start.getMinutes();
-                      endMinute = end.getHours() * 60 + end.getMinutes();
-                    }
-                    
-                    return { ...task, startMinute, endMinute };
-                  });
-                  
-                  const timePoints: number[] = [];
-                  eventsWithTime.forEach(event => {
-                    timePoints.push(event.startMinute);
-                    timePoints.push(event.endMinute);
-                  });
-                  
-                  let maxOverlapping = 0;
-                  timePoints.forEach(timePoint => {
-                    const overlappingCount = eventsWithTime.filter(event => 
-                      event.startMinute <= timePoint && event.endMinute >= timePoint
-                    ).length;
-                    maxOverlapping = Math.max(maxOverlapping, overlappingCount);
-                  });
-                  
-                  return Math.max(1, maxOverlapping);
-                };
-                
-                return Array.from({length: 7}).map((_, i) => {
-                  const day = addDays(weekStart, i);
-                  const isCurrentDay = isToday(day);
-                  const maxColumns = getMaxColumnsForDay(day);
-                  
-                  // 헤더는 항상 동일한 너비 유지
-                  const headerStyle = {};
-                  
-                  return (
-                    <div 
-                      key={i} 
-                      className={`flex-1 py-2 text-center text-sm font-medium border-r border-border last:border-r-0 ${
-                        i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-foreground'
-                      } ${isCurrentDay ? 'bg-primary/10' : ''}`}
-                      style={headerStyle}
-                    >
-                      <div className="font-semibold">{weekDays[i]}</div>
-                      <div className={`text-lg ${isCurrentDay ? 'text-primary font-bold' : ''} flex items-center justify-center gap-1`}>
-                        <span>{format(day, 'd')}</span>
-                        {(() => {
-                          const dateKey = format(day, 'yyyy-MM-dd');
-                          const events = tasksByDate.get(dateKey) || [];
-                          const holidayEvent = events.find(event => event.isHoliday);
-                          return holidayEvent ? (
-                            <span 
-                              className="text-red-500 text-xs"
-                              title={holidayEvent.title}
-                            >
-                              {holidayEvent.title}
-                            </span>
-                          ) : null;
-                        })()}
-                      </div>
-                      {maxColumns > 1 && (
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {maxColumns}개 일정
-                        </div>
-                      )}
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-            
-            {/* 주별 뷰 본문 */}
             <div className="flex-1 overflow-y-auto week-view-scroll">
-              <div className="flex">
-                {/* 시간 표시 열 */}
-                <div className="w-16 border-r border-border bg-muted/30">
-                  {Array.from({length: 24}).map((_, hour) => (
-                    <div key={hour} className="h-16 border-b border-border flex items-start justify-center pt-1">
-                      <span className="text-xs text-muted-foreground">
-                        {hour.toString().padStart(2, '0')}:00
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                
-                {/* 7일 컬럼 */}
-                {(() => {
-                  const curr = selectedDate || currentDate;
-                  const weekStart = addDays(curr, -getDay(curr));
-                  
-                  // 각 날짜별 최대 겹치는 일정 수 계산 (본문과 동일한 로직 사용)
-                  const getMaxColumnsForDay = (day: Date) => {
-                    const dateKey = format(day, 'yyyy-MM-dd');
-                    const events = tasksByDate.get(dateKey) || [];
-                    
-                    if (events.length === 0) return 1;
-                    
-                    // 본문과 동일한 로직으로 이벤트 처리
-                    const eventsWithPosition = events.map((task, i) => {
-                      const start = task.startDate ? new Date(task.startDate) : undefined;
-                      const end = task.endDate ? new Date(task.endDate) : undefined;
+              <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: '64px' }} />
+                  <col style={{ width: 'calc((100% - 64px) / 7)' }} />
+                  <col style={{ width: 'calc((100% - 64px) / 7)' }} />
+                  <col style={{ width: 'calc((100% - 64px) / 7)' }} />
+                  <col style={{ width: 'calc((100% - 64px) / 7)' }} />
+                  <col style={{ width: 'calc((100% - 64px) / 7)' }} />
+                  <col style={{ width: 'calc((100% - 64px) / 7)' }} />
+                  <col style={{ width: 'calc((100% - 64px) / 7)' }} />
+                </colgroup>
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-muted text-muted-foreground border-b border-border">
+                    <th className="border-r border-border py-2 text-center text-sm font-medium" style={{ width: '64px' }}>
+                      시간
+                    </th>
+                    {(() => {
+                      const curr = selectedDate || currentDate;
+                      const weekStart = addDays(curr, -getDay(curr));
                       
-                      let startMinute = 0;
-                      let endMinute = 1440;
-                      
-                      if (start && end) {
-                        const startHour = start.getHours();
-                        const startMin = start.getMinutes();
-                        startMinute = startHour * 60 + startMin;
+                      return Array.from({length: 7}).map((_, i) => {
+                        const day = addDays(weekStart, i);
+                        const isCurrentDay = isToday(day);
                         
-                        const endHour = end.getHours();
-                        const endMin = end.getMinutes();
-                        endMinute = endHour * 60 + endMin;
-                      } else if (task.dueDate) {
-                        startMinute = 0;
-                        endMinute = 30;
-                      }
-                      
-                      return {
-                        ...task,
-                        originalIndex: i,
-                        startMinute,
-                        endMinute,
-                        column: 0,
-                        totalColumns: 1
-                      };
-                    });
-                    
-                    // 시간 순으로 정렬
-                    const sortedEvents = [...eventsWithPosition].sort((a, b) => {
-                      if (a.startMinute !== b.startMinute) {
-                        return a.startMinute - b.startMinute;
-                      }
-                      return a.endMinute - b.endMinute;
-                    });
-                    
-                    // 본문과 동일한 겹침 처리 알고리즘
-                    const finalEvents: any[] = [];
-                    
-                    for (let i = 0; i < sortedEvents.length; i++) {
-                      const currentEvent = sortedEvents[i];
-                      
-                      const conflictingEvents = finalEvents.filter(placedEvent => {
-                        return (currentEvent.startMinute <= placedEvent.endMinute && 
-                                currentEvent.endMinute >= placedEvent.startMinute);
+                        return (
+                          <th 
+                            key={i} 
+                            className={`border-r border-border last:border-r-0 py-2 text-center text-sm font-medium ${
+                              i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-foreground'
+                            } ${isCurrentDay ? 'bg-primary/10' : ''}`}
+                          >
+                            <div className="font-semibold">{weekDays[i]}</div>
+                            <div className={`text-lg ${isCurrentDay ? 'text-primary font-bold' : ''} flex items-center justify-center gap-1`}>
+                              <span>{format(day, 'd')}</span>
+                              {(() => {
+                                const dateKey = format(day, 'yyyy-MM-dd');
+                                const events = tasksByDate.get(dateKey) || [];
+                                const holidayEvent = events.find(event => event.isHoliday);
+                                return holidayEvent ? (
+                                  <span 
+                                    className="text-red-500 text-xs"
+                                    title={holidayEvent.title}
+                                  >
+                                    {holidayEvent.title}
+                                  </span>
+                                ) : null;
+                              })()}
+                            </div>
+                          </th>
+                        );
                       });
-                      
-                      const usedColumns = new Set(conflictingEvents.map(event => event.column));
-                      
-                      let column = 0;
-                      while (usedColumns.has(column)) {
-                        column++;
-                      }
-                      
-                      const eventWithColumn = {
-                        ...currentEvent,
-                        column,
-                        totalColumns: 1
-                      };
-                      
-                      finalEvents.push(eventWithColumn);
-                    }
-                    
-                    const maxColumns = finalEvents.length > 0 ? Math.max(...finalEvents.map(event => event.column)) + 1 : 1;
-                    return maxColumns;
-                  };
-                  
-                  return Array.from({length: 7}).map((_, dayIndex) => {
-                    const day = addDays(weekStart, dayIndex);
-                    const isCurrentDay = isToday(day);
-                    const maxColumns = getMaxColumnsForDay(day);
-                    
-                    // 컬럼 너비는 항상 동일하게 유지
-                    const columnStyle = {};
-                    
-                    return (
-                      <div 
-                        key={dayIndex} 
-                        className={`flex-1 relative border-r border-border last:border-r-0 ${
-                          isCurrentDay ? 'bg-primary/5' : ''
-                        }`}
-                        style={columnStyle}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          e.dataTransfer.dropEffect = 'move';
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          if (draggedTask && !draggedTask.isCalendarEvent && !draggedTask.isHoliday) {
-                            handleDrop(day)(e);
-                          }
-                        }}
-                      >
-                        {/* 시간 격자 */}
-                        {Array.from({length: 24}).map((_, hour) => (
-                          <div 
-                            key={hour} 
-                            className="h-16 border-b border-border hover:bg-muted/20 transition-colors"
-                            onDoubleClick={() => {
-                              const dateTimeString = format(day, 'yyyy-MM-dd') + `T${hour.toString().padStart(2, '0')}:00`;
-                              setActiveTab('addEvent');
-                              setAddFormDate(format(day, 'yyyy-MM-dd'));
-                              setNewEvent({ 
-                                ...newEvent, 
-                                startDate: dateTimeString,
-                                endDate: format(day, 'yyyy-MM-dd') + `T${(hour + 1).toString().padStart(2, '0')}:00`
-                              });
-                              setEditEventDialog({ show: false, event: null });
-                            }}
-                          />
-                        ))}
+                    })()}
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({length: 24}).map((_, hour) => (
+                    <tr key={hour} className="h-16">
+                      <td className="border-r border-border border-b border-border bg-muted/30 text-center align-top pt-1" style={{ width: '64px' }}>
+                        <span className="text-xs text-muted-foreground">
+                          {hour.toString().padStart(2, '0')}:00
+                        </span>
+                      </td>
+                      {(() => {
+                        const curr = selectedDate || currentDate;
+                        const weekStart = addDays(curr, -getDay(curr));
                         
-                        {/* 해당 날짜의 일정들 */}
-                        {(() => {
-                          const dateKey = format(day, 'yyyy-MM-dd');
-                          const events = tasksByDate.get(dateKey) || [];
-                          
-                          // 시간대별로 일정들을 그룹화하고 겹침 처리 (공휴일 제외)
-                          const processedEvents = (() => {
-                            // 공휴일이 아닌 이벤트만 필터링
-                            const nonHolidayEvents = events.filter(event => !event.isHoliday);
-                            if (nonHolidayEvents.length === 0) return [];
-                            
-                            const eventsWithPosition = nonHolidayEvents.map((task, i) => {
-                              const start = task.startDate ? new Date(task.startDate) : undefined;
-                              const end = task.endDate ? new Date(task.endDate) : undefined;
-                              
-                              let topPosition = 0;
-                              let height = 64;
-                              let startMinute = 0;
-                              let endMinute = 1440; // 하루 끝
-                              
-                              if (start && end) {
-                                const startHour = start.getHours();
-                                const startMin = start.getMinutes();
-                                startMinute = startHour * 60 + startMin;
-                                topPosition = (startHour * 64) + (startMin * 64 / 60);
-                                
-                                const endHour = end.getHours();
-                                const endMin = end.getMinutes();
-                                endMinute = endHour * 60 + endMin;
-                                
-                                const durationMinutes = endMinute - startMinute;
-                                height = Math.max(24, (durationMinutes / 60) * 64);
-                                
-                                console.log(`일정 "${task.title}": ${startHour}:${startMin.toString().padStart(2,'0')} - ${endHour}:${endMin.toString().padStart(2,'0')} (${startMinute}-${endMinute}분)`);
-                              } else if (task.dueDate) {
-                                topPosition = 4;
-                                height = 20;
-                                startMinute = 0;
-                                endMinute = 30; // 30분 정도로 설정
-                              }
-                              
-                              return {
-                                ...task,
-                                originalIndex: i,
-                                topPosition,
-                                height,
-                                startMinute,
-                                endMinute,
-                                column: 0,
-                                totalColumns: 1
-                              };
-                            });
-                            
-                            // 시간 순으로 정렬
-                            const sortedEvents = [...eventsWithPosition].sort((a, b) => {
-                              if (a.startMinute !== b.startMinute) {
-                                return a.startMinute - b.startMinute;
-                              }
-                              return a.endMinute - b.endMinute;
-                            });
-                            
-                            // 겹치는 그룹들을 찾고 컬럼 할당 (개선된 알고리즘)
-                            const finalEvents: any[] = [];
-                            
-                            // 간단한 겹침 처리 알고리즘으로 변경
-                            
-                            // 시간 순으로 정렬된 이벤트들을 순차적으로 처리
-                            for (let i = 0; i < sortedEvents.length; i++) {
-                              const currentEvent = sortedEvents[i];
-                              
-                              // 현재 이벤트와 겹치는 이미 배치된 이벤트들 찾기
-                              const conflictingEvents = finalEvents.filter(placedEvent => {
-                                // 겹침 조건을 더 엄격하게: 시작시간이 같거나 시간대가 겹치는 경우
-                                return (currentEvent.startMinute <= placedEvent.endMinute && 
-                                        currentEvent.endMinute >= placedEvent.startMinute);
-                              });
-                              
-                              // 사용 중인 컬럼 번호들 수집
-                              const usedColumns = new Set(conflictingEvents.map(event => event.column));
-                              
-                              // 사용되지 않은 가장 작은 컬럼 번호 찾기
-                              let column = 0;
-                              while (usedColumns.has(column)) {
-                                column++;
-                              }
-                              
-                              // 이벤트에 컬럼 정보 할당
-                              const eventWithColumn = {
-                                ...currentEvent,
-                                column,
-                                totalColumns: 1 // 임시로 1로 설정, 나중에 업데이트
-                              };
-                              
-                              finalEvents.push(eventWithColumn);
-                            }
-                            
-                            // 모든 이벤트의 totalColumns를 최대 컬럼 수로 업데이트
-                            const maxColumns = finalEvents.length > 0 ? Math.max(...finalEvents.map(event => event.column)) + 1 : 1;
-                            finalEvents.forEach(event => {
-                              event.totalColumns = maxColumns;
-                            });
-                            
-                            // 디버깅 로그
-                            if (finalEvents.length > 1) {
-                              console.log('주별뷰 겹침 처리 결과:', finalEvents.map(e => ({
-                                title: e.title,
-                                column: e.column,
-                                totalColumns: e.totalColumns,
-                                startMinute: e.startMinute,
-                                endMinute: e.endMinute
-                              })));
-                            }
-                            
-                            return finalEvents;
-                          })();
-                          
-                          return processedEvents.map((processedTask) => {
-                            const { column, totalColumns, topPosition, height } = processedTask;
-                            
-                            // 디버깅용 로그
-                            if (totalColumns > 1) {
-                              console.log(`일정 "${processedTask.title}": column=${column}, totalColumns=${totalColumns}`);
-                            }
-                            
-                            // 컬럼 너비 계산 (겹치는 일정이 있으면 나누어서 표시)
-                            const columnWidth = totalColumns > 1 ? `${90 / totalColumns}%` : '90%';
-                            const leftOffset = totalColumns > 1 ? `${(column * 90) / totalColumns + 5}%` : '5%';
-                            
-                            const start = processedTask.startDate ? new Date(processedTask.startDate) : undefined;
-                            const end = processedTask.endDate ? new Date(processedTask.endDate) : undefined;
-                            
-                            const timeStr = (start && end)
-                              ? `${start.getHours().toString().padStart(2,'0')}:${start.getMinutes().toString().padStart(2,'0')}`
-                              : processedTask.dueDate ? '마감' : '';
-                            
-                            return (
-                              <div
-                                key={processedTask.id + '' + processedTask.originalIndex}
-                                className={`absolute rounded px-1 py-0.5 text-xs font-medium border-2 shadow-sm ${
-                                  processedTask.isHoliday ? 'cursor-default' : 
-                                  !processedTask.isCalendarEvent ? 'cursor-move' : 'cursor-pointer'
-                                } ${
-                                  processedTask.isHoliday ? getHolidayClasses() :
-                                  processedTask.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()
-                                }`}
-                                style={{
-                                  top: `${topPosition}px`,
-                                  height: `${height}px`,
-                                  left: leftOffset,
-                                  width: columnWidth,
-                                  zIndex: 10 + column,
-                                  minHeight: '20px',
-                                  overflow: 'hidden',
-                                  marginRight: totalColumns > 1 ? '2px' : '0px'
-                                }}
-                                onClick={() => handleEventClick(processedTask)}
-                                draggable={!processedTask.isCalendarEvent && !processedTask.isHoliday}
-                                onDragStart={!processedTask.isCalendarEvent && !processedTask.isHoliday ? handleDragStart(processedTask) : undefined}
-                                onDragEnd={!processedTask.isCalendarEvent && !processedTask.isHoliday ? handleDragEnd : undefined}
-                                title={processedTask.isHoliday ? "공휴일" : !processedTask.isCalendarEvent ? "드래그하여 일정 변경" : "클릭하여 수정"}
-                              >
-                                <div className="font-semibold truncate text-[10px]">{processedTask.title}</div>
-                                {timeStr && height > 24 && (
-                                  <div className="text-[9px] opacity-75">{timeStr}</div>
-                                )}
-                              </div>
-                            );
-                          });
-                        })()}
-                        
-                        {/* 현재 시간 표시선 (오늘인 경우에만) */}
-                        {isCurrentDay && (() => {
-                          const now = new Date();
-                          const currentHour = now.getHours();
-                          const currentMinute = now.getMinutes();
-                          const currentTimePosition = (currentHour * 64) + (currentMinute * 64 / 60);
+                        return Array.from({length: 7}).map((_, dayIndex) => {
+                          const day = addDays(weekStart, dayIndex);
+                          const isCurrentDay = isToday(day);
                           
                           return (
-                            <div
-                              className="absolute left-0 right-0 border-t-2 border-red-500 z-20"
-                              style={{ top: `${currentTimePosition}px` }}
+                            <td 
+                              key={dayIndex} 
+                              className={`relative border-r border-border last:border-r-0 border-b border-border hover:bg-muted/20 transition-colors p-0 ${
+                                isCurrentDay ? 'bg-primary/5' : ''
+                              }`}
+                              onDoubleClick={() => {
+                                const dateTimeString = format(day, 'yyyy-MM-dd') + `T${hour.toString().padStart(2, '0')}:00`;
+                                setActiveTab('addEvent');
+                                setAddFormDate(format(day, 'yyyy-MM-dd'));
+                                setNewEvent({ 
+                                  ...newEvent, 
+                                  startDate: dateTimeString,
+                                  endDate: format(day, 'yyyy-MM-dd') + `T${(hour + 1).toString().padStart(2, '0')}:00`
+                                });
+                                setEditEventDialog({ show: false, event: null });
+                              }}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = 'move';
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                if (draggedTask && !draggedTask.isCalendarEvent && !draggedTask.isHoliday) {
+                                  handleDrop(day)(e);
+                                }
+                              }}
                             >
-                              <div className="absolute -left-1 -top-1 w-2 h-2 bg-red-500 rounded-full"></div>
-                            </div>
+                              {/* 해당 날짜의 일정들 - 첫 번째 행(0시)에만 표시하고 절대 위치로 배치 */}
+                              {hour === 0 && (() => {
+                                const dateKey = format(day, 'yyyy-MM-dd');
+                                const events = tasksByDate.get(dateKey) || [];
+                                
+                                // 공휴일이 아닌 이벤트만 필터링
+                                const nonHolidayEvents = events.filter(event => !event.isHoliday);
+                                if (nonHolidayEvents.length === 0) return null;
+                                
+                                const eventsWithPosition = nonHolidayEvents.map((task, i) => {
+                                  const start = task.startDate ? new Date(task.startDate) : undefined;
+                                  const end = task.endDate ? new Date(task.endDate) : undefined;
+                                  
+                                  let topPosition = 0;
+                                  let height = 64;
+                                  let startMinute = 0;
+                                  let endMinute = 1440;
+                                  
+                                  if (start && end) {
+                                    const startHour = start.getHours();
+                                    const startMin = start.getMinutes();
+                                    startMinute = startHour * 60 + startMin;
+                                    topPosition = (startHour * 64) + (startMin * 64 / 60);
+                                    
+                                    const endHour = end.getHours();
+                                    const endMin = end.getMinutes();
+                                    endMinute = endHour * 60 + endMin;
+                                    
+                                    const durationMinutes = endMinute - startMinute;
+                                    height = Math.max(24, (durationMinutes / 60) * 64);
+                                  } else if (task.dueDate) {
+                                    topPosition = 4;
+                                    height = 20;
+                                    startMinute = 0;
+                                    endMinute = 30;
+                                  }
+                                  
+                                  return {
+                                    ...task,
+                                    originalIndex: i,
+                                    topPosition,
+                                    height,
+                                    startMinute,
+                                    endMinute,
+                                    column: 0,
+                                    totalColumns: 1
+                                  };
+                                });
+                                
+                                // 시간 순으로 정렬
+                                const sortedEvents = [...eventsWithPosition].sort((a, b) => {
+                                  if (a.startMinute !== b.startMinute) {
+                                    return a.startMinute - b.startMinute;
+                                  }
+                                  return a.endMinute - b.endMinute;
+                                });
+                                
+                                // 겹침 처리 알고리즘
+                                const finalEvents: Array<any> = [];
+                                
+                                for (let i = 0; i < sortedEvents.length; i++) {
+                                  const currentEvent = sortedEvents[i];
+                                  
+                                  const conflictingEvents = finalEvents.filter(placedEvent => {
+                                    return (currentEvent.startMinute <= placedEvent.endMinute && 
+                                            currentEvent.endMinute >= placedEvent.startMinute);
+                                  });
+                                  
+                                  const usedColumns = new Set(conflictingEvents.map(event => event.column));
+                                  
+                                  let column = 0;
+                                  while (usedColumns.has(column)) {
+                                    column++;
+                                  }
+                                  
+                                  const eventWithColumn = {
+                                    ...currentEvent,
+                                    column,
+                                    totalColumns: 1
+                                  };
+                                  
+                                  finalEvents.push(eventWithColumn);
+                                }
+                                
+                                // totalColumns 업데이트
+                                const maxColumns = finalEvents.length > 0 ? Math.max(...finalEvents.map(event => event.column)) + 1 : 1;
+                                finalEvents.forEach(event => {
+                                  event.totalColumns = maxColumns;
+                                });
+                                
+                                return finalEvents.map((processedTask) => {
+                                  const { column, totalColumns, topPosition, height } = processedTask;
+                                  
+                                  const columnWidth = totalColumns > 1 ? `${90 / totalColumns}%` : '90%';
+                                  const leftOffset = totalColumns > 1 ? `${(column * 90) / totalColumns + 5}%` : '5%';
+                                  
+                                  const start = processedTask.startDate ? new Date(processedTask.startDate) : undefined;
+                                  const end = processedTask.endDate ? new Date(processedTask.endDate) : undefined;
+                                  
+                                  const timeStr = (start && end)
+                                    ? `${start.getHours().toString().padStart(2,'0')}:${start.getMinutes().toString().padStart(2,'0')}`
+                                    : processedTask.dueDate ? '마감' : '';
+                                  
+                                  return (
+                                    <div
+                                      key={processedTask.id + '' + processedTask.originalIndex}
+                                      className={`absolute rounded px-1 py-0.5 text-xs font-medium border shadow-sm ${
+                                        !processedTask.isCalendarEvent ? 'cursor-move' : 'cursor-pointer'
+                                      } ${
+                                        processedTask.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()
+                                      }`}
+                                      style={{
+                                        top: `${topPosition}px`,
+                                        height: `${height}px`,
+                                        left: leftOffset,
+                                        width: columnWidth,
+                                        zIndex: 10 + column,
+                                        minHeight: '20px',
+                                        overflow: 'hidden',
+                                        marginRight: totalColumns > 1 ? '2px' : '0px'
+                                      }}
+                                      onClick={() => handleEventClick(processedTask)}
+                                      draggable={!processedTask.isCalendarEvent && !processedTask.isHoliday}
+                                      onDragStart={!processedTask.isCalendarEvent && !processedTask.isHoliday ? handleDragStart(processedTask) : undefined}
+                                      onDragEnd={!processedTask.isCalendarEvent && !processedTask.isHoliday ? handleDragEnd : undefined}
+                                      title={!processedTask.isCalendarEvent ? "드래그하여 일정 변경" : "클릭하여 수정"}
+                                    >
+                                      <div className="font-semibold truncate text-[10px]">{processedTask.title}</div>
+                                      {timeStr && height > 24 && (
+                                        <div className="text-[9px] opacity-75">{timeStr}</div>
+                                      )}
+                                    </div>
+                                  );
+                                });
+                              })()}
+                              
+                              {/* 현재 시간 표시선 (해당 시간대에만) */}
+                              {hour === new Date().getHours() && isCurrentDay && (() => {
+                                const now = new Date();
+                                const currentMinute = now.getMinutes();
+                                const currentTimePosition = (currentMinute / 60) * 100;
+                                
+                                return (
+                                  <div
+                                    className="absolute left-0 right-0 border-t-2 border-red-500 z-20"
+                                    style={{ top: `${currentTimePosition}%` }}
+                                  >
+                                    <div className="absolute -left-1 -top-1 w-2 h-2 bg-red-500 rounded-full"></div>
+                                  </div>
+                                );
+                              })()}
+                            </td>
                           );
-                        })()}
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
+                        });
+                      })()}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -1804,7 +1679,7 @@ const CalendarPageContent: React.FC = () => {
                       });
                       
                       // 간단한 겹침 처리 알고리즘으로 변경 (일별뷰)
-                      const finalEvents: any[] = [];
+                      const finalEvents: Array<any> = [];
                       
                       // 시간 순으로 정렬된 이벤트들을 순차적으로 처리
                       for (let i = 0; i < sortedEvents.length; i++) {
@@ -1861,7 +1736,7 @@ const CalendarPageContent: React.FC = () => {
                       
                       // 디버깅용 로그
                       if (totalColumns > 1) {
-                        console.log(`[일별뷰] 일정 "${processedTask.title}": column=${column}, totalColumns=${totalColumns}`);
+                        console.log(`일정 "${processedTask.title}": column=${column}, totalColumns=${totalColumns}`);
                       }
                       
                       // 컬럼 너비 계산 (겹치는 일정이 있으면 나누어서 표시)
