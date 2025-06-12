@@ -1,0 +1,25 @@
+/* 협업 커서 스타일 */
+.collaboration-cursor {
+  position: absolute !important;
+  pointer-events: none !important;
+  z-index: 1000 !important;
+  height: 1.2em !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-left: 2px solid;
+  width: 0 !important;
+  contain: layout style paint !important;
+}
+
+/* 커서 레이블 스타일 */
+.collaboration-cursor-label {
+  position: absolute !important;
+  top: -1.4em !important;
+  left: -3px !important;
+  border-radius: 3px !important;
+  padding: 0 0.2em !important;
+  pointer-events: none !important;
+  white-space: nowrap !important;
+  font-size: 10px !important;
+  z-index: 1001 !important;
+} 

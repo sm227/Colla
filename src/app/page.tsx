@@ -970,6 +970,22 @@ function HomeContent() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
+  
+  // 설정 모달 관련 상태
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [tempSettings, setTempSettings] = useState({
+    theme: theme,
+    language: 'ko',
+    notifications: {
+      email: true,
+      push: true,
+      desktop: true,
+    },
+    privacy: {
+      profileVisible: true,
+      activityVisible: true,
+    }
+  });
 
   // 기존의 theme 저장 useEffect 제거 (next-themes가 자동으로 처리)
 
@@ -1137,6 +1153,37 @@ function HomeContent() {
     if (diffDay < 7) return `${diffDay}일 전`;
     return date.toLocaleDateString("ko-KR");
   };
+
+  // 설정 저장 함수
+  const handleSaveSettings = () => {
+    // 테마 변경
+    if (tempSettings.theme !== theme) {
+      setTheme(tempSettings.theme);
+    }
+    
+    // 다른 설정들도 여기서 저장 처리
+    localStorage.setItem('userSettings', JSON.stringify(tempSettings));
+    
+    setShowSettingsModal(false);
+  };
+  
+  // 설정 모달 열기 함수
+  const openSettingsModal = () => {
+    setTempSettings({
+      theme: theme,
+      language: 'ko',
+      notifications: {
+        email: true,
+        push: true,
+        desktop: true,
+      },
+      privacy: {
+        profileVisible: true,
+        activityVisible: true,
+      }
+    });
+    setShowSettingsModal(true);
+  };
   
   // hydration mismatch 방지
   if (!mounted) {
@@ -1271,6 +1318,9 @@ function HomeContent() {
     return "좋은 밤 되세요";
   };
 
+
+
+
   return (
     <> 
       <CalendarStyles />
@@ -1281,7 +1331,7 @@ function HomeContent() {
           mobileSidebarOpen={mobileSidebarOpen}
           setMobileSidebarOpen={setMobileSidebarOpen}
           currentPage="dashboard"
-          onSettingsClick={() => setShowTaskModal(true)}
+          onSettingsClick={openSettingsModal}
         />
 
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -1405,6 +1455,219 @@ function HomeContent() {
             </div>
           </main>
         </div> {/* flex-1 flex flex-col overflow-hidden ... 의 닫는 태그 */}
+
+        {/* 설정 모달 */}
+        {showSettingsModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="rounded-lg shadow-xl bg-card text-card-foreground">
+                {/* 헤더 */}
+                <div className="flex items-center justify-between p-6 border-b border-border">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mr-4">
+                      <SettingsIcon className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground">설정</h3>
+                      <p className="text-sm text-muted-foreground">앱 설정을 관리하세요</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowSettingsModal(false)}
+                    className="p-2 rounded-md hover:bg-muted transition-colors"
+                  >
+                    <XIcon className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                </div>
+                
+                {/* 본문 */}
+                <div className="p-6 space-y-6">
+                  {/* 외관 설정 */}
+                  <div>
+                    <h4 className="text-base font-medium text-foreground mb-4 flex items-center">
+                      <div className="w-5 h-5 rounded bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mr-2">
+                        {theme === 'dark' ? <MoonIcon className="w-3 h-3 text-blue-600 dark:text-blue-400" /> : <SunIcon className="w-3 h-3 text-blue-600" />}
+                      </div>
+                      외관
+                    </h4>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-sm font-medium text-foreground">테마</label>
+                          <p className="text-xs text-muted-foreground">다크 모드와 라이트 모드를 선택하세요</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setTempSettings({...tempSettings, theme: 'light'})}
+                            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                              tempSettings.theme === 'light' 
+                                ? 'bg-primary text-primary-foreground' 
+                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                            }`}
+                          >
+                            <SunIcon className="w-4 h-4 mr-1 inline" />
+                            라이트
+                          </button>
+                          <button
+                            onClick={() => setTempSettings({...tempSettings, theme: 'dark'})}
+                            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                              tempSettings.theme === 'dark' 
+                                ? 'bg-primary text-primary-foreground' 
+                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                            }`}
+                          >
+                            <MoonIcon className="w-4 h-4 mr-1 inline" />
+                            다크
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* 알림 설정 */}
+                  <div>
+                    <h4 className="text-base font-medium text-foreground mb-4 flex items-center">
+                      <div className="w-5 h-5 rounded bg-green-100 dark:bg-green-900/30 flex items-center justify-center mr-2">
+                        <BellIcon className="w-3 h-3 text-green-600 dark:text-green-400" />
+                      </div>
+                      알림
+                    </h4>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-sm font-medium text-foreground">이메일 알림</label>
+                          <p className="text-xs text-muted-foreground">중요한 업데이트를 이메일로 받기</p>
+                        </div>
+                        <button
+                          onClick={() => setTempSettings({
+                            ...tempSettings,
+                            notifications: {...tempSettings.notifications, email: !tempSettings.notifications.email}
+                          })}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            tempSettings.notifications.email ? 'bg-primary' : 'bg-muted'
+                          }`}
+                        >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            tempSettings.notifications.email ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </button>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-sm font-medium text-foreground">푸시 알림</label>
+                          <p className="text-xs text-muted-foreground">브라우저 푸시 알림 받기</p>
+                        </div>
+                        <button
+                          onClick={() => setTempSettings({
+                            ...tempSettings,
+                            notifications: {...tempSettings.notifications, push: !tempSettings.notifications.push}
+                          })}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            tempSettings.notifications.push ? 'bg-primary' : 'bg-muted'
+                          }`}
+                        >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            tempSettings.notifications.push ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </button>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-sm font-medium text-foreground">데스크톱 알림</label>
+                          <p className="text-xs text-muted-foreground">데스크톱 알림 표시</p>
+                        </div>
+                        <button
+                          onClick={() => setTempSettings({
+                            ...tempSettings,
+                            notifications: {...tempSettings.notifications, desktop: !tempSettings.notifications.desktop}
+                          })}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            tempSettings.notifications.desktop ? 'bg-primary' : 'bg-muted'
+                          }`}
+                        >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            tempSettings.notifications.desktop ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* 개인정보 설정 */}
+                  <div>
+                    <h4 className="text-base font-medium text-foreground mb-4 flex items-center">
+                      <div className="w-5 h-5 rounded bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mr-2">
+                        <UserIcon className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      개인정보
+                    </h4>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-sm font-medium text-foreground">프로필 공개</label>
+                          <p className="text-xs text-muted-foreground">다른 사용자에게 프로필 정보 공개</p>
+                        </div>
+                        <button
+                          onClick={() => setTempSettings({
+                            ...tempSettings,
+                            privacy: {...tempSettings.privacy, profileVisible: !tempSettings.privacy.profileVisible}
+                          })}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            tempSettings.privacy.profileVisible ? 'bg-primary' : 'bg-muted'
+                          }`}
+                        >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            tempSettings.privacy.profileVisible ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </button>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-sm font-medium text-foreground">활동 내역 공개</label>
+                          <p className="text-xs text-muted-foreground">프로젝트 활동 내역 공개</p>
+                        </div>
+                        <button
+                          onClick={() => setTempSettings({
+                            ...tempSettings,
+                            privacy: {...tempSettings.privacy, activityVisible: !tempSettings.privacy.activityVisible}
+                          })}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            tempSettings.privacy.activityVisible ? 'bg-primary' : 'bg-muted'
+                          }`}
+                        >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            tempSettings.privacy.activityVisible ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* 푸터 */}
+                <div className="flex justify-end gap-3 p-6 border-t border-border">
+                  <button
+                    type="button"
+                    className="px-4 py-2 text-sm font-medium text-muted-foreground bg-secondary hover:bg-secondary/80 rounded-lg transition-colors"
+                    onClick={() => setShowSettingsModal(false)}
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    className="px-4 py-2 text-sm font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors"
+                    onClick={handleSaveSettings}
+                  >
+                    설정 저장
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 작업 생성 모달 */}
         <TaskCreateModal 
