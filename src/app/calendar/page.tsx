@@ -76,17 +76,18 @@ const CalendarPageContent: React.FC = () => {
   const { user } = useAuth();
   const { theme } = useTheme();
 
+  // 탭 타입 정의
+  type ActiveTab = 'none' | 'unscheduled' | 'addEvent' | 'editEvent' | 'taskDetail';
+
   // useState hooks
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [calendarTasks, setCalendarTasks] = useState<CalendarTask[]>([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [sidebarTasks, setSidebarTasks] = useState<Task[]>([]);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [dropTarget, setDropTarget] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [showAddForm, setShowAddForm] = useState(false);
   const [addFormDate, setAddFormDate] = useState<string>('');
   const [calendarView, setCalendarView] = useState<'month'|'week'|'day'>('month');
   const [mounted, setMounted] = useState(false);
@@ -114,7 +115,9 @@ const CalendarPageContent: React.FC = () => {
     projectId: ''
   });
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [showTaskDetail, setShowTaskDetail] = useState(false);
+  
+  // 통합 탭 상태 관리 - 하나의 탭만 열리도록 제어
+  const [activeTab, setActiveTab] = useState<ActiveTab>('none');
 
   // useCallback hooks
   const fetchCalendarEvents = useCallback(async () => {
@@ -868,8 +871,7 @@ const CalendarPageContent: React.FC = () => {
     if (event.isCalendarEvent) {
       // 캘린더 일정인 경우 기존 로직
       setEditEventDialog({ show: true, event });
-      setShowAddForm(false);
-      setShowTaskDetail(false);
+      setActiveTab('editEvent');
       setEditingEvent({
         id: event.id,
         title: event.title,
@@ -881,8 +883,7 @@ const CalendarPageContent: React.FC = () => {
     } else {
       // 칸반 태스크인 경우 태스크 상세 정보 표시
       setSelectedTask(event);
-      setShowTaskDetail(true);
-      setShowAddForm(false);
+      setActiveTab('taskDetail');
       setEditEventDialog({ show: false, event: null });
     }
   };
@@ -1026,7 +1027,7 @@ const CalendarPageContent: React.FC = () => {
         {/* 일정 추가 버튼 */}
         <Button className="w-full mb-4" onClick={() => {
           setAddEventDialog({show:true,date:null});
-          setShowAddForm(true);
+          setActiveTab('addEvent');
           setEditEventDialog({ show: false, event: null });
           setNewEvent({
             ...newEvent,
@@ -1081,7 +1082,7 @@ const CalendarPageContent: React.FC = () => {
             <Button 
               variant="ghost"
               size="sm"
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              onClick={() => setActiveTab(activeTab === 'unscheduled' ? 'none' : 'unscheduled')}
               className="text-gray-600 hover:text-gray-900 text-xs"
             >
               <CalendarIcon className="w-3 h-3 mr-1" />
@@ -1110,7 +1111,7 @@ const CalendarPageContent: React.FC = () => {
                     key={day.toString()}
                     className={`relative border border-border p-2 h-full ${!isCurrentMonth?'bg-muted text-muted-foreground':'bg-card text-card-foreground'} ${isCurrentDay?'ring-2 ring-primary':''}`}
                     onDoubleClick={() => {
-                      setShowAddForm(true);
+                      setActiveTab('addEvent');
                       setAddFormDate(format(day, 'yyyy-MM-dd'));
                       setNewEvent({ ...newEvent, startDate: format(day, 'yyyy-MM-dd') });
                       setEditEventDialog({ show: false, event: null });
@@ -1164,7 +1165,9 @@ const CalendarPageContent: React.FC = () => {
                                 : '';
                               return (
                                 <div key={task.id+''+i} 
-                                  className={`truncate px-2 py-0.5 rounded text-xs font-medium cursor-move ${
+                                  className={`truncate px-2 py-0.5 rounded text-xs font-medium ${
+                                    !task.isCalendarEvent ? 'cursor-move' : 'cursor-pointer'
+                                  } ${
                                     task.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()
                                   }`}
                                   style={{whiteSpace:'normal',maxHeight:48,overflowY:'auto',wordBreak:'break-all',marginBottom:2}}
@@ -1421,7 +1424,7 @@ const CalendarPageContent: React.FC = () => {
                             className="h-16 border-b border-border hover:bg-muted/20 transition-colors"
                             onDoubleClick={() => {
                               const dateTimeString = format(day, 'yyyy-MM-dd') + `T${hour.toString().padStart(2, '0')}:00`;
-                              setShowAddForm(true);
+                              setActiveTab('addEvent');
                               setAddFormDate(format(day, 'yyyy-MM-dd'));
                               setNewEvent({ 
                                 ...newEvent, 
@@ -1429,7 +1432,6 @@ const CalendarPageContent: React.FC = () => {
                                 endDate: format(day, 'yyyy-MM-dd') + `T${(hour + 1).toString().padStart(2, '0')}:00`
                               });
                               setEditEventDialog({ show: false, event: null });
-                              setShowTaskDetail(false);
                             }}
                           />
                         ))}
@@ -1572,7 +1574,10 @@ const CalendarPageContent: React.FC = () => {
                             return (
                               <div
                                 key={processedTask.id + '' + processedTask.originalIndex}
-                                className={`absolute rounded px-1 py-0.5 text-xs font-medium cursor-pointer border-2 shadow-sm ${
+                                className={`absolute rounded px-1 py-0.5 text-xs font-medium border-2 shadow-sm ${
+                                  processedTask.isHoliday ? 'cursor-default' : 
+                                  !processedTask.isCalendarEvent ? 'cursor-move' : 'cursor-pointer'
+                                } ${
                                   processedTask.isHoliday ? getHolidayClasses() :
                                   processedTask.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()
                                 }`}
@@ -1725,7 +1730,7 @@ const CalendarPageContent: React.FC = () => {
                       onDoubleClick={() => {
                         const clickedDate = selectedDate || currentDate;
                         const dateTimeString = format(clickedDate, 'yyyy-MM-dd') + `T${hour.toString().padStart(2, '0')}:00`;
-                        setShowAddForm(true);
+                        setActiveTab('addEvent');
                         setAddFormDate(format(clickedDate, 'yyyy-MM-dd'));
                         setNewEvent({ 
                           ...newEvent, 
@@ -1733,7 +1738,6 @@ const CalendarPageContent: React.FC = () => {
                           endDate: format(clickedDate, 'yyyy-MM-dd') + `T${(hour + 1).toString().padStart(2, '0')}:00`
                         });
                         setEditEventDialog({ show: false, event: null });
-                        setShowTaskDetail(false);
                       }}
                     />
                   ))}
@@ -1874,7 +1878,10 @@ const CalendarPageContent: React.FC = () => {
                       return (
                         <div
                           key={processedTask.id + '' + processedTask.originalIndex}
-                          className={`absolute rounded px-2 py-1 text-xs font-medium cursor-pointer border-2 shadow-sm ${
+                          className={`absolute rounded px-2 py-1 text-xs font-medium border-2 shadow-sm ${
+                            processedTask.isHoliday ? 'cursor-default' : 
+                            !processedTask.isCalendarEvent ? 'cursor-move' : 'cursor-pointer'
+                          } ${
                             processedTask.isCalendarEvent ? getCalendarEventClasses() : getKanbanTaskClasses()
                           }`}
                           style={{
@@ -1937,8 +1944,8 @@ const CalendarPageContent: React.FC = () => {
 
       {/* 우측 패널 */}
       <aside className="w-80 border-l border-border bg-card text-card-foreground flex flex-col p-4 overflow-y-auto">
-        {/* 일정 추가 폼: showAddForm이 true일 때만 표시 */}
-        {showAddForm && (
+        {/* 일정 추가 폼: activeTab이 'addEvent'일 때만 표시 */}
+        {activeTab === 'addEvent' && (
           <div className="mb-6 border-b pb-4">
             <div className="font-bold text-lg mb-4">새 일정 추가</div>
             <div className="space-y-6">
@@ -1983,13 +1990,13 @@ const CalendarPageContent: React.FC = () => {
               <div className="flex gap-2 pt-2">
                 <Button className="flex-1" onClick={() => {
                   addCalendarEvent(newEvent);
-                  setShowAddForm(false);
+                  setActiveTab('none');
                   setNewEvent({ title: '', description: '', startDate: '', endDate: '', projectId: '' });
                 }}>
                   일정 추가
                 </Button>
                 <Button className="flex-1" variant="outline" onClick={() => {
-                  setShowAddForm(false);
+                  setActiveTab('none');
                   setNewEvent({ title: '', description: '', startDate: '', endDate: '', projectId: '' });
                 }}>
                   취소
@@ -1998,8 +2005,8 @@ const CalendarPageContent: React.FC = () => {
             </div>
           </div>
         )}
-        {/* 일정 수정 폼: editEventDialog.show가 true일 때만 표시 */}
-        {editEventDialog.show && editEventDialog.event && (
+        {/* 일정 수정 폼: activeTab이 'editEvent'일 때만 표시 */}
+        {activeTab === 'editEvent' && editEventDialog.event && (
           <div className="mb-6 border-b pb-4">
             <div className="font-bold text-lg mb-4">일정 수정</div>
             <div className="space-y-6">
@@ -2069,13 +2076,13 @@ const CalendarPageContent: React.FC = () => {
             </div>
           </div>
         )}
-        {/* 태스크 상세 정보: showTaskDetail이 true일 때만 표시 */}
-        {showTaskDetail && selectedTask && (
+        {/* 태스크 상세 정보: activeTab이 'taskDetail'일 때만 표시 */}
+        {activeTab === 'taskDetail' && selectedTask && (
           <div className="mb-6 border-b pb-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-lg">태스크 상세 정보</h3>
               <Button variant="ghost" size="sm" onClick={() => {
-                setShowTaskDetail(false);
+                setActiveTab('none');
                 setSelectedTask(null);
               }}>
                 <X className="h-4 w-4" />
@@ -2175,7 +2182,7 @@ const CalendarPageContent: React.FC = () => {
       </aside>
 
       {/* 예약되지 않은 업무 사이드바 (드래그 앤 드롭) */}
-      {isSidebarOpen && (
+      {activeTab === 'unscheduled' && (
         <div 
           className="fixed top-0 bottom-0 right-0 w-80 bg-card text-card-foreground shadow-lg border-l border-border p-4 transition-transform duration-300 z-20 mt-0 flex flex-col"
           style={{marginTop:0}}
@@ -2193,7 +2200,7 @@ const CalendarPageContent: React.FC = () => {
         >
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-foreground">예약되지 않은 업무</h3>
-            <Button variant="ghost" size="sm" onClick={() => setIsSidebarOpen(false)}>
+            <Button variant="ghost" size="sm" onClick={() => setActiveTab('none')}>
               <X className="h-4 w-4" />
             </Button>
           </div>
