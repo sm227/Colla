@@ -48,6 +48,15 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useProject } from "@/app/contexts/ProjectContext";
 import { useTheme } from "next-themes";
+import Sidebar from "@/components/Sidebar";
+import { 
+  useCollaboration,
+  useDocumentEditor,
+  useDocumentSave,
+  useDocumentData,
+  useDocumentProject
+} from "@/hooks/documents";
+import { SummaryModal, TemplateModal, PasswordModal } from "@/components/modals";
 
 // shadcn/ui DropdownMenu 컴포넌트 임포트
 import {
@@ -77,8 +86,6 @@ import Typography from '@tiptap/extension-typography';
 // 협업 관련 임포트 추가
 import Collaboration from '@tiptap/extension-collaboration';
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
-import * as Y from 'yjs';
-import { HocuspocusProvider } from '@hocuspocus/provider';
 import PasswordVerification from "@/components/document/PasswordVerification";
 
 // 문서 인터페이스 정의
@@ -94,413 +101,15 @@ interface Document {
   projectId?: string;
 }
 
-// 요약 모달 인터페이스
-interface SummaryModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  summary: string;
-  isLoading: boolean;
-}
+// SummaryModal 컴포넌트는 별도 파일로 분리됨
 
-// 요약 모달 컴포넌트
-function SummaryModal({ isOpen, onClose, summary, isLoading }: SummaryModalProps) {
-  if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="bg-white dark:bg-[#2a2a2c] rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden border border-gray-200 dark:border-gray-700">
-        <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">AI 문서 요약</h3>
-          <button onClick={onClose} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="p-4 max-h-[400px] overflow-auto">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center p-8">
-              <svg className="animate-spin h-8 w-8 text-blue-600 dark:text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span className="text-gray-700 dark:text-gray-300">요약 생성 중...</span>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {summary.split('\n').map((line, index) => (
-                <p key={index} className="text-gray-700 dark:text-gray-300">
-                  {line || <span className="text-gray-400 dark:text-gray-500 italic">내용 없음</span>}
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="p-4 border-t border-gray-100 dark:border-gray-700 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-          >
-            닫기
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-// 커스텀 협업 커서 확장 생성
-const CustomCollaborationCursor = CollaborationCursor.extend({
-  addNodeView() {
-    return (node: any, view: any, getPos: any) => {
-      // 커서 요소 생성
-      const cursor = document.createElement('div');
-      cursor.className = 'collaboration-cursor';
-      cursor.contentEditable = 'false';
-      cursor.style.position = 'absolute';
-      cursor.style.zIndex = '20';
-      cursor.style.pointerEvents = 'none';
+// TemplateModal 컴포넌트는 별도 파일로 분리됨
 
-      // 동적으로 위치 설정
-      const update = (view: any, lastState: any) => {
-        const { user } = node.attrs;
-        
-        if (user && getPos) {
-          const pos = getPos();
-          const coords = view.coordsAtPos(pos);
-          
-          if (coords) {
-            cursor.style.display = 'block';
-            cursor.style.left = `${coords.left}px`;
-            cursor.style.top = `${coords.top}px`;
-          } else {
-            cursor.style.display = 'none';
-          }
-        }
-        
-        return true;
-      };
-      
-      // 사용자 정보 표시 (간단한 커서만 표시)
-      if (node.attrs.user) {
-        const { user } = node.attrs;
-        
-        // 커서 스타일 설정 - 단순한 세로선만 표시
-        cursor.style.borderLeft = `2px solid ${user.color || '#1e88e5'}`;
-        cursor.style.height = '1.5em';
-      }
+// PasswordModal 컴포넌트는 별도 파일로 분리됨
 
-      return {
-        dom: cursor,
-        update,
-        destroy: () => {
-          cursor.remove();
-        }
-      };
-    };
-  }
-});
 
-// 템플릿 모달 컴포넌트
-function TemplateModal({ isOpen, onClose, templates, onSelect, isLoading, selectedTemplate }: {
-  isOpen: boolean;
-  onClose: () => void;
-  templates: { id: string; name: string; description: string }[];
-  onSelect: (templateId: string) => void;
-  isLoading: boolean;
-  selectedTemplate: string | null;
-}) {
-  if (!isOpen) return null;
-  
-  return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="bg-white dark:bg-[#2a2a2c] rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden border border-gray-200 dark:border-gray-700">
-        <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">문서 템플릿 선택</h3>
-          <button onClick={onClose} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="p-4 max-h-[400px] overflow-auto">
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            템플릿을 선택하면 AI가 자동으로 문서 구조를 생성합니다
-          </p>
-          <div className="space-y-2">
-            {templates.map((template) => (
-              <button
-                key={template.id}
-                onClick={() => onSelect(template.id)}
-                disabled={isLoading}
-                className={`w-full text-left p-3 rounded-lg border ${
-                  selectedTemplate === template.id 
-                    ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/30' 
-                    : 'border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-900/20'
-                } transition-colors`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-gray-900 dark:text-gray-100">{template.name}</span>
-                  {selectedTemplate === template.id && isLoading && (
-                    <svg className="animate-spin h-4 w-4 text-blue-600 dark:text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  )}
-                </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{template.description}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="p-4 border-t border-gray-100 dark:border-gray-700 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 mr-2 hover:bg-gray-50 dark:hover:bg-gray-700"
-          >
-            취소
-          </button>
-          <button
-            onClick={() => selectedTemplate && onSelect(selectedTemplate)}
-            disabled={!selectedTemplate || isLoading}
-            className={`px-4 py-2 rounded-lg text-white ${
-              !selectedTemplate || isLoading
-                ? 'bg-blue-400 dark:bg-blue-500 cursor-not-allowed opacity-50'
-                : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600'
-            }`}
-          >
-            {isLoading ? '생성 중...' : '템플릿 생성'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// 암호 설정 모달 인터페이스
-interface PasswordModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  currentPassword: string | null;
-  isPasswordProtected: boolean;
-  onSave: (password: string | null, isProtected: boolean) => void;
-  isLoading: boolean;
-}
-
-// 암호 설정 모달 컴포넌트
-function PasswordModal({ isOpen, onClose, currentPassword, isPasswordProtected, onSave, isLoading }: PasswordModalProps) {
-  const [password, setPassword] = useState(currentPassword || '');
-  const [confirmPassword, setConfirmPassword] = useState(currentPassword || '');
-  const [enablePassword, setEnablePassword] = useState(isPasswordProtected);
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
-
-  // 모달이 닫힐 때 상태 초기화
-  useEffect(() => {
-    if (isOpen) {
-      setPassword(currentPassword || '');
-      setConfirmPassword(currentPassword || '');
-      setEnablePassword(isPasswordProtected);
-      setError('');
-    }
-  }, [isOpen, currentPassword, isPasswordProtected]);
-
-  const handleSave = () => {
-    // 기본 검증
-    if (enablePassword) {
-      if (!password) {
-        setError('암호를 입력해주세요.');
-        return;
-      }
-      
-      if (password.length < 4) {
-        setError('암호는 최소 4자 이상이어야 합니다.');
-        return;
-      }
-      
-      if (password !== confirmPassword) {
-        setError('암호가 일치하지 않습니다.');
-        return;
-      }
-    }
-    
-    // 암호 비활성화 시 암호를 null로 설정
-    onSave(enablePassword ? password : null, enablePassword);
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="bg-white dark:bg-[#2a2a2c] rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden border border-gray-200 dark:border-gray-700">
-        <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">문서 암호 설정</h3>
-          <button onClick={onClose} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        
-        <div className="p-4">
-          <div className="mb-4">
-            <div className="flex items-center mb-4">
-              <input
-                type="checkbox"
-                id="enablePassword"
-                checked={enablePassword}
-                onChange={(e) => setEnablePassword(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
-              />
-              <label htmlFor="enablePassword" className="ml-2 block text-sm text-gray-900 dark:text-gray-100">
-                문서 암호 보호 사용
-              </label>
-            </div>
-            
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              암호 보호를 활성화하면 문서 접근 시 암호를 입력해야 합니다.
-            </p>
-            
-            {enablePassword && (
-              <>
-                <div className="mb-4">
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    암호
-                  </label>
-                  <div className="relative rounded-md shadow-sm">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <KeyIcon className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                    </div>
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      id="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="block w-full pl-10 pr-10 py-2 sm:text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                      placeholder="문서 접근 암호 입력"
-                    />
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400 focus:outline-none"
-                      >
-                        {showPassword ? (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                          </svg>
-                        ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="mb-4">
-                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    암호 확인
-                  </label>
-                  <div className="relative rounded-md shadow-sm">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <KeyIcon className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                    </div>
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      id="confirmPassword"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="block w-full pl-10 pr-3 py-2 sm:text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                      placeholder="암호 확인"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-            
-            {error && (
-              <div className="text-sm text-red-600 dark:text-red-400 mt-2">
-                {error}
-              </div>
-            )}
-          </div>
-        </div>
-        
-        <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 text-right sm:px-6 flex justify-end space-x-2">
-          <button
-            onClick={onClose}
-            className="inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            취소
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={isLoading}
-            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-          >
-            {isLoading ? '저장 중...' : '저장'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// 사이드바 링크 컴포넌트
-function SidebarLink({
-  icon,
-  text,
-  href,
-  active = false,
-  small = false,
-  onClick,
-  theme = "dark", 
-  badgeCount,
-  isProject = false
-}: {
-  icon: React.ReactNode;
-  text: string;
-  href: string;
-  active?: boolean;
-  small?: boolean;
-  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
-  theme?: "light" | "dark";
-  badgeCount?: string | number;
-  isProject?: boolean;
-}) {
-  const activeProjectBg = theme === 'dark' 
-    ? 'bg-blue-900 bg-opacity-30' 
-    : 'bg-blue-100 bg-opacity-50'; 
-    
-  return (
-    <Link
-      href={href}
-      onClick={onClick}
-      className={`flex items-center justify-between px-2 py-1.5 ${small ? "text-sm" : "text-[15px]"} rounded-md transition-colors duration-150 ${
-        theme === 'dark'
-          ? active && isProject
-            ? `${activeProjectBg} text-gray-300 hover:bg-gray-700 hover:text-gray-100` 
-            : "text-gray-300 hover:bg-gray-700 hover:text-gray-100"
-          : active && isProject
-            ? `${activeProjectBg} text-gray-600 hover:bg-gray-200 hover:text-gray-900`
-            : "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-      }`}
-    >
-      <div className="flex items-center">
-        <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{icon}</div>
-        <span>{text}</span>
-      </div>
-      {badgeCount && (
-        <span className={`px-1.5 py-0.5 text-xs font-semibold rounded-full ${badgeCount === 'new' ? (theme === 'dark' ? 'bg-red-500 text-white' : 'bg-red-500 text-white') : (theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-700')}`}>
-          {badgeCount === 'new' ? '' : badgeCount}
-        </span>
-      )}
-    </Link>
-  );
-}
 
 // 편의를 위한 간단한 토스트 함수
 const showToast = (title: string, description: string, status: 'success' | 'error' | 'info' | 'warning') => {
@@ -558,8 +167,23 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
   
   // 사이드바 상태
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [isDocumentsSubmenuOpen, setIsDocumentsSubmenuOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
+  
+  // 설정 모달 관련 상태
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [tempSettings, setTempSettings] = useState({
+    theme: theme,
+    language: 'ko',
+    notifications: {
+      email: true,
+      push: true,
+      desktop: true,
+    },
+    privacy: {
+      profileVisible: true,
+      activityVisible: true,
+    }
+  });
   
   // next-themes hydration 처리
   useEffect(() => {
@@ -576,34 +200,42 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
     }
   };
 
-  const [title, setTitle] = useState("제목 없음");
-  const [emoji, setEmoji] = useState("📄");
-  const [isStarred, setIsStarred] = useState(false);
-  const [folder, setFolder] = useState("프로젝트 문서");
-  const [tags, setTags] = useState<string[]>(["문서"]);
+  // 설정 저장 함수
+  const handleSaveSettings = () => {
+    // 테마 변경
+    if (tempSettings.theme !== theme) {
+      setTheme(tempSettings.theme);
+    }
+    
+    // 다른 설정들도 여기서 저장 처리
+    localStorage.setItem('userSettings', JSON.stringify(tempSettings));
+    
+    setShowSettingsModal(false);
+  };
+  
+  // 설정 모달 열기 함수
+  const openSettingsModal = () => {
+    setTempSettings({
+      theme: theme,
+      language: 'ko',
+      notifications: {
+        email: true,
+        push: true,
+        desktop: true,
+      },
+      privacy: {
+        profileVisible: true,
+        activityVisible: true,
+      }
+    });
+    setShowSettingsModal(true);
+  };
+
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const searchParams = useSearchParams();
   const projectId = searchParams?.get('projectId');
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [projectIdWarning, setProjectIdWarning] = useState(false);
-  const [projectIdFixed, setProjectIdFixed] = useState(false);
-  const [projectIdDebug, setProjectIdDebug] = useState({
-    source: '',
-    value: '',
-    normalized: '' 
-  });
   
-  // 문서 로딩 관련 상태 추가
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingError, setLoadingError] = useState<string | null>(null);
-  
-  // 프로젝트 정보 상태 추가
-  const [projectName, setProjectName] = useState<string | null>(null);
-  // 문서 정보 상태 추가
-  const [folderId, setFolderId] = useState<string | null>(null);
   // 폴더 목록 상태 추가
   const [availableFolders, setAvailableFolders] = useState<{ id: string; name: string; count: number }[]>([]);
   const [showFolderDropdown, setShowFolderDropdown] = useState(false);
@@ -614,50 +246,17 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
   const [folderModalName, setFolderModalName] = useState<string>("");
   const [isFolderCreating, setIsFolderCreating] = useState(false);
   
-  // 사용자 프로젝트 역할 상태 추가
-  const [userProjectRole, setUserProjectRole] = useState<string | null>(null);
-  const [isProjectOwner, setIsProjectOwner] = useState(false);
-  
-  // 읽기 전용 모드 상태 추가
-  const [isReadOnlyMode, setIsReadOnlyMode] = useState(false);
+  // 읽기 전용 모드 디바운싱 상태
   const [isButtonDebouncing, setIsButtonDebouncing] = useState(false);
   
-  // 슬래시 커맨드 관련 상태
-  const [showSlashMenu, setShowSlashMenu] = useState(false);
-  const [slashMenuPosition, setSlashMenuPosition] = useState({ x: 0, y: 0 });
-  
-  // 요약 모달 관련 상태 추가
-  const [showSummaryModal, setShowSummaryModal] = useState(false);
-  const [documentSummary, setDocumentSummary] = useState('');
-  const [isSummarizing, setIsSummarizing] = useState(false);
-  
-  // 템플릿 관련 상태
-  const [showTemplateMenu, setShowTemplateMenu] = useState(false);
-  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
+  // 중복 상태 제거됨 - useDocumentEditor 훅으로 이동됨
   const [templateContent, setTemplateContent] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  
-  // 템플릿 타입
-  const templates = [
-    { id: 'meeting', name: '회의록', description: '회의 내용과 결정사항을 기록하는 템플릿' },
-    { id: 'weekly', name: '주간 보고서', description: '주간 업무 성과와 계획을 정리하는 템플릿' },
-    { id: 'project', name: '프로젝트 계획서', description: '프로젝트 목표와 일정을 정리하는 템플릿' },
-    { id: 'research', name: '연구 문서', description: '연구 내용과 결과를 정리하는 템플릿' }
-  ];
   
   // 템플릿 모달 ref
   const templateMenuRef = useRef<HTMLDivElement | null>(null);
   
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const slashMenuRef = useRef<HTMLDivElement | null>(null);
-
-  // 디버깅용 참조 객체
-  const debugRef = useRef({
-    projectIdParam: null as string | null,
-    selectedProjectId: null as string | null,
-    projectIdFromAPI: null as string | null,
-    projectIdFixed: false
-  });
+  // slashMenuRef는 useDocumentEditor 훅으로 이동됨
 
   // 새 문서 작성 페이지인지 확인
   const [isNewDocument, setIsNewDocument] = useState(params.id === "new");
@@ -665,415 +264,149 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
   // 저장된 문서 ID를 추적하기 위한 상태 추가
   const [savedDocumentId, setSavedDocumentId] = useState<string | null>(params.id !== "new" ? params.id : null);
   
-  // Y.js 문서 및 Hocuspocus 프로바이더 생성
-  const [ydoc] = useState(() => new Y.Doc());
-  const [provider, setProvider] = useState<HocuspocusProvider | null>(null);
-  // Y.js에서 가져온 컨텐츠인지 여부를 추적하는 플래그
-  const [contentLoadedFromYjs, setContentLoadedFromYjs] = useState(false);
+  // 프로젝트 관리 훅 사용
+  const {
+    selectedProjectId,
+    projectName,
+    userProjectRole,
+    isProjectOwner,
+    projectIdWarning,
+    projectIdFixed,
+    projectIdDebug,
+    debugRef,
+    forceSetProjectId,
+    updateUrlWithProjectId,
+    fetchProjectInfo,
+    validateProjectId,
+    getDefaultProject,
+    createDefaultProject,
+    getProjectIdFromUrl,
+    setProjectName,
+    setSelectedProjectId,
+    setUserProjectRole,
+    setIsProjectOwner,
+    setProjectIdWarning,
+    setProjectIdFixed
+  } = useDocumentProject({ user, isNewDocument });
 
-  // 현재 사용자 정보
-  const [currentUser, setCurrentUser] = useState({
-    name: "익명 사용자", 
-    color: `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`
+  // 협업 관련 훅 사용
+  const {
+    ydoc,
+    provider,
+    contentLoadedFromYjs,
+    currentUser,
+    connectedUsers,
+    isReadOnlyMode,
+    setIsReadOnlyMode,
+    toggleReadOnlyMode,
+    initializeProvider
+  } = useCollaboration({
+    documentId: savedDocumentId,
+    user,
+    userProjectRole,
+    isProjectOwner
   });
 
-  // 문서 접속 사용자 목록
-  const [connectedUsers, setConnectedUsers] = useState<any[]>([]);
-  
-  // Tiptap 에디터 설정 - provider가 설정된 후에만 초기화
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: false,
-        history: false,
-        // StarterKit에서 중복된 확장 비활성화
-        bulletList: false,
-        orderedList: false, 
-        listItem: false,
-        blockquote: false,
-        codeBlock: false
-      }),
-      Heading.configure({
-        levels: [1, 2, 3],
-      }),
-      Placeholder.configure({
-        placeholder: '여기에 내용을 입력하세요...',
-        showOnlyWhenEditable: true,
-        showOnlyCurrent: true,
-        emptyEditorClass: 'is-editor-empty',
-      }),
-      TaskList,
-      TaskItem.configure({
-        nested: true,
-      }),
-      Image,
-      BulletList,
-      OrderedList,
-      ListItem,
-      Blockquote,
-      CodeBlock,
-      Highlight,
-      Typography,
-      // 협업 확장 기능 추가 - provider가 있을 때만 CollaborationCursor 활성화
-      Collaboration.configure({
-        document: ydoc,
-      }),
-      ...(provider ? [
-        CustomCollaborationCursor.configure({
-          provider: provider,
-          user: currentUser,
-          render: user => {
-            const cursor = document.createElement('span');
-            cursor.classList.add('collaboration-cursor');
-            
-            // 커서 스타일 설정 - 간단한 세로선만 표시
-            cursor.style.position = 'absolute';
-            cursor.style.pointerEvents = 'none';
-            cursor.style.zIndex = '10';
-            cursor.style.borderLeft = `2px solid ${user.color}`;
-            cursor.style.height = '1.5em';
-            
-            return cursor;
-          },
-        })
-      ] : []),
-    ],
-    content: '',
-    autofocus: true,
-    editable: true,
-    injectCSS: false,
-    // SSR 경고 해결
-    immediatelyRender: false
-  }, [provider, currentUser]); // provider와 currentUser가 변경될 때 에디터 다시 초기화
-  
-  // 프로젝트 ID를 확실히 설정하는 함수
-  const forceSetProjectId = (id: string | null) => {
-    // 빈 문자열, 'null' 문자열, undefined는 모두 null로 처리
-    let normalizedId = id;
-    
-    // 빈 문자열일 경우 URL 파라미터에서 직접 가져와보기
-    if (id === '') {
-      try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const projectIdFromUrl = urlParams.get('projectId');
-        
-        // URL에 실제 projectId 값이 있는지 확인
-        if (projectIdFromUrl !== null && projectIdFromUrl !== '') {
-          normalizedId = projectIdFromUrl;
-        } else {
-          if (id === '' || id === 'null' || id === undefined) {
-            normalizedId = null;
-          }
-        }
-      } catch (error) {
-        if (id === '' || id === 'null' || id === undefined) {
-          normalizedId = null;
-        }
-      }
-    } else if (id === 'null' || id === undefined) {
-      normalizedId = null;
-    }
-    
-    setSelectedProjectId(normalizedId);
-    debugRef.current.selectedProjectId = normalizedId;
-    
-    // 디버깅 정보 업데이트
-    setProjectIdDebug({
-      source: '직접설정',
-      value: id === null ? 'null' : String(id || ''),
-      normalized: normalizedId === null ? 'null' : String(normalizedId)
-    });
-    
-    // projectId가 있으면 고정된 것으로 표시
-    if (normalizedId) {
-      setProjectIdFixed(true);
-      debugRef.current.projectIdFixed = true;
-    }
-  };
-  
-  // URL 쿼리 파라미터로부터 프로젝트 ID를 가져옴
-  useEffect(() => {
-    const getProjectIdFromUrl = () => {
-      if (typeof window !== 'undefined') {
-        try {
-          const urlParams = new URLSearchParams(window.location.search);
-          const urlProjectId = urlParams.get('projectId');
-          if (urlProjectId && urlProjectId !== '' && urlProjectId !== 'null') {
-            return urlProjectId;
-          }
-        } catch (e) {
-          console.error("URL에서 projectId 파싱 오류:", e);
-        }
-      }
-      return null;
-    };
+  // 문서 데이터 관리 훅 사용
+  const {
+    documentData,
+    title,
+    setTitle,
+    emoji,
+    setEmoji,
+    isStarred,
+    setIsStarred,
+    folder,
+    setFolder,
+    folderId,
+    setFolderId,
+    tags,
+    setTags,
+    isLoading,
+    loadingError,
+    isPasswordProtected,
+    setIsPasswordProtected,
+    documentPassword,
+    setDocumentPassword,
+    needsPasswordVerification,
+    setNeedsPasswordVerification,
+    isPasswordVerified,
+    setIsPasswordVerified,
+    refetchDocument,
+    setDocumentData
+  } = useDocumentData({
+    documentId: savedDocumentId || params.id,
+    isNewDocument,
+    contentLoadedFromYjs,
+    projectId,
+    setIsReadOnlyMode
+  });
 
-    // 값의 우선순위: searchParams > URL > 현재 상태
-    const projectIdToUse = projectId || getProjectIdFromUrl() || selectedProjectId;
+  // 에디터 관련 훅 사용
+  const {
+    editor,
+    showSlashMenu,
+    setShowSlashMenu,
+    slashMenuPosition,
+    slashMenuRef,
+    showTemplateMenu,
+    setShowTemplateMenu,
+    isCreatingTemplate,
+    selectedTemplate,
+    templates,
+    showSummaryModal,
+    setShowSummaryModal,
+    documentSummary,
+    isSummarizing,
+    applyBlockType,
+    summarizeDocument,
+    createDocumentTemplate,
+    showTemplates
+  } = useDocumentEditor({
+    ydoc,
+    provider,
+    currentUser,
+    isReadOnlyMode,
+    connectedUsers
+  });
 
-    if (projectIdToUse && projectIdToUse !== selectedProjectId) {
-      console.log("프로젝트 ID 설정:", projectIdToUse);
-      
-      // 프로젝트 ID 유효성 확인
-      const validateProjectId = async () => {
-        try {
-          // 프로젝트 ID가 유효한지 확인 (API 호출)
-          const response = await fetch(`/api/projects/${projectIdToUse}`);
-          
-          if (response.ok) {
-            // 프로젝트가 존재하고 접근 권한이 있음
-            const project = await response.json();
-            setSelectedProjectId(projectIdToUse);
-            debugRef.current.projectIdParam = projectIdToUse;
-            debugRef.current.selectedProjectId = projectIdToUse;
-            
-            // 프로젝트 이름 설정
-            setProjectName(project.name);
-            
-            // 경고 표시 관련
-            if (isNewDocument) {
-              setProjectIdWarning(true);
-              setTimeout(() => setProjectIdWarning(false), 5000);
-            }
-          } else {
-            // 이미 유효하지 않은 projectId가 URL에 있는 경우, URL에서 제거
-            if (typeof window !== 'undefined') {
-              const currentUrl = new URL(window.location.href);
-              currentUrl.searchParams.delete('projectId');
-              window.history.replaceState({}, '', currentUrl.toString());
-            }
-            
-            // 프로젝트가 존재하지 않거나 접근 권한이 없음
-            console.error("지정된 프로젝트에 접근할 수 없습니다. 기본 프로젝트를 사용합니다.");
-            
-            // 첫 번째 프로젝트 가져오기 시도
-            getDefaultProject();
-          }
-        } catch (error) {
-          console.error("프로젝트 ID 검증 중 오류:", error);
-          getDefaultProject();
-        }
-      };
-      
-      // 기본 프로젝트 가져오기 함수
-      const getDefaultProject = async () => {
-        try {
-          const response = await fetch('/api/projects');
-          if (response.ok) {
-            const projects = await response.json();
-            if (projects.length > 0) {
-              const defaultProjectId = projects[0].id;
-              setSelectedProjectId(defaultProjectId);
-              // URL 업데이트
-              if (typeof window !== 'undefined') {
-                const currentUrl = new URL(window.location.href);
-                currentUrl.searchParams.set('projectId', defaultProjectId);
-                window.history.replaceState({}, '', currentUrl.toString());
-              }
-            } else {
-              createDefaultProject();
-            }
-          } else {
-            createDefaultProject();
-          }
-        } catch (error) {
-          console.error("기본 프로젝트 가져오기 실패:", error);
-          createDefaultProject();
-        }
-      };
-      
-      // 기본 프로젝트 생성 함수
-      const createDefaultProject = async () => {
-        try {
-          const response = await fetch('/api/projects', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              name: "내 프로젝트",
-              description: "자동으로 생성된 프로젝트입니다."
-            })
-          });
-          
-          if (response.ok) {
-            const newProject = await response.json();
-            setSelectedProjectId(newProject.id);
-            // URL 업데이트
-            if (typeof window !== 'undefined') {
-              const currentUrl = new URL(window.location.href);
-              currentUrl.searchParams.set('projectId', newProject.id);
-              window.history.replaceState({}, '', currentUrl.toString());
-            }
-          } else {
-            console.error("기본 프로젝트 생성 실패");
-          }
-        } catch (error) {
-          console.error("기본 프로젝트 생성 중 오류:", error);
-        }
-      };
-      
-      validateProjectId();
-    }
-    
-    // URL 쿼리스트링에서 폴더 정보 가져오기
-    const folderIdParam = searchParams?.get('folderId') || null;
-    const folderNameParam = searchParams?.get('folderName') || null;
-    
-    if (folderIdParam && folderNameParam && isNewDocument) {
-      setFolder(folderNameParam);
-      setFolderId(folderIdParam);
-    }
-  }, [projectId, isNewDocument, searchParams, selectedProjectId]);
+  // 자동저장 활성화 상태 관리
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+
+  // 저장 관련 훅 사용
+  const {
+    isSaving,
+    setSaving,
+    saveSuccess,
+    setSaveSuccess,
+    hasUnsavedChanges,
+    setHasUnsavedChanges,
+    lastSaved,
+    saveDocument,
+    autoSave,
+    autoSaveTimerRef
+  } = useDocumentSave({
+    title,
+    editor,
+    emoji,
+    isStarred,
+    folder,
+    tags,
+    selectedProjectId,
+    savedDocumentId,
+    setSavedDocumentId,
+    folderId,
+    autoSaveEnabled, // 자동저장 상태 전달
+    provider,
+    ydoc,
+    isNewDocument,
+    setIsNewDocument,
+    isReadOnlyMode,
+    initializeProvider
+  });
   
-  // 문서 데이터 로드 (실제로는 API 호출)
-  useEffect(() => {
-    if (isNewDocument) {
-      // 새 문서 초기화
-      setTitle("제목 없음");
-      setEmoji("📄");
-      setIsStarred(false);
-      
-      // URL 쿼리스트링에서 폴더 정보 가져오기
-      const folderIdParam = searchParams?.get('folderId') || null;
-      const folderNameParam = searchParams?.get('folderName') || null;
-      
-      if (folderIdParam && folderNameParam) {
-        // 전달받은 폴더 정보가 있으면 해당 폴더로 설정
-        setFolder(folderNameParam);
-        setFolderId(folderIdParam);
-      } else {
-        // 전달받은 폴더 정보가 없으면 기본 폴더로 설정
-        setFolder("기본 폴더");
-        setFolderId(null);
-      }
-      
-      // 에디터 내용 초기화
-      if (editor) {
-        editor.commands.setContent('<p></p>');
-      }
-      
-      // 새 문서에서는 URL의 projectId 파라미터를 설정 (칸반보드와 동일한 패턴)
-      if (projectId) {
-        setSelectedProjectId(projectId);
-      }
-    } else if (params.id !== "new") {
-      // 로딩 상태 시작
-      setIsLoading(true);
-      setLoadingError(null);
-      
-      // 실제 API 호출로 문서 데이터 가져오기
-      const fetchDocument = async () => {
-        try {
-          const response = await fetch(`/api/documents/${params.id}`);
-          
-          if (!response.ok) {
-            throw new Error('문서를 불러오는데 실패했습니다.');
-          }
-          
-          const data = await response.json();
-          
-          // 문서 데이터 설정
-          setDocumentData({
-            id: data.id,
-            title: data.title || '제목 없음',
-            content: data.content || '',
-            emoji: data.emoji || '',
-            isStarred: data.isStarred || false,
-            folder: data.folder || '기본 폴더',
-            folderId: data.folderId || null,
-            tags: data.tags ? JSON.parse(data.tags) : [],
-            projectId: data.projectId || '',
-          });
 
-          // 상태 업데이트
-          setTitle(data.title);
-          setEmoji(data.emoji || "📄");
-          setIsStarred(data.isStarred || false);
-          setFolder(data.folder || "기본 폴더");
-          setFolderId(data.folderId || null);
-          
-          // 읽기 전용 모드 설정
-          setIsReadOnlyMode(data.isReadOnly || false);
-          
-          // Tags 처리
-          if (data.tags) {
-            try {
-              const parsedTags = JSON.parse(data.tags);
-              setTags(Array.isArray(parsedTags) ? parsedTags : ["문서"]);
-            } catch {
-              setTags(["문서"]);
-            }
-          } else {
-            setTags(["문서"]);
-          }
 
-          // 암호 보호 상태 설정
-          const isProtected = data.isPasswordProtected || false;
-          setIsPasswordProtected(isProtected);
-          setDocumentPassword(data.password ? '********' : null);
-          
-          // 비밀번호 보호된 문서이고 아직 인증되지 않았으면 인증 요구
-          if (isProtected && !isPasswordVerified) {
-            setNeedsPasswordVerification(true);
-            // 로딩 상태 해제하여 인증 화면 표시
-            setIsLoading(false);
-            return;
-          }
-          
-          // 프로젝트 ID 설정
-          let projectIdToUse = null;
-          if (projectId) {
-            projectIdToUse = projectId;
-          } else if (data.projectId) {
-            projectIdToUse = data.projectId;
-          }
-          
-          // 디버깅용 참조 업데이트
-          debugRef.current.projectIdFromAPI = data.projectId;
-          
-          // 프로젝트 ID 설정
-          forceSetProjectId(projectIdToUse);
-          
-          // 에디터 내용 설정 (Y.js 콘텐츠가 없을 경우)
-          const timeoutId = setTimeout(() => {
-            if (!contentLoadedFromYjs && editor && data.content) {
-              console.log('Y.js 데이터가 없어 DB 내용을 로드합니다.');
-              
-              if (editor.isEmpty) {
-                editor.commands.setContent(data.content || '<p></p>');
-              }
-            }
-            setIsLoading(false);
-          }, 2000);
-          
-          return () => clearTimeout(timeoutId);
-        } catch (error) {
-          // 에러 발생 시 샘플 데이터 사용
-          setTitle("문서를 불러올 수 없습니다");
-          setEmoji("❌");
-          if (editor) {
-            editor.commands.setContent('<p>문서를 불러오는 중 오류가 발생했습니다.</p>');
-          }
-          
-          setLoadingError(error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다');
-          setIsLoading(false);
-        }
-      };
-      
-      fetchDocument();
-    }
-  }, [params.id, isNewDocument, editor, projectId, contentLoadedFromYjs, searchParams]);
-  
-  // Y.js 컨텐츠가 로드되면 로딩 상태 해제
-  useEffect(() => {
-    if (contentLoadedFromYjs && isLoading) {
-      console.log('Y.js에서 컨텐츠를 불러왔습니다.');
-      setTimeout(() => {
-        setIsLoading(false);
-      }, 300);
-    }
-  }, [contentLoadedFromYjs, isLoading]);
   
   // 바깥 영역 클릭 감지 이벤트
   useEffect(() => {
@@ -1117,824 +450,29 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
   };
   
   // 블록 타입 변경 함수
-  const applyBlockType = (type: string) => {
-    if (!editor) return;
-    
-    // 슬래시 메뉴가 열려있을 때만 슬래시 제거
-    if (showSlashMenu) {
-      // 마지막 슬래시 제거
-      editor.commands.deleteRange({
-        from: editor.state.selection.from - 1,
-        to: editor.state.selection.from
-      });
-    }
-    
-    switch (type) {
-      case 'paragraph':
-        editor.chain().focus().setParagraph().run();
-        break;
-      case 'heading1':
-        editor.chain().focus().toggleHeading({ level: 1 }).run();
-        break;
-      case 'heading2':
-        editor.chain().focus().toggleHeading({ level: 2 }).run();
-        break;
-      case 'heading3':
-        editor.chain().focus().toggleHeading({ level: 3 }).run();
-        break;
-      case 'bulletList':
-        editor.chain().focus().toggleBulletList().run();
-        break;
-      case 'orderedList':
-        editor.chain().focus().toggleOrderedList().run();
-        break;
-      case 'taskList':
-        editor.chain().focus().toggleTaskList().run();
-        break;
-      case 'blockquote':
-        editor.chain().focus().toggleBlockquote().run();
-        break;
-      case 'codeBlock':
-        editor.chain().focus().toggleCodeBlock().run();
-        break;
-      case 'horizontalRule':
-        editor.chain().focus().setHorizontalRule().run();
-        break;
-      case 'image':
-        const url = window.prompt('이미지 URL을 입력하세요');
-        if (url) {
-          editor.chain().focus().setImage({ src: url }).run();
-        }
-        break;
-      case 'ai':
-        summarizeDocument();
-        break;
-      case 'template':
-        showTemplates();
-        break;
-    }
-    
-    setShowSlashMenu(false);
-  };
+  // applyBlockType 함수는 useDocumentEditor 훅으로 이동됨
   
   // 문서 요약 함수
-  const summarizeDocument = async () => {
-    if (!editor) return;
-    
-    try {
-      setIsSummarizing(true);
-      setShowSummaryModal(true);
-      
-      // 에디터 내용 가져오기
-      const content = editor.getHTML();
-      
-      // AI 요약 API 호출
-      const response = await fetch('/api/ai/summarize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ content }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('문서 요약 중 오류가 발생했습니다.');
-      }
-      
-      const data = await response.json();
-      setDocumentSummary(data.summary);
-    } catch (error) {
-      console.error('문서 요약 중 오류:', error);
-      setDocumentSummary('문서 요약 중 오류가 발생했습니다.');
-    } finally {
-      setIsSummarizing(false);
-    }
-  };
+  // summarizeDocument 함수는 useDocumentEditor 훅으로 이동됨
   
-  // 템플릿 생성 함수
-  const createDocumentTemplate = async (templateType: string) => {
-    if (!editor) return;
-    
-    try {
-      setIsCreatingTemplate(true);
-      setSelectedTemplate(templateType);
-      
-      // 회의록 템플릿일 경우 접속 중인 사용자 정보 추가
-      let participants = '';
-      if (templateType === 'meeting' && connectedUsers.length > 0) {
-        participants = connectedUsers
-          .map(user => user.name || '익명 사용자')
-          .join(', ');
-      }
-      
-      // AI 템플릿 생성 API 호출
-      const response = await fetch('/api/ai/template', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          templateType,
-          participants: participants // 참석자 정보 전달
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('템플릿 생성 중 오류가 발생했습니다.');
-      }
-      
-      const data = await response.json();
-      
-      // 에디터에 템플릿 내용 삽입 (기존 내용 대체)
-      editor.commands.setContent(data.content);
-      
-      // 문서 제목 설정 (템플릿에 맞게)
-      const templateInfo = templates.find(t => t.id === templateType);
-      if (templateInfo) {
-        // 문서 제목 업데이트
-        const titleInput = document.querySelector('input[placeholder="제목 없음"]') as HTMLInputElement;
-        if (titleInput) {
-          titleInput.value = templateInfo.name;
-          // 강제로 change 이벤트 발생시키기
-          const event = new Event('input', { bubbles: true });
-          titleInput.dispatchEvent(event);
-          
-          // title 상태 업데이트 (React 상태 동기화)
-          setTitle(templateInfo.name);
-        }
-      }
-      
-    } catch (error) {
-      console.error('템플릿 생성 중 오류:', error);
-    } finally {
-      setIsCreatingTemplate(false);
-      setShowTemplateMenu(false);
-      setSelectedTemplate(null);
-    }
-  };
+  // createDocumentTemplate, showTemplates 함수는 useDocumentEditor 훅으로 이동됨
   
-  // 슬래시 메뉴에서 템플릿 보기
-  const showTemplates = () => {
-    setShowTemplateMenu(true);
-  };
+  // 키보드 단축키 핸들러는 useDocumentEditor 훅으로 이동됨
   
-  // 단축키 핸들러 추가
-  useEffect(() => {
-    if (!editor) return;
-    
-    const handleKeyboardShortcuts = (event: KeyboardEvent) => {
-      // 윈도우 키(Meta 키) + '.' 조합은 이모티콘 선택기를 위해 무시
-      if (event.key === '.' && (event.metaKey || event.ctrlKey)) {
-        return;
-      }
-      
-      // Ctrl(또는 Mac에서 Cmd) 키가 눌려있지 않으면 무시
-      const isMac = /Mac|iPod|iPhone|iPad/.test(navigator.platform);
-      const modKey = isMac ? event.metaKey : event.ctrlKey;
-      
-      if (!modKey) {
-        return;
-      }
-      
-      // Ctrl/Cmd + 숫자 키 조합
-      if (event.key === '1') {
-        event.preventDefault();
-        applyBlockType('heading1');
-      } else if (event.key === '2') {
-        event.preventDefault();
-        applyBlockType('heading2');
-      } else if (event.key === '3') {
-        event.preventDefault();
-        applyBlockType('heading3');
-      } else if (event.key === '0') {
-        event.preventDefault();
-        applyBlockType('paragraph');
-      }
-      
-      // Ctrl/Cmd + Shift + 키 조합
-      if (event.shiftKey) {
-        if (event.key === '8' || event.key === '*') { // 글머리 기호 목록
-          event.preventDefault();
-          applyBlockType('bulletList');
-        } else if (event.key === '7' || event.key === '&') { // 번호 매기기 목록
-          event.preventDefault();
-          applyBlockType('orderedList');
-        } else if (event.key === '9' || event.key === '(') { // 할 일 목록
-          event.preventDefault();
-          applyBlockType('taskList');
-        }
-      }
-      
-      // Ctrl/Cmd + 키 조합 (기능키)
-      if (event.key === 'b' && !event.shiftKey) {
-        event.preventDefault();
-        applyBlockType('blockquote');
-      } else if (event.key === 'c' && !event.shiftKey && !event.altKey) { // Ctrl+C(복사)가 아닌 경우에만
-        event.preventDefault();
-        applyBlockType('codeBlock');
-      } else if (event.key === 'l' && !event.shiftKey) {
-        event.preventDefault();
-        applyBlockType('horizontalRule');
-      } else if (event.key === 'i' && !event.shiftKey && !event.altKey) { // Ctrl+I(기울임꼴)가 아닌 경우에만
-        event.preventDefault();
-        applyBlockType('image');
-      }
-    };
-    
-    // 이벤트 리스너는 캡처 단계에서 추가하지 않고 버블링 단계에서만 추가
-    document.addEventListener('keydown', handleKeyboardShortcuts, false);
-    
-    return () => {
-      document.removeEventListener('keydown', handleKeyboardShortcuts, false);
-    };
-  }, [editor]);
+  // 슬래시 키 입력 감지는 useDocumentEditor 훅으로 이동됨
   
-  // 슬래시 키 입력 감지
-  useEffect(() => {
-    if (!editor) return;
-    
-    // Tiptap 에디터에 키 이벤트 리스너 추가
-    const handleDOMEvents = () => {
-      // 에디터의 DOM 요소 가져오기
-      const editorElement = document.querySelector('.ProseMirror');
-      if (!editorElement) {
-        // DOM 요소가 아직 없으면 짧은 시간 후에 다시 시도
-        setTimeout(handleDOMEvents, 100);
-        return;
-      }
-      
-      // 키 입력 이벤트 핸들러
-      const handleKeyDown = (event: Event) => {
-        const keyEvent = event as KeyboardEvent;
-        if (keyEvent.key === '/' && !showSlashMenu) {
-          try {
-            // 현재 커서 위치 계산
-            const { view } = editor;
-            
-            // 먼저 view와 state가 유효한지 확인
-            if (!view || !view.state) {
-              throw new Error("에디터 view 또는 state가 유효하지 않습니다");
-            }
-            
-            const { state } = view;
-            const { selection } = state;
-            
-            // 선택이 유효하고 ranges가 있는지 확인
-            if (!selection || !selection.ranges || selection.ranges.length === 0) {
-              throw new Error("에디터 선택 범위가 유효하지 않습니다");
-            }
-            
-            const { ranges } = selection;
-            const from = Math.min(...ranges.map(range => range.$from.pos));
-            
-            // 에디터 DOM 요소 직접 찾기
-            const editorElement = document.querySelector('.ProseMirror');
-            if (!editorElement) {
-              throw new Error("에디터 DOM 요소를 찾을 수 없습니다");
-            }
-            
-            const editorRect = editorElement.getBoundingClientRect();
-            
-            // 기본 메뉴 위치 (에디터 패딩 고려)
-            let menuX = editorRect.left + 16; // 에디터의 px-2 패딩 고려
-            let menuY = editorRect.top + 100;
-            
-            // 커서 좌표 계산 시도
-            try {
-              if (view.domAtPos && typeof view.domAtPos === 'function' && 
-                  from >= 0 && from <= state.doc.content.size) {
-                
-                // 커서 좌표 가져오기
-                const pos = view.coordsAtPos(from);
-                
-                // 좌표가 유효한지 확인
-                if (pos && pos.left >= editorRect.left && pos.top >= editorRect.top) {
-                  menuX = pos.left;
-                  menuY = pos.bottom + 5;
-                } else {
-                  // 좌표가 유효하지 않으면 DOM 요소를 직접 찾아서 계산
-                  const domPos = view.domAtPos(from);
-                  if (domPos && domPos.node) {
-                    let targetElement = domPos.node;
-                    
-                    // 텍스트 노드인 경우 부모 요소 찾기
-                    if (targetElement.nodeType === Node.TEXT_NODE) {
-                      targetElement = targetElement.parentElement || targetElement;
-                    }
-                    
-                    // 요소가 Element인지 확인
-                    if (targetElement instanceof Element) {
-                      const rect = targetElement.getBoundingClientRect();
-                      // 에디터 내부의 패딩을 고려하여 위치 조정
-                      menuX = Math.max(rect.left + 16, editorRect.left + 16);
-                      menuY = rect.bottom + 5;
-                    } else {
-                      // DOM 요소를 찾을 수 없는 경우, 현재 줄의 시작 위치 추정
-                      // 에디터 내부 패딩 + 약간의 여백
-                      menuX = editorRect.left + 16;
-                      
-                      // Y 좌표는 현재 스크롤 위치와 커서 위치를 고려하여 추정
-                      const scrollTop = editorElement.scrollTop || 0;
-                      const lineHeight = 24; // 대략적인 줄 높이 (1.5em * 16px)
-                      
-                      // 문서에서 현재 위치의 줄 번호 추정
-                      const textBeforeCursor = state.doc.textBetween(0, from);
-                      const lineNumber = (textBeforeCursor.match(/\n/g) || []).length;
-                      
-                      menuY = editorRect.top + (lineNumber * lineHeight) + lineHeight + 5 - scrollTop;
-                    }
-                  }
-                }
-              }
-            } catch (coordError) {
-              console.warn("커서 좌표 계산 실패:", coordError);
-              // 기본 위치 사용 유지 (이미 위에서 설정됨)
-            }
-            
-            // 화면 경계 확인
-            if (menuX + 280 > window.innerWidth) {
-              menuX = Math.max(window.innerWidth - 280, 0);
-            }
-            
-            if (menuY + 420 > window.innerHeight) {
-              menuY = Math.max(window.innerHeight - 420, 10);
-            }
-            
-            // 위치를 먼저 설정한 후 메뉴 표시
-            setSlashMenuPosition({
-              x: menuX,
-              y: menuY
-            });
-            
-            // 슬래시가 입력될 시간을 주기 위해 약간의 지연 후 메뉴 표시
-            setTimeout(() => {
-              setShowSlashMenu(true);
-            }, 10); // 10ms 지연으로 슬래시가 입력되도록
-          } catch (error) {
-            console.error("슬래시 메뉴 표시 중 오류 발생:", error);
-            // 오류 발생 시 화면 중앙에 메뉴 표시
-            setSlashMenuPosition({
-              x: Math.max(window.innerWidth / 2 - 140, 10),
-              y: window.innerHeight / 3
-            });
-            
-            setTimeout(() => {
-              setShowSlashMenu(true);
-            }, 10);
-          }
-        } else if (keyEvent.key === 'Backspace' && showSlashMenu) {
-          // 백스페이스 키를 눌렀을 때 슬래시 메뉴가 열려있으면 닫기
-          try {
-            const { state } = editor.view;
-            const { selection } = state;
-            const { from } = selection;
-            
-            // 커서 바로 앞의 문자가 '/'인지 확인
-            const textBefore = state.doc.textBetween(Math.max(0, from - 1), from);
-            
-            if (textBefore === '/') {
-              setShowSlashMenu(false);
-            }
-          } catch (error) {
-            // 오류 발생 시 안전하게 메뉴 숨기기
-            setShowSlashMenu(false);
-          }
-        }
-      };
-      
-      // 입력 이벤트 핸들러 - 다른 방법으로 내용이 삭제된 경우 처리
-      const handleInput = () => {
-        if (showSlashMenu) {
-          // 현재 선택 범위의 텍스트 확인
-          const { state } = editor.view;
-          const { selection } = state;
-          const { from } = selection;
-          
-          // 슬래시 문자가 있는지 확인 (커서 위치 기준으로 최대 5자 앞까지 확인)
-          const checkFrom = Math.max(0, from - 5);
-          const surroundingText = state.doc.textBetween(checkFrom, from);
-          
-          // 선택 범위 주변에 슬래시가 없으면 메뉴 닫기
-          if (!surroundingText.includes('/')) {
-            setShowSlashMenu(false);
-          }
-        }
-      };
-      
-      // 새 이벤트 리스너 추가 전에 기존 리스너 제거 (중복 방지)
-      editorElement.removeEventListener('keydown', handleKeyDown);
-      editorElement.removeEventListener('input', handleInput);
-      
-      // 이벤트 리스너 추가
-      editorElement.addEventListener('keydown', handleKeyDown);
-      editorElement.addEventListener('input', handleInput);
-      
-      // 컴포넌트 언마운트 시 이벤트 리스너 제거
-      return () => {
-        editorElement.removeEventListener('keydown', handleKeyDown);
-        editorElement.removeEventListener('input', handleInput);
-      };
-    };
-    
-    // 에디터 내용 변경 감지하는 핸들러 추가 (붙여넣기 등 작업 후 호출됨)
-    const onEditorUpdate = () => {
-      // 에디터 업데이트 시 이벤트 리스너 재등록
-      handleDOMEvents();
-    };
-    
-    // 에디터 업데이트 이벤트 구독
-    editor.on('update', onEditorUpdate);
-    
-    // 에디터가 마운트된 후 DOM 이벤트 리스너 설정
-    handleDOMEvents();
-    
-    return () => {
-      // 이벤트 구독 해제
-      editor.off('update', onEditorUpdate);
-      
-      // 에디터의 DOM 요소 가져오기
-      const editorElement = document.querySelector('.ProseMirror');
-      if (editorElement) {
-        // 모든 이벤트 리스너 제거 시도
-        const newEvent = new Event('keydown');
-        const newInputEvent = new Event('input');
-        editorElement.removeEventListener('keydown', () => {});
-        editorElement.removeEventListener('input', () => {});
-      }
-    };
-  }, [editor, showSlashMenu]);
+  // 자동저장 관련 상태는 useDocumentSave 훅으로 이동됨
   
-  // 자동저장 관련 상태 추가
-  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  
-  // 자동저장 디바운스 타이머 ref
-  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // 자동저장 함수
-  const autoSave = useCallback(async () => {
-    if (!editor || !autoSaveEnabled) return;
-    
-    try {
-      setIsSaving(true);
-      setHasUnsavedChanges(false);
-      
-      // 빈 제목은 "제목 없음"으로 설정
-      const documentTitle = title.trim() || "제목 없음";
-      
-      // 에디터 내용 가져오기 (저장 시에는 HTML 형식으로)
-      const content = editor.getHTML();
-      
-      // 프로젝트 ID 확인 또는 기본 프로젝트 획득
-      let finalProjectId = selectedProjectId;
-      
-      if (!finalProjectId) {
-        console.log("프로젝트 ID 검색 중...");
-        
-        // 1. URL에서 직접 확인 (최우선)
-        const urlProjectId = getProjectIdFromUrl();
-        
-        if (urlProjectId) {
-          finalProjectId = urlProjectId;
-          setSelectedProjectId(urlProjectId);
-          console.log("URL에서 프로젝트 ID 가져옴:", finalProjectId);
-        } else {
-          // 2. 기본 프로젝트를 가져오거나 생성
-          try {
-            // 사용자의 프로젝트 목록 가져오기 시도
-            const projectsResponse = await fetch('/api/projects');
-            
-            if (projectsResponse.ok) {
-              const projects = await projectsResponse.json();
-              
-              // 프로젝트가 있으면 첫 번째 프로젝트 ID 사용
-              if (projects && projects.length > 0) {
-                finalProjectId = projects[0].id;
-                setSelectedProjectId(finalProjectId);
-                console.log("기존 프로젝트 ID 사용:", finalProjectId);
-              } else {
-                // 프로젝트가 없으면 새 프로젝트 생성
-                const createResponse = await fetch('/api/projects', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    name: "내 프로젝트",
-                    description: "자동으로 생성된 프로젝트입니다."
-                  })
-                });
-                
-                if (createResponse.ok) {
-                  const newProject = await createResponse.json();
-                  finalProjectId = newProject.id;
-                  setSelectedProjectId(finalProjectId);
-                  console.log("새 프로젝트 생성:", finalProjectId);
-                } else {
-                  throw new Error('프로젝트를 생성할 수 없습니다');
-                }
-              }
-              
-              // URL 업데이트 (페이지 새로고침 없이)
-              if (finalProjectId) {
-                updateUrlWithProjectId(finalProjectId);
-              }
-            } else {
-              throw new Error('프로젝트 목록을 가져올 수 없습니다');
-            }
-          } catch (error) {
-            console.error("프로젝트 ID 획득 실패:", error);
-            setProjectIdWarning(true);
-            throw new Error('프로젝트 ID를 가져올 수 없습니다');
-          }
-        }
-      }
-      
-      // 필수 값 검증
-      if (!finalProjectId) {
-        console.error("프로젝트 ID가 설정되지 않았습니다");
-        setProjectIdWarning(true);
-        throw new Error('프로젝트 ID가 필요합니다');
-      }
-      
-      const isCreatingNew = !savedDocumentId || savedDocumentId === 'new';
-      
-      // Y.js 데이터 추출 및 인코딩
-      let yjsData = null;
-      if (provider) {
-        try {
-          // @ts-ignore - provider.document 타입 문제 무시
-          const yDocState = Y.encodeStateAsUpdate(ydoc);
-          yjsData = Buffer.from(yDocState).toString('base64');
-          console.log("Y.js 데이터 추출 완료:", yjsData.length, "바이트");
-        } catch (error) {
-          console.error("Y.js 데이터 추출 중 오류:", error);
-        }
-      }
-      
-      // 문서 데이터 구성
-      const documentData = {
-        title: documentTitle,
-        content: content,
-        emoji,
-        isStarred,
-        folder,
-        projectId: finalProjectId,
-        tags,
-        folderId,
-        // Y.js 데이터 포함
-        ycontent: yjsData,
-        // 추가 필드: 이 문서가 Y.js를 사용하는지 여부를 표시
-        isCollaborative: true
-      };
-      
-      // API 엔드포인트 설정 (새 문서/기존 문서)
-      const endpoint = isCreatingNew 
-        ? `/api/documents` 
-        : `/api/documents/${savedDocumentId}`;
-      
-      // HTTP 메서드 설정 (새 문서/기존 문서)
-      const method = isCreatingNew ? 'POST' : 'PATCH';
-      
-      // API 호출
-      const response = await fetch(endpoint, {
-        method,
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(documentData)
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: '알 수 없는 오류' }));
-        throw new Error(`자동 저장 실패: ${errorData.message || response.statusText}`);
-      }
-      
-      const responseData = await response.json();
-      
-      // 새 문서 생성 후 ID 저장 및 URL 업데이트
-      if (isCreatingNew && responseData.id) {
-        setSavedDocumentId(responseData.id);
-        setIsNewDocument(false);
-        
-        // URL 업데이트
-        const newUrl = `/documents/${responseData.id}?projectId=${finalProjectId}${
-          folderId ? `&folderId=${folderId}&folderName=${encodeURIComponent(folder)}` : ''
-        }`;
-        window.history.replaceState({}, '', newUrl);
-        
-        // 새 문서가 생성되면 해당 ID로 Y.js 프로바이더 생성
-        initializeProvider(responseData.id);
-      }
-      
-      setLastSaved(new Date());
-      
-    } catch (error) {
-      console.error('자동 저장 중 오류:', error);
-      setSaveSuccess(false);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [title, editor, emoji, isStarred, folder, tags, selectedProjectId, savedDocumentId, folderId, autoSaveEnabled, provider]);
+  // 자동저장 함수는 useDocumentSave 훅으로 이동됨
   
   // URL에서 프로젝트 ID 가져오기 함수
-  const getProjectIdFromUrl = () => {
-    if (typeof window !== 'undefined') {
-      try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlProjectId = urlParams.get('projectId');
-        if (urlProjectId && urlProjectId !== '' && urlProjectId !== 'null') {
-          return urlProjectId;
-        }
-      } catch (e) {
-        console.error("URL에서 projectId 파싱 오류:", e);
-      }
-    }
-    return null;
-  };
-  
-  // URL에 프로젝트 ID 업데이트하는 함수
-  const updateUrlWithProjectId = (projectId: string) => {
-    if (typeof window !== 'undefined') {
-      const currentUrl = new URL(window.location.href);
-      currentUrl.searchParams.set('projectId', projectId);
-      window.history.replaceState({}, '', currentUrl.toString());
-    }
-  };
-  
-  // Y.js 프로바이더 초기화 함수
-  const initializeProvider = (documentId: string) => {
-    // 기존 프로바이더 정리
-    if (provider) {
-      provider.destroy();
-    }
-    
-    // 새 프로바이더 생성
-    const hocuspocusProvider = new HocuspocusProvider({
-      url: process.env.NEXT_PUBLIC_SOCKET_URL || 'ws://localhost:1234',
-      name: documentId,
-      document: ydoc,
-      onConnect: () => {
-        console.log('협업 서버에 연결되었습니다.');
-        // 즉시 사용자 정보 설정
-        hocuspocusProvider.setAwarenessField('user', currentUser);
-        console.log('초기 사용자 정보 설정:', currentUser.name);
-        
-        setTimeout(() => {
-          setContentLoadedFromYjs(true);
-        }, 100);
-      },
-      onDisconnect: () => {
-        console.log('협업 서버와의 연결이 끊어졌습니다.');
-      },
-      onAwarenessUpdate: ({ states }) => {
-        // 접속 중인 사용자 목록 업데이트
-        const users = Array.from(states.entries())
-          .filter(([_, state]) => state.user)
-          .map(([_, state]) => state.user);
-        
-        setConnectedUsers(users);
-        console.log('접속 중인 사용자 목록 업데이트:', users.map(u => u.name).join(', '));
-      },
-      // Y.js 문서 동기화 이벤트
-      onSynced: () => {
-        console.log('Y.js 문서가 서버와 동기화되었습니다.');
-        // 약간의 지연 후 플래그 설정 (에디터 포커스 문제 방지)
-        setTimeout(() => {
-          setContentLoadedFromYjs(true);
-        }, 100);
-      }
-    });
-    
-    // 초기 사용자 정보 설정
-    hocuspocusProvider.setAwarenessField('user', currentUser);
-    
-    setProvider(hocuspocusProvider);
-  };
-  
-  // 현재 사용자 정보 가져오기 - AuthContext 사용
-  useEffect(() => {
-    if (user) {
-      console.log('AuthContext에서 사용자 정보 가져옴:', user);
-      
-      // 사용자 랜덤 색상 생성
-      let idValue = 0;
-      try {
-        // id가 uuid일 경우 간단한 해시값으로 변환
-        idValue = user.id ? 
-          user.id.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0) : 
-          Date.now();
-      } catch (e) {
-        idValue = Date.now();
-      }
-      
-      const userColor = `#${(idValue % 0xffffff).toString(16).padStart(6, '0')}`;
-      
-      setCurrentUser({
-        name: user.name || user.email || '익명 사용자',
-        color: userColor,
-      });
-      
-      console.log('사용자 정보 설정 완료:', user.name || user.email);
-    } else {
-      console.log('로그인된 사용자 정보가 없습니다.');
-      
-      // 사용자 정보가 없을 경우 직접 API 호출 시도
-      const fetchUserDirectly = async () => {
-        try {
-          console.log('API를 통해 사용자 정보 직접 요청...');
-          const response = await fetch('/api/auth/me', {
-            credentials: 'include'
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            console.log('API 응답:', data);
-            
-            if (data.authenticated && data.user) {
-              const userColor = `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`;
-              
-              setCurrentUser({
-                name: data.user.name || data.user.email || '익명 사용자',
-                color: userColor,
-              });
-            }
-          } else {
-            console.warn('사용자 정보 요청 실패:', response.status);
-          }
-        } catch (error) {
-          console.error('사용자 정보 직접 요청 실패:', error);
-        }
-      };
-      
-      fetchUserDirectly();
-    }
-  }, [user]);
 
-  // 문서 ID가 있을 때 협업 프로바이더 설정
-  useEffect(() => {
-    if (!savedDocumentId || savedDocumentId === 'new') return;
-    
-    // 기존 프로바이더 정리
-    if (provider) {
-      provider.destroy();
-    }
-    
-    // 역할 정보를 포함한 사용자 정보 준비
-    const userInfoWithRole = {
-      ...currentUser,
-      projectRole: userProjectRole,
-      isProjectOwner
-    };
-    
-    // 새 프로바이더 생성
-    const hocuspocusProvider = new HocuspocusProvider({
-      url: process.env.NEXT_PUBLIC_SOCKET_URL || 'ws://localhost:1234',
-      name: savedDocumentId,
-      document: ydoc,
-      onConnect: () => {
-        console.log('협업 서버에 연결되었습니다.');
-        // 즉시 사용자 정보 설정
-        hocuspocusProvider.setAwarenessField('user', userInfoWithRole);
-        console.log('문서 ID 변경 시 사용자 정보 설정:', userInfoWithRole);
-        
-        // Y.js에서 데이터가 로드되면 플래그 설정
-        setTimeout(() => {
-          setContentLoadedFromYjs(true);
-        }, 100);
-      },
-      onDisconnect: () => {
-        console.log('협업 서버와의 연결이 끊어졌습니다.');
-      },
-      onAwarenessUpdate: ({ states }) => {
-        // 접속 중인 사용자 목록 업데이트
-        const users = Array.from(states.entries())
-          .filter(([_, state]) => state.user)
-          .map(([_, state]) => state.user);
-        
-        setConnectedUsers(users);
-        console.log('접속 중인 사용자 목록 업데이트:', users.map(u => u.name || '익명').join(', '));
-      },
-      // Y.js 문서 동기화 이벤트
-      onSynced: () => {
-        console.log('Y.js 문서가 서버와 동기화되었습니다.');
-        // 약간의 지연 후 플래그 설정 (에디터 포커스 문제 방지)
-        setTimeout(() => {
-          setContentLoadedFromYjs(true);
-        }, 100);
-      }
-    });
-    
-    // 초기 사용자 정보 설정
-    hocuspocusProvider.setAwarenessField('user', userInfoWithRole);
-    
-    setProvider(hocuspocusProvider);
-    
-    return () => {
-      hocuspocusProvider.destroy();
-    };
-  }, [savedDocumentId, ydoc, currentUser, userProjectRole, isProjectOwner]);
+  
+
+  
+
+
+
   
   // 프로바이더 변경 시 에디터 업데이트
   useEffect(() => {
@@ -1973,191 +511,17 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
       }
     } else {
       try {
-        // 확장이 없으면 에디터에 추가
-        editor.extensionManager.extensions.push(
-          CustomCollaborationCursor.configure({
-            provider: provider,
-            user: userInfoWithRole,
-            render: user => {
-              const cursor = document.createElement('span');
-              cursor.classList.add('collaboration-cursor');
-              
-              // 절대 위치 스타일을 직접 설정 (transform 속성 제거)
-              cursor.style.position = 'absolute';
-              cursor.style.pointerEvents = 'none';
-              cursor.style.zIndex = '10';
-              cursor.style.borderLeft = `2px solid ${user.color}`;
-              cursor.style.height = '1.5em';
-              cursor.style.width = '0'; // 0 너비 설정
-              
-              const label = document.createElement('div');
-              label.classList.add('collaboration-cursor-label');
-              label.style.position = 'absolute';
-              label.style.top = '-1.4em';
-              label.style.left = '-3px'; // 위치 조정
-              label.style.backgroundColor = user.color;
-              label.style.color = 'white';
-              label.style.padding = '0.1rem 0.3rem';
-              label.style.borderRadius = '3px';
-              label.style.fontSize = '0.7rem';
-              label.style.whiteSpace = 'nowrap';
-              label.style.pointerEvents = 'none';
-              
-              // 이름 표시 (역할 정보 추가)
-              const userLabel = user.name || '익명';
-              const roleLabel = user.isProjectOwner ? ' (소유자)' : 
-                                (user.projectRole ? ` (${user.projectRole})` : '');
-              label.textContent = userLabel + roleLabel;
-              
-              cursor.appendChild(label);
-              return cursor;
-            },
-          })
-        );
-        console.log('새 협업 커서 추가 완료:', userInfoWithRole);
+        // 협업 커서 설정은 useDocumentEditor 훅으로 이동됨
+        console.log('협업 커서 설정 완료:', userInfoWithRole);
       } catch (err) {
-        console.error('협업 커서 추가 실패:', err);
+        console.error('협업 커서 설정 실패:', err);
       }
     }
   }, [editor, provider, currentUser, userProjectRole, isProjectOwner]);
   
   // 문서 저장
-  const saveDocument = async () => {
-    try {
-      setIsSaving(true);
-      setSaveSuccess(false);
-      
-      // 빈 제목은 "제목 없음"으로 설정
-      const documentTitle = title.trim() || "제목 없음";
-      
-      // 에디터 내용 가져오기
-      const content = editor ? editor.getHTML() : '';
-      
-      // 프로젝트 ID 확인 - 여러 소스에서 확인
-      let finalProjectId = selectedProjectId;
-      
-      // 1. URL에서 직접 확인 (최우선)
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlProjectId = urlParams.get('projectId');
-      
-      if (urlProjectId && urlProjectId !== '' && urlProjectId !== 'null') {
-        finalProjectId = urlProjectId;
-      }
-      
-      // 2. 디버깅 참조 객체에서 확인 (백업)
-      if (!finalProjectId && debugRef.current.projectIdParam) {
-        finalProjectId = debugRef.current.projectIdParam;
-      }
-      
-      // 프로젝트 ID 필수 체크
-      if (!finalProjectId) {
-        alert("프로젝트 ID가 필요합니다. 문서를 저장할 수 없습니다.");
-        setIsSaving(false);
-        return;
-      }
-      
-      // API 요청 데이터 구성
-      const documentData = {
-        title: documentTitle,
-        content,
-        emoji,
-        isStarred,
-        isReadOnly: isReadOnlyMode,
-        folder,
-        tags,
-        projectId: finalProjectId,
-        folderId
-      };
-      
-      // 저장된 문서가 있으면 업데이트, 없으면 새로 생성
-      const isCreatingNew = !savedDocumentId;
-      const endpoint = isCreatingNew ? '/api/documents' : `/api/documents/${savedDocumentId}`;
-      const method = isCreatingNew ? 'POST' : 'PATCH';
-      
-      const response = await fetch(endpoint, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(documentData)
-      });
-      
-      // 응답이 OK가 아닌 경우 에러 텍스트 확인
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`서버 응답 오류 (${response.status}): ${errorText}`);
-      }
-      
-      const responseData = await response.json();
-      
-      // 새 문서 생성 후 ID 저장
-      if (isCreatingNew && responseData.id) {
-        setSavedDocumentId(responseData.id);
-        setIsNewDocument(false);
-        
-        // URL 업데이트
-        const newUrl = `/documents/${responseData.id}?projectId=${finalProjectId}`;
-        window.history.replaceState({}, '', newUrl);
-      }
-      
-      setSaveSuccess(true);
-      
-    } catch (error) {
-      alert(error instanceof Error ? error.message : '문서 저장 중 오류가 발생했습니다.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-  
-  // 프로젝트 정보 가져오기 함수
-  const fetchProjectInfo = async (projectId: string) => {
-    try {
-      const response = await fetch(`/api/projects/${projectId}`);
-      if (response.ok) {
-        const projectData = await response.json();
-        setProjectName(projectData.name);
-        
-        // 프로젝트 소유자 확인
-        if (user && projectData.userId === user.id) {
-          setIsProjectOwner(true);
-          setUserProjectRole('owner');
-          console.log('사용자는 이 프로젝트의 소유자입니다.');
-        } else {
-          setIsProjectOwner(false);
-          
-          // 멤버인 경우 역할 확인
-          if (user && projectData.members) {
-            const currentUserMember = projectData.members.find(
-              (member: any) => member.userId === user.id && member.inviteStatus === "accepted"
-            );
-            
-            if (currentUserMember) {
-              setUserProjectRole(currentUserMember.role);
-              console.log(`사용자 역할: ${currentUserMember.role}`);
-            } else {
-              setUserProjectRole(null);
-              console.log('사용자는 이 프로젝트의 멤버가 아닙니다.');
-            }
-          } else {
-            setUserProjectRole(null);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('프로젝트 정보를 가져오는데 실패했습니다:', error);
-      setUserProjectRole(null);
-      setIsProjectOwner(false);
-    }
-  };
+  // saveDocument 함수는 useDocumentSave 훅으로 이동됨
 
-  // 프로젝트 ID가 변경될 때마다 프로젝트 정보 가져오기
-  useEffect(() => {
-    if (selectedProjectId) {
-      fetchProjectInfo(selectedProjectId);
-    } else {
-      // 프로젝트 ID가 없는 경우 역할 초기화
-      setUserProjectRole(null);
-      setIsProjectOwner(false);
-    }
-  }, [selectedProjectId, user]);
   
   // 폴더 목록 가져오기
   const fetchFolders = async () => {
@@ -2283,20 +647,20 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
 
   // 컨텐츠 변경 감지 및 자동저장 트리거
   useEffect(() => {
-    if (!editor || !autoSaveEnabled) return;
+    if (!editor) return;
     
     const handleUpdate = () => {
-      setHasUnsavedChanges(true);
-      
-      // 이전 타이머 제거
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-      }
-      
-      // 타이핑할 때마다 2초 후 자동저장
-      autoSaveTimerRef.current = setTimeout(() => {
-        autoSave();
-      }, 2000); // 2초 지연
+              setHasUnsavedChanges(true);
+        
+        // 이전 타이머 제거
+        if (autoSaveTimerRef.current) {
+          clearTimeout(autoSaveTimerRef.current);
+        }
+        
+        // 타이핑할 때마다 2초 후 자동저장
+        autoSaveTimerRef.current = setTimeout(() => {
+          autoSave();
+        }, 2000); // 2초 지연
     };
     
     editor.on('update', handleUpdate);
@@ -2468,15 +832,15 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
     };
   }, [editor]);
 
-  // 읽기 전용 모드 토글 함수
-  const toggleReadOnlyMode = () => {
+  // 커스텀 읽기 전용 모드 토글 함수 (디바운싱 및 저장 포함)
+  const customToggleReadOnlyMode = () => {
     if (isButtonDebouncing) return;
     
     // 디바운싱 상태 활성화
     setIsButtonDebouncing(true);
     
-    // 읽기 전용 모드 토글
-    setIsReadOnlyMode(prev => !prev);
+    // 협업 훅의 토글 함수 호출
+    toggleReadOnlyMode();
     
     // 1초 후 디바운싱 상태 비활성화
     setTimeout(() => {
@@ -2510,25 +874,9 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
     }
   };
 
-  const [documentData, setDocumentData] = useState<Document>({
-    id: params.id,
-    title: '',
-    emoji: '📄',
-    isStarred: false,
-    folder: 'Root',
-    folderId: null,
-    tags: [],
-    content: '',
-    projectId: '',
-  });
-
   const [showSecurityMenu, setShowSecurityMenu] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [isPasswordProtected, setIsPasswordProtected] = useState(false);
-  const [documentPassword, setDocumentPassword] = useState<string | null>(null);
   const [isPasswordSaving, setIsPasswordSaving] = useState(false);
-  const [isPasswordVerified, setIsPasswordVerified] = useState(false);
-  const [needsPasswordVerification, setNeedsPasswordVerification] = useState(false);
   
   // 드롭다운 메뉴 토글 함수
   const toggleSecurityMenu = (e: React.MouseEvent) => {
@@ -2645,248 +993,13 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
   
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-[#1f1f21]">
-      {/* 사이드바 */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 border-r border-gray-200 bg-white dark:bg-[#2a2a2c] dark:border-gray-700 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
-          mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } md:relative md:flex-shrink-0 flex flex-col`}
-      >
-        <div className="flex items-center justify-between h-16 px-4">
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-black dark:bg-blue-600 rounded-lg flex items-center justify-center mr-2">
-              <span className="text-white font-bold text-lg">C</span>
-            </div>
-            <span className="text-xl font-semibold text-gray-900 dark:text-gray-100">Colla</span>
-          </div>
-          <button
-            className="md:hidden"
-            onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-          >
-            <XIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
-          </button>
-        </div>
-        
-        <nav className="flex-grow px-4 py-4 space-y-2 overflow-y-auto">
-          <SidebarLink
-            icon={<SearchIcon className="w-5 h-5" />}
-            text="검색"
-            href="#" 
-            theme={theme}
-            onClick={(e) => { e.preventDefault(); alert('검색 기능 구현 예정'); }}
-          />
-          <SidebarLink
-            icon={<LayoutDashboardIcon className="w-5 h-5" />}
-            text="대시보드"
-            href="/"
-            active={pathname === "/"}
-            theme={theme}
-          />
-          
-          <div className="pt-4">
-            <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              프로젝트
-            </h3>
-            <nav className="mt-2 space-y-1">
-              {projects.map((project) => (
-                <SidebarLink
-                  key={project.id}
-                  icon={<FolderIcon className="w-5 h-5" />}
-                  text={project.name}
-                  href={`/documents/${params.id}?projectId=${project.id}`}
-                  small
-                  active={projectId === project.id}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setCurrentProject(project);
-                    forceSetProjectId(project.id);
-                  }}
-                  theme={theme}
-                  isProject={true}
-                />
-              ))}
-              <SidebarLink
-                icon={<PlusIcon className="w-5 h-5" />}
-                text="새 프로젝트"
-                href="/projects/new"
-                active={pathname === "/projects/new"}
-                theme={theme}
-                small
-                onClick={() => router.push("/projects/new")}
-              />
-            </nav>
-          </div>
-
-          <div className="pt-4">
-            <h3 className="px-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              내 작업 공간
-            </h3>
-            <div className="mt-2 space-y-1">
-              <SidebarLink
-                icon={<Trello className="w-5 h-5" />}
-                text="칸반보드"
-                href={currentProject ? `/kanban?projectId=${currentProject.id}` : "/kanban"}
-                active={pathname?.startsWith("/kanban")}
-                theme={theme}
-                small
-              />
-              <SidebarLink
-                icon={<CalendarIcon className="w-5 h-5" />}
-                text="캘린더"
-                href={currentProject ? `/calendar?projectId=${currentProject.id}` : "/calendar"}
-                active={pathname?.startsWith("/calendar")}
-                theme={theme}
-                small
-              />
-              
-              {/* 문서 섹션 */}
-              <div>
-                <button
-                  onClick={() => setIsDocumentsSubmenuOpen(!isDocumentsSubmenuOpen)}
-                  className={`flex items-center justify-between w-full px-2 py-1.5 text-sm rounded-md transition-colors duration-150 ${
-                    theme === 'dark'
-                      ? pathname?.startsWith("/documents")
-                        ? "bg-blue-900 bg-opacity-30 text-gray-300 hover:bg-gray-700 hover:text-gray-100"
-                        : "text-gray-300 hover:bg-gray-700 hover:text-gray-100"
-                      : pathname?.startsWith("/documents")
-                        ? "bg-blue-100 bg-opacity-50 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                        : "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                      <FileTextIcon className="w-5 h-5" />
-                    </div>
-                    <span>문서</span>
-                  </div>
-                  <ChevronRightIcon 
-                    className={`w-4 h-4 transition-transform duration-200 ${
-                      isDocumentsSubmenuOpen ? 'transform rotate-90' : ''
-                    } ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}
-                  />
-                </button>
-                
-                {isDocumentsSubmenuOpen && (
-                  <div className="ml-4 mt-1 space-y-1">
-                    <SidebarLink
-                      icon={<FileTextIcon className="w-4 h-4" />}
-                      text="모든 문서"
-                      href={projectId ? `/documents?projectId=${projectId}` : "/documents"}
-                      active={pathname === "/documents"}
-                      theme={theme}
-                      small
-                    />
-                    
-                    {/* 폴더 목록 */}
-                    {availableFolders.map((folder) => (
-                      <SidebarLink
-                        key={folder.id}
-                        icon={<FolderIcon className="w-4 h-4" />}
-                        text={folder.name}
-                        href={projectId ? `/documents?projectId=${projectId}&folderId=${folder.id}` : `/documents?folderId=${folder.id}`}
-                        active={false}
-                        theme={theme}
-                        small
-                        badgeCount={folder.count}
-                      />
-                    ))}
-                    
-                    {/* 새 폴더 만들기 */}
-                    <button
-                      onClick={() => setShowFolderModal(true)}
-                      className={`flex items-center w-full px-2 py-1.5 text-sm rounded-md transition-colors duration-150 ${
-                        theme === 'dark'
-                          ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200"
-                          : "text-gray-500 hover:bg-gray-200 hover:text-gray-700"
-                      }`}
-                    >
-                      <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                        <PlusIcon className="w-4 h-4" />
-                      </div>
-                      <span>새 폴더</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-              
-              <SidebarLink 
-                icon={<UsersIcon className="w-5 h-5"/>} 
-                text="팀원 관리" 
-                href={currentProject ? `/projects/${currentProject.id}/members` : "/projects"}
-                active={pathname?.includes("/projects") && pathname?.includes("/members")}
-                theme={theme}
-                small 
-              />
-              <SidebarLink
-                icon={<VideoIcon className="w-5 h-5" />}
-                text="화상 회의"
-                href="/meeting"
-                active={pathname?.startsWith("/meeting")}
-                theme={theme}
-                small
-              />
-              <SidebarLink
-                icon={<BarChart3Icon className="w-5 h-5" />}
-                text="보고서"
-                href="/reports"
-                active={pathname?.startsWith("/reports")}
-                theme={theme}
-                small
-              />
-            </div>
-          </div>
-        </nav>
-
-        <div className="p-4">
-          <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center flex-1 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
-                  <UserIcon className="w-6 h-6 mr-3 rounded-full bg-gray-200 dark:bg-gray-600 p-0.5 text-gray-700 dark:text-gray-300" />
-                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user?.name || user?.email || '사용자'}</span>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" sideOffset={5}>
-                <DropdownMenuLabel className="px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400">
-                  {user?.email}
-                </DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => router.push('/mypage')} className="cursor-pointer">
-                  <UserIcon className="w-4 h-4 mr-2" />
-                  <span>정보 수정</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer">
-                  <SettingsIcon className="w-4 h-4 mr-2" />
-                  <span>설정</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
-                  {theme === 'dark' ? <SunIcon className="w-4 h-4 mr-2" /> : <MoonIcon className="w-4 h-4 mr-2" />}
-                  <span>{theme === 'dark' ? "라이트 모드" : "다크 모드"}</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/50 focus:text-red-600 dark:focus:text-red-400">
-                  <LogOutIcon className="w-4 h-4 mr-2" />
-                  <span>로그아웃</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            
-            {/* 알림 버튼 */}
-            <button 
-              onClick={() => alert('알림 기능은 대시보드에서 확인해주세요.')}
-              className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none outline-none transition-colors"
-              title="알림"
-            >
-              <BellIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* 모바일 사이드바 오버레이 */}
-      {mobileSidebarOpen && (
-        <div
-          className="fixed inset-0 z-20 bg-black bg-opacity-50 md:hidden"
-          onClick={() => setMobileSidebarOpen(false)}
-        />
-      )}
+      {/* 통합 사이드바 */}
+      <Sidebar
+        mobileSidebarOpen={mobileSidebarOpen}
+        setMobileSidebarOpen={setMobileSidebarOpen}
+        currentPage="documents"
+        onSettingsClick={openSettingsModal}
+      />
 
             {/* 메인 콘텐츠 영역 */}
       <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#2a2a2c]">
@@ -3739,6 +1852,159 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
         isLoading={isPasswordSaving}
       />
       
+      {/* 설정 모달 */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="rounded-lg shadow-xl bg-card text-card-foreground">
+              {/* 헤더 */}
+              <div className="flex items-center justify-between p-6 border-b border-border">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mr-4">
+                    <SettingsIcon className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">설정</h3>
+                    <p className="text-sm text-muted-foreground">애플리케이션 설정을 관리합니다</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowSettingsModal(false)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <XIcon className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* 설정 내용 */}
+              <div className="p-6 space-y-6">
+                {/* 외관 설정 */}
+                <div>
+                  <h4 className="text-sm font-medium text-foreground mb-4">외관</h4>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-foreground">테마</label>
+                      <div className="mt-2 flex space-x-3">
+                        <button
+                          onClick={() => setTempSettings(prev => ({ ...prev, theme: 'light' }))}
+                          className={`px-3 py-2 rounded-md text-sm ${
+                            tempSettings.theme === 'light'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          }`}
+                        >
+                          라이트
+                        </button>
+                        <button
+                          onClick={() => setTempSettings(prev => ({ ...prev, theme: 'dark' }))}
+                          className={`px-3 py-2 rounded-md text-sm ${
+                            tempSettings.theme === 'dark'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          }`}
+                        >
+                          다크
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 알림 설정 */}
+                <div>
+                  <h4 className="text-sm font-medium text-foreground mb-4">알림</h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm text-foreground">이메일 알림</label>
+                      <input
+                        type="checkbox"
+                        checked={tempSettings.notifications.email}
+                        onChange={(e) => setTempSettings(prev => ({
+                          ...prev,
+                          notifications: { ...prev.notifications, email: e.target.checked }
+                        }))}
+                        className="rounded"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm text-foreground">푸시 알림</label>
+                      <input
+                        type="checkbox"
+                        checked={tempSettings.notifications.push}
+                        onChange={(e) => setTempSettings(prev => ({
+                          ...prev,
+                          notifications: { ...prev.notifications, push: e.target.checked }
+                        }))}
+                        className="rounded"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm text-foreground">데스크톱 알림</label>
+                      <input
+                        type="checkbox"
+                        checked={tempSettings.notifications.desktop}
+                        onChange={(e) => setTempSettings(prev => ({
+                          ...prev,
+                          notifications: { ...prev.notifications, desktop: e.target.checked }
+                        }))}
+                        className="rounded"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 개인정보 설정 */}
+                <div>
+                  <h4 className="text-sm font-medium text-foreground mb-4">개인정보</h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm text-foreground">프로필 공개</label>
+                      <input
+                        type="checkbox"
+                        checked={tempSettings.privacy.profileVisible}
+                        onChange={(e) => setTempSettings(prev => ({
+                          ...prev,
+                          privacy: { ...prev.privacy, profileVisible: e.target.checked }
+                        }))}
+                        className="rounded"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm text-foreground">활동 공개</label>
+                      <input
+                        type="checkbox"
+                        checked={tempSettings.privacy.activityVisible}
+                        onChange={(e) => setTempSettings(prev => ({
+                          ...prev,
+                          privacy: { ...prev.privacy, activityVisible: e.target.checked }
+                        }))}
+                        className="rounded"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 푸터 */}
+              <div className="flex justify-end space-x-3 p-6 border-t border-border">
+                <button
+                  onClick={() => setShowSettingsModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleSaveSettings}
+                  className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors"
+                >
+                  저장
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* 폴더 생성 모달 */}
       {showFolderModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
@@ -3798,7 +2064,7 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
                     <>
                       <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                       생성 중...
                     </>
