@@ -58,6 +58,9 @@ import {
 } from "@/hooks/documents";
 import { SummaryModal, TemplateModal, PasswordModal } from "@/components/modals";
 
+// 문서 에디터 CSS 스타일 import
+import "@/styles/documents/index.css";
+
 // shadcn/ui DropdownMenu 컴포넌트 임포트
 import {
   DropdownMenu,
@@ -100,16 +103,6 @@ interface Document {
   content: string;
   projectId?: string;
 }
-
-// SummaryModal 컴포넌트는 별도 파일로 분리됨
-
-
-
-// TemplateModal 컴포넌트는 별도 파일로 분리됨
-
-// PasswordModal 컴포넌트는 별도 파일로 분리됨
-
-
 
 // 편의를 위한 간단한 토스트 함수
 const showToast = (title: string, description: string, status: 'success' | 'error' | 'info' | 'warning') => {
@@ -405,9 +398,6 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
     initializeProvider
   });
   
-
-
-  
   // 바깥 영역 클릭 감지 이벤트
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -448,32 +438,7 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
     setMenuPosition({ x: rect.left, y: rect.bottom });
     setShowMenu(true);
   };
-  
-  // 블록 타입 변경 함수
-  // applyBlockType 함수는 useDocumentEditor 훅으로 이동됨
-  
-  // 문서 요약 함수
-  // summarizeDocument 함수는 useDocumentEditor 훅으로 이동됨
-  
-  // createDocumentTemplate, showTemplates 함수는 useDocumentEditor 훅으로 이동됨
-  
-  // 키보드 단축키 핸들러는 useDocumentEditor 훅으로 이동됨
-  
-  // 슬래시 키 입력 감지는 useDocumentEditor 훅으로 이동됨
-  
-  // 자동저장 관련 상태는 useDocumentSave 훅으로 이동됨
-  
-  // 자동저장 함수는 useDocumentSave 훅으로 이동됨
-  
-  // URL에서 프로젝트 ID 가져오기 함수
 
-  
-
-  
-
-
-
-  
   // 프로바이더 변경 시 에디터 업데이트
   useEffect(() => {
     if (!editor || !provider) return;
@@ -1195,65 +1160,7 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
                 </div>
               </div>
             )}
-            
-            {/* <div className="relative">
-              <button
-                onClick={() => setShowFolderDropdown(!showFolderDropdown)}
-                  className="flex items-center bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 text-sm text-gray-700 dark:text-gray-300"
-                disabled={isLoading}
-              >
-                  <FolderIcon className="w-4 h-4 mr-1 text-gray-500 dark:text-gray-400" />
-                <span className="truncate max-w-[150px]">{folder || '기본 폴더'}</span>
-                <span className="ml-1">
-                    <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                </span>
-              </button>
-              
-              {showFolderDropdown && (
-                  <div className="absolute left-0 mt-1 w-64 bg-white dark:bg-[#2a2a2c] shadow-lg rounded-xl z-10 border border-gray-200 dark:border-gray-700">
-                    <div className="py-2 px-3">
-                      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">폴더 선택</div>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="새 폴더 이름..."
-                        value={newFolderName}
-                        onChange={(e) => setNewFolderName(e.target.value)}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                      />
-                      <button
-                        onClick={() => createNewFolder(newFolderName)}
-                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                      >
-                        <PlusIcon className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div className="max-h-60 overflow-y-auto py-1">
-                    {availableFolders.length > 0 ? (
-                      availableFolders.map((f) => (
-                        <button
-                          key={f.id}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between ${f.id === folderId ? 'bg-gray-50 dark:bg-gray-700 font-medium text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}
-                          onClick={() => handleFolderChange({ id: f.id, name: f.name })}
-                        >
-                          <div className="flex items-center">
-                              <FolderIcon className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
-                            <span className="truncate">{f.name}</span>
-                          </div>
-                          {f.id === folderId && (
-                              <CheckIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                          )}
-                        </button>
-                      ))
-                    ) : (
-                        <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">폴더가 없습니다</div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div> */}
+
             
           </div>
         </div>
@@ -1299,9 +1206,7 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
           </div>
         </div>
       )}
-      
 
-      
       {isReadOnlyMode && (
             <div className="fixed top-16 left-1/2 transform -translate-x-1/2 bg-blue-50 dark:bg-blue-900 border-l-4 border-blue-500 dark:border-blue-400 p-4 rounded-lg shadow-md z-50">
           <div className="flex">
@@ -1360,282 +1265,7 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
             </div>
           )}
           
-          {/* 공통 CSS 스타일 */}
-          <style jsx global>{`
-            .ProseMirror {
-              position: relative; /* 필수: 모든 absolute 포지션의 기준점 */
-              outline: none;
-              min-height: 100px;
-              padding: 0.5rem 0;
-              font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-              font-size: 1rem;
-              line-height: 1.6;
-              color: #374151;
-            }
-            
-            .dark .ProseMirror {
-              color: #d1d5db;
-            }
-            
-            /* 협업 커서 스타일 수정 */
-            .collaboration-cursor {
-              position: absolute !important;
-              border-left: 2px solid;
-              pointer-events: none;
-              height: 1.5em;
-              width: 0 !important;
-              z-index: 10 !important;
-            }
-            
-            /* 커서 레이블 스타일 수정 */
-            .collaboration-cursor-label {
-              position: absolute !important;
-              top: -1.4em;
-              left: -3px;
-              z-index: 11 !important;
-              white-space: nowrap;
-              pointer-events: none;
-            }
-            
-            /* 텍스트 줄 높이 일관성 유지 */
-            .ProseMirror p {
-              min-height: 1.5em;
-              line-height: 1.5;
-              position: relative;
-              margin: 0.5em 0;
-            }
-            
-            .ProseMirror p.is-editor-empty:first-child::before {
-              content: attr(data-placeholder);
-              float: left;
-              color: #9ca3af;
-              pointer-events: none;
-              height: 0;
-              font-style: italic;
-            }
-            
-            .dark .ProseMirror p.is-editor-empty:first-child::before {
-              color: #6b7280;
-            }
-            
-            /* 빈 줄과 협업 커서 사이의 간격 조정 */
-            .ProseMirror p:empty {
-              margin-top: 0;
-              margin-bottom: 0;
-              padding: 0;
-              min-height: 0;
-              height: 1.5em;
-              line-height: 1.5em;
-            }
-            
-            /* 협업 커서가 포함된 요소의 공백 처리 */
-            .ProseMirror p:has(.collaboration-cursor) {
-              margin-bottom: 0.5em;
-              margin-top: 0;
-            }
-            
-            /* 문단 간격 일관성 유지 */
-            .ProseMirror * + p {
-              margin-top: 0;
-            }
-            
-            .ProseMirror h1 {
-              font-size: 1.875rem;
-              font-weight: 700;
-              margin: 1.5em 0 0.5em;
-              padding-bottom: 0.3em;
-              color: #111827;
-            }
-            
-            .dark .ProseMirror h1 {
-              color: #f9fafb;
-            }
-            
-            .ProseMirror h2 {
-              font-size: 1.5rem;
-              font-weight: 600;
-              margin: 1.2em 0 0.5em;
-              padding-bottom: 0.2em;
-              color: #111827;
-            }
-            
-            .dark .ProseMirror h2 {
-              color: #f3f4f6;
-            }
-            
-            .ProseMirror h3 {
-              font-size: 1.25rem;
-              font-weight: 600;
-              margin: 1em 0 0.5em;
-              color: #111827;
-            }
-            
-            .dark .ProseMirror h3 {
-              color: #e5e7eb;
-            }
-            
-            .ProseMirror ul, .ProseMirror ol {
-              padding-left: 1.5em;
-              margin-bottom: 0.75em;
-            }
-            
-            .ProseMirror li p {
-              margin: 0.3em 0;
-            }
-            
-            .ProseMirror blockquote {
-              border-left: 3px solid #e5e7eb;
-              padding-left: 1em;
-              font-style: italic;
-              color: #4b5563;
-              margin: 1em 0;
-              background-color: #f9fafb;
-              padding: 0.5em 1em;
-              border-radius: 0 0.25em 0.25em 0;
-            }
-            
-            .dark .ProseMirror blockquote {
-              border-left-color: #4b5563;
-              color: #9ca3af;
-              background-color: #374151;
-            }
-            
-            .ProseMirror pre {
-              background-color: #f3f4f6;
-              padding: 1em;
-              border-radius: 0.375em;
-              overflow-x: auto;
-              margin: 1em 0;
-              font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-              font-size: 0.875em;
-            }
-            
-            .dark .ProseMirror pre {
-              background-color: #374151;
-              color: #d1d5db;
-            }
-            
-            .ProseMirror code {
-              font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-              font-size: 0.875em;
-              background-color: #f3f4f6;
-              padding: 0.2em 0.4em;
-              border-radius: 0.25em;
-            }
-            
-            .dark .ProseMirror code {
-              background-color: #374151;
-              color: #d1d5db;
-            }
-            
-            .ProseMirror hr {
-              border: none;
-              border-top: 1px solid #e5e7eb;
-              margin: 2em 0;
-            }
-            
-            .ProseMirror img {
-              max-width: 100%;
-              height: auto;
-              border-radius: 0.375em;
-              margin: 1em 0;
-            }
-            
-            .ProseMirror a {
-              color: #2563eb;
-              text-decoration: underline;
-              text-decoration-thickness: 1px;
-              text-underline-offset: 0.2em;
-            }
-            
-            /* 할 일 목록 스타일 */
-            .ProseMirror ul[data-type="taskList"] {
-              list-style: none;
-              padding: 0;
-            }
-            
-            .ProseMirror ul[data-type="taskList"] li {
-              display: flex;
-              align-items: flex-start;
-              margin-bottom: 0.5em;
-            }
-            
-            .ProseMirror ul[data-type="taskList"] li > label {
-              margin-right: 0.5em;
-              user-select: none;
-            }
-            
-            .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
-              cursor: pointer;
-              width: 1em;
-              height: 1em;
-              margin-right: 0.5em;
-              border-radius: 0.25em;
-              border: 1px solid #d1d5db;
-            }
-            
-            .ProseMirror ul[data-type="taskList"] li > div {
-              flex: 1;
-            }
-            
-            .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
-              text-decoration: line-through;
-              color: #9ca3af;
-            }
-            
-            /* 선택된 텍스트 스타일 */
-            .ProseMirror .selection {
-              background-color: rgba(35, 131, 226, 0.14);
-            }
-            
-            .ProseMirror:focus {
-              outline: none;
-            }
-            
-            /* ProseMirror 관련 문제 해결 */
-            .ProseMirror-separator {
-              display: none !important;
-              visibility: hidden !important;
-              height: 0 !important;
-              width: 0 !important;
-              padding: 0 !important;
-              margin: 0 !important;
-            }
-            
-            .ProseMirror-trailingBreak {
-              display: none !important;
-              visibility: hidden !important;
-              height: 0 !important;
-              width: 0 !important;
-              padding: 0 !important;
-              margin: 0 !important;
-            }
-            
-            /* 협업 커서 관련 스타일 추가 수정 */
-            .collaboration-cursor {
-              position: absolute !important;
-              pointer-events: none !important;
-              z-index: 1000 !important;
-              height: 1.2em !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              border-left: 2px solid;
-              width: 0 !important;
-              contain: layout style paint !important;
-            }
-            
-            .collaboration-cursor-label {
-              position: absolute !important;
-              top: -1.4em !important;
-              left: -3px !important;
-              border-radius: 3px !important;
-              padding: 0 0.2em !important;
-              pointer-events: none !important;
-              white-space: nowrap !important;
-              font-size: 10px !important;
-              z-index: 1001 !important;
-            }
-          `}</style>
+
           
           {/* 선택 텍스트에 대한 버블 메뉴 */}
           {editor && (

@@ -751,8 +751,17 @@ const Sidebar = memo(function Sidebar({
                     
                     {/* 폴더 목록 */}
                     {folders.map((folder) => (
-                      <button
+                      <div
                         key={folder.id}
+                        className={`group flex items-center justify-between w-full px-2 py-1.5 text-sm rounded-md transition-colors duration-150 cursor-pointer ${
+                          selectedFolder === folder.name
+                            ? theme === 'dark'
+                              ? "bg-blue-900 bg-opacity-30 text-gray-300"
+                              : "bg-blue-100 bg-opacity-50 text-gray-600"
+                            : theme === 'dark'
+                              ? "text-gray-300 hover:bg-gray-700 hover:text-gray-100"
+                              : "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                        }`}
                         onClick={() => {
                           if (onFolderSelect) {
                             onFolderSelect(folder.id, folder.name);
@@ -767,15 +776,6 @@ const Sidebar = memo(function Sidebar({
                             window.dispatchEvent(new PopStateEvent('popstate'));
                           }
                         }}
-                        className={`group flex items-center justify-between w-full px-2 py-1.5 text-sm rounded-md transition-colors duration-150 outline-none focus:outline-none ${
-                          selectedFolder === folder.name
-                            ? theme === 'dark'
-                              ? "bg-blue-900 bg-opacity-30 text-gray-300"
-                              : "bg-blue-100 bg-opacity-50 text-gray-600"
-                            : theme === 'dark'
-                              ? "text-gray-300 hover:bg-gray-700 hover:text-gray-100"
-                              : "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                        }`}
                       >
                         <div className="flex items-center">
                           <div className={`mr-2.5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
@@ -789,20 +789,31 @@ const Sidebar = memo(function Sidebar({
                               {folder.count}
                             </span>
                           )}
-                          <button
+                          <span
                             onClick={(e) => {
                               e.stopPropagation();
                               setFolderIdToDelete(folder.id);
                               setFolderToDelete(folder.name);
                               setShowDeleteFolderModal(true);
                             }}
-                            className={`p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 outline-none focus:outline-none`}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setFolderIdToDelete(folder.id);
+                                setFolderToDelete(folder.name);
+                                setShowDeleteFolderModal(true);
+                              }
+                            }}
+                            className={`p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer select-none`}
                             title="폴더 삭제"
                           >
                             <Trash2Icon className="w-3 h-3" />
-                          </button>
+                          </span>
                         </div>
-                      </button>
+                      </div>
                     ))}
                     
                     {/* 새 폴더 만들기 */}
@@ -1018,21 +1029,47 @@ const Sidebar = memo(function Sidebar({
                         
                         {/* 초대 알림인 경우 수락/거절 버튼 표시 */}
                         {notification.type === "invitation" && notification.projectId && (
-                          <div className="flex space-x-2 mt-3" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              onClick={(e) => acceptInvitation(notification.id, notification.projectId!, e)}
-                              disabled={processingInvitation === notification.id}
-                              className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                          <div className="flex space-x-2 mt-3">
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                acceptInvitation(notification.id, notification.projectId!, e);
+                              }}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  acceptInvitation(notification.id, notification.projectId!, e as any);
+                                }
+                              }}
+                              className={`px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors cursor-pointer select-none ${
+                                processingInvitation === notification.id ? 'opacity-50 cursor-not-allowed' : ''
+                              }`}
                             >
                               {processingInvitation === notification.id ? "처리중..." : "수락"}
-                            </button>
-                            <button
-                              onClick={(e) => rejectInvitation(notification.id, notification.projectId!, e)}
-                              disabled={processingInvitation === notification.id}
-                              className="px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
+                            </span>
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                rejectInvitation(notification.id, notification.projectId!, e);
+                              }}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  rejectInvitation(notification.id, notification.projectId!, e as any);
+                                }
+                              }}
+                              className={`px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors cursor-pointer select-none ${
+                                processingInvitation === notification.id ? 'opacity-50 cursor-not-allowed' : ''
+                              }`}
                             >
                               거절
-                            </button>
+                            </span>
                           </div>
                         )}
                         
