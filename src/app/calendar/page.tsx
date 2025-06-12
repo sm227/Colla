@@ -1400,44 +1400,55 @@ const CalendarPageContent: React.FC = () => {
                                   return a.endMinute - b.endMinute;
                                 });
                                 
-                                // 겹침 처리 알고리즘
+                                // 겹침 처리 알고리즘 - 그룹별로 처리
                                 const finalEvents: Array<any> = [];
+                                const processedEvents = new Set();
                                 
                                 for (let i = 0; i < sortedEvents.length; i++) {
+                                  if (processedEvents.has(i)) continue;
+                                  
                                   const currentEvent = sortedEvents[i];
                                   
-                                  const conflictingEvents = finalEvents.filter(placedEvent => {
-                                    return (currentEvent.startMinute <= placedEvent.endMinute && 
-                                            currentEvent.endMinute >= placedEvent.startMinute);
-                                  });
+                                  // 현재 이벤트와 겹치는 모든 이벤트 찾기
+                                  const overlappingGroup = [currentEvent];
+                                  const overlappingIndexes = [i];
                                   
-                                  const usedColumns = new Set(conflictingEvents.map(event => event.column));
-                                  
-                                  let column = 0;
-                                  while (usedColumns.has(column)) {
-                                    column++;
+                                  for (let j = i + 1; j < sortedEvents.length; j++) {
+                                    if (processedEvents.has(j)) continue;
+                                    
+                                    const otherEvent = sortedEvents[j];
+                                    const isOverlapping = overlappingGroup.some(groupEvent => 
+                                      otherEvent.startMinute < groupEvent.endMinute && 
+                                      otherEvent.endMinute > groupEvent.startMinute
+                                    );
+                                    
+                                    if (isOverlapping) {
+                                      overlappingGroup.push(otherEvent);
+                                      overlappingIndexes.push(j);
+                                    }
                                   }
                                   
-                                  const eventWithColumn = {
-                                    ...currentEvent,
-                                    column,
-                                    totalColumns: 1
-                                  };
+                                  // 겹치는 그룹의 totalColumns 계산
+                                  const groupTotalColumns = overlappingGroup.length;
                                   
-                                  finalEvents.push(eventWithColumn);
+                                  // 각 이벤트에 컬럼 할당
+                                  overlappingGroup.forEach((event, index) => {
+                                    finalEvents.push({
+                                      ...event,
+                                      column: index,
+                                      totalColumns: groupTotalColumns
+                                    });
+                                  });
+                                  
+                                  // 처리된 이벤트들 마킹
+                                  overlappingIndexes.forEach(index => processedEvents.add(index));
                                 }
-                                
-                                // totalColumns 업데이트
-                                const maxColumns = finalEvents.length > 0 ? Math.max(...finalEvents.map(event => event.column)) + 1 : 1;
-                                finalEvents.forEach(event => {
-                                  event.totalColumns = maxColumns;
-                                });
                                 
                                 return finalEvents.map((processedTask) => {
                                   const { column, totalColumns, topPosition, height } = processedTask;
                                   
-                                  const columnWidth = totalColumns > 1 ? `${90 / totalColumns}%` : '90%';
-                                  const leftOffset = totalColumns > 1 ? `${(column * 90) / totalColumns + 5}%` : '5%';
+                                  const columnWidth = totalColumns > 1 ? `${95 / totalColumns}%` : '95%';
+                                  const leftOffset = totalColumns > 1 ? `${(column * 95) / totalColumns + 2.5}%` : '2.5%';
                                   
                                   const start = processedTask.startDate ? new Date(processedTask.startDate) : undefined;
                                   const end = processedTask.endDate ? new Date(processedTask.endDate) : undefined;
