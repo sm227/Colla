@@ -14,6 +14,9 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: '워크스페이스 - 협업 플랫폼',
   description: '팀 협업을 위한 올인원 워크스페이스 플랫폼',
+  verification: {
+    google: 'DCHtzHquxEDqg642zkpMh2OTvt6xOdW-GlgvsmuCHlI', // content 값만 넣기
+  },
 };
 
 export default function RootLayout({
