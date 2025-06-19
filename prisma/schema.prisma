@@ -18,6 +18,9 @@ model User {
   memberships ProjectMember[]
   comments    Comment[]
   calendars   Calendar[]
+  taskEvents  TaskEvent[]
+  taskEventsPrevious TaskEvent[] @relation("PreviousAssignee")
+  taskEventsNew      TaskEvent[] @relation("NewAssignee")
 }
 
 model Task {
@@ -38,6 +41,7 @@ model Task {
   project     Project?  @relation(fields: [projectId], references: [id])
   epic        Epic?     @relation(fields: [epicId], references: [id])
   comments    Comment[]
+  events      TaskEvent[]
 }
 
 model Comment {
@@ -66,6 +70,7 @@ model Project {
   epics       Epic[]
   calendars   Calendar[]
   meetings    Meeting[]
+  taskEvents  TaskEvent[]
 }
 
 model ProjectMember {
@@ -158,4 +163,24 @@ model Epic {
   color       String?   @default("#4F46E5")
   project     Project?  @relation(fields: [projectId], references: [id])
   tasks       Task[]
+}
+
+model TaskEvent {
+  id                String    @id @default(cuid())
+  eventType         String    // "task_created", "task_updated", "assignee_changed"
+  taskId            String
+  projectId         String?
+  userId            String?   // 이벤트를 발생시킨 사용자
+  previousAssignee  String?   // 이전 담당자 ID
+  newAssignee       String?   // 새 담당자 ID
+  previousStatus    String?   // 이전 상태
+  newStatus         String?   // 새 상태
+  description       String?   // 이벤트 상세 설명
+  createdAt         DateTime  @default(now())
+  
+  task              Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  project           Project?  @relation(fields: [projectId], references: [id])
+  user              User?     @relation(fields: [userId], references: [id])
+  previousUser      User?     @relation("PreviousAssignee", fields: [previousAssignee], references: [id])
+  newUser           User?     @relation("NewAssignee", fields: [newAssignee], references: [id])
 }

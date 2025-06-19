@@ -7,5 +7,8 @@ alwaysApply: true
 # Your rule content
 
 한국어로 대답하세요.
+[layout.tsx](mdc:src/app/layout.tsx) [tailwind.config.js](mdc:tailwind.config.js) [globals.css](mdc:src/app/globals.css) 현재 next-theme 라이브러리를 사용중입니다. 하위 페이지, 컴포넌트 들을 테마와 주요색상까지 고려하여 디자인하세요.
+다크모드 예시코드 [page.tsx](mdc:src/app/dark-test/page.tsx)
+다크모드 주요색상 : #1f1f21 ,#2a2a2c
 - You can @ files here
 - You can use markdown but dont have to

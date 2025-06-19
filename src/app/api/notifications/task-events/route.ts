@@ -8,6 +8,8 @@ const prisma = new PrismaClient();
 // 작업 이벤트 처리 API (작업 생성, 상태 변경 등)
 export async function POST(req: NextRequest) {
   try {
+    console.log("=== 작업 이벤트 처리 시작 ===");
+    
     // 세션 확인 (향후 인증 시 주석 해제)
     // const session = await getServerSession(authOptions);
     // if (!session || !session.user) {
@@ -19,9 +21,20 @@ export async function POST(req: NextRequest) {
     
     // 이벤트 데이터 파싱
     const eventData = await req.json();
-    const { eventType, taskId, projectId, newStatus } = eventData;
+    console.log("받은 이벤트 데이터:", eventData);
+    
+    const { 
+      eventType, 
+      taskId, 
+      projectId, 
+      newStatus, 
+      assigneeChanged, 
+      previousAssignee, 
+      newAssignee 
+    } = eventData;
     
     if (!eventType || !taskId) {
+      console.log("필수 필드 누락:", { eventType, taskId });
       return NextResponse.json(
         { error: "필수 필드가 누락되었습니다" }, 
         { status: 400 }
@@ -42,35 +55,146 @@ export async function POST(req: NextRequest) {
     });
     
     if (!task) {
+      console.log("작업을 찾을 수 없음:", taskId);
       return NextResponse.json(
         { error: "작업을 찾을 수 없습니다" }, 
         { status: 404 }
       );
     }
     
-    // 작업 알림 저장 (작업 이벤트 히스토리 테이블이 있다면 사용)
-    // 현재는 간단히 작업 이벤트를 로그로 기록
-    console.log(`작업 이벤트 발생: ${eventType}`, {
-      taskId,
-      projectId: task.projectId,
-      projectName: task.project?.name,
-      taskTitle: task.title,
-      status: eventType === 'task_updated' ? newStatus : task.status
-    });
+    console.log("작업 정보:", { taskId: task.id, title: task.title, projectId: task.projectId });
     
-    // 실제 데이터베이스에 이벤트 기록을 저장하는 코드 (스키마에 TaskEvent 테이블이 있는 경우)
-    // await prisma.taskEvent.create({
-    //   data: {
-    //     eventType,
-    //     taskId,
-    //     projectId: task.projectId || undefined,
-    //     status: eventType === 'task_updated' ? newStatus : task.status,
-    //     userId: session.user.id
-    //   }
-    // });
+    // 담당자 정보 조회 (이름 가져오기)
+    let previousAssigneeName = null;
+    let newAssigneeName = null;
     
-    // 성공 응답
-    return NextResponse.json({ success: true });
+    if (assigneeChanged) {
+      console.log("담당자 변경 감지:", { previousAssignee, newAssignee });
+      
+      if (previousAssignee) {
+        const prevUser = await prisma.user.findUnique({
+          where: { id: previousAssignee },
+          select: { name: true }
+        });
+        previousAssigneeName = prevUser?.name || "알 수 없는 사용자";
+      }
+      
+      if (newAssignee) {
+        const newUser = await prisma.user.findUnique({
+          where: { id: newAssignee },
+          select: { name: true }
+        });
+        newAssigneeName = newUser?.name || "알 수 없는 사용자";
+      }
+      
+      console.log("담당자 이름:", { previousAssigneeName, newAssigneeName });
+    }
+    
+    // 작업 생성 시 담당자도 설정된 경우 - 두 개의 개별 이벤트 생성
+    if (eventType === 'task_created' && newAssignee) {
+      console.log("작업 생성 + 담당자 설정 → 2개의 개별 이벤트 생성");
+      
+      // 1. 작업 생성 이벤트
+      const taskCreatedEvent = await prisma.taskEvent.create({
+        data: {
+          eventType: "task_created",
+          taskId,
+          projectId: task.projectId || undefined,
+          userId: session.user.id,
+          previousAssignee: null,
+          newAssignee: null,
+          previousStatus: null,
+          newStatus: newStatus || null,
+          description: "작업이 생성되었습니다"
+        }
+      });
+      
+      console.log(`✅ 작업 생성 이벤트 저장: ${taskCreatedEvent.id}`);
+      
+      // 2. 담당자 설정 이벤트 (약간의 지연 후 생성)
+      await new Promise(resolve => setTimeout(resolve, 100)); // 0.1초 지연
+      
+      const assigneeSetEvent = await prisma.taskEvent.create({
+        data: {
+          eventType: "assignee_changed",
+          taskId,
+          projectId: task.projectId || undefined,
+          userId: session.user.id,
+          previousAssignee: null,
+          newAssignee,
+          previousStatus: null,
+          newStatus: newStatus || null,
+          description: `담당자가 ${newAssigneeName}으로 설정되었습니다`
+        }
+      });
+      
+      console.log(`✅ 담당자 설정 이벤트 저장: ${assigneeSetEvent.id}`);
+      
+      return NextResponse.json({ 
+        success: true,
+        eventIds: [taskCreatedEvent.id, assigneeSetEvent.id]
+      });
+    }
+    
+    // 담당자 변경만 있는 경우
+    else if (assigneeChanged) {
+      let eventDescription = "";
+      
+      if (!previousAssignee && newAssignee) {
+        eventDescription = `담당자가 ${newAssigneeName}으로 설정되었습니다`;
+      } else if (previousAssignee && !newAssignee) {
+        eventDescription = `담당자 ${previousAssigneeName}이 해제되었습니다`;
+      } else if (previousAssignee && newAssignee) {
+        eventDescription = `담당자가 ${previousAssigneeName}에서 ${newAssigneeName}으로 변경되었습니다`;
+      }
+      
+      const taskEvent = await prisma.taskEvent.create({
+        data: {
+          eventType: "assignee_changed",
+          taskId,
+          projectId: task.projectId || undefined,
+          userId: session.user.id,
+          previousAssignee,
+          newAssignee,
+          previousStatus: null,
+          newStatus: newStatus || null,
+          description: eventDescription
+        }
+      });
+      
+      console.log(`✅ 담당자 변경 이벤트 저장: ${taskEvent.id}`, { eventDescription });
+      
+      return NextResponse.json({ 
+        success: true,
+        eventId: taskEvent.id
+      });
+    }
+    
+    // 일반 작업 생성 또는 업데이트
+    else {
+      const eventDescription = `작업이 ${eventType === 'task_created' ? '생성' : '업데이트'}되었습니다`;
+      
+      const taskEvent = await prisma.taskEvent.create({
+        data: {
+          eventType,
+          taskId,
+          projectId: task.projectId || undefined,
+          userId: session.user.id,
+          previousAssignee,
+          newAssignee,
+          previousStatus: null,
+          newStatus: newStatus || null,
+          description: eventDescription
+        }
+      });
+      
+      console.log(`✅ 작업 이벤트 저장: ${taskEvent.id}`, { eventType, eventDescription });
+      
+      return NextResponse.json({ 
+        success: true,
+        eventId: taskEvent.id
+      });
+    }
     
   } catch (error) {
     console.error("작업 이벤트 처리 중 오류 발생:", error);

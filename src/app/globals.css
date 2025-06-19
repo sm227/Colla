@@ -27,25 +27,25 @@
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --background: 240 3.13% 12.55%; /* #1f1f21 */
+    --foreground: 0 0% 95%;
+    --card: 240 10% 16%;
+    --card-foreground: 0 0% 95%;
+    --popover: 240 10% 12%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 220 10% 90%;
+    --primary-foreground: 240 10% 12%;
+    --secondary: 240 5% 20%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 240 5% 20%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 5% 25%;
+    --accent-foreground: 0 0% 95%;
+    --destructive: 0 65% 35%;
+    --destructive-foreground: 0 0% 95%;
+    --border: 240 5% 20%;
+    --input: 240 5% 20%;
+    --ring: 240 5% 65%;
   }
 }
 
@@ -58,5 +58,145 @@
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  
+  /* 부드러운 알림 패널 애니메이션을 위한 커스텀 easing */
+  .smooth-slide-transition {
+    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), 
+                opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+/* 알림 바운스 애니메이션 v2 */
+@keyframes notificationBounce {
+  0%, 100% { 
+    transform: scale(1) translateY(0); 
+    animation-timing-function: ease-in-out;
+  }
+  10% { 
+    transform: scale(1.05) translateY(-3px); 
+    animation-timing-function: ease-out;
+  }
+  20% { 
+    transform: scale(0.98) translateY(0); 
+    animation-timing-function: ease-in;
+  }
+  30% { 
+    transform: scale(1.02) translateY(-1px); 
+    animation-timing-function: ease-out;
+  }
+  40%, 60%, 80% { 
+    transform: scale(1) translateY(0); 
+    animation-timing-function: ease-in-out;
+  }
+}
+
+/* 우선순위 높은 선택자들 */
+button[data-bounce="true"] {
+  animation: notificationBounce 2s ease-in-out infinite !important;
+}
+
+button.notification-bounce {
+  animation: notificationBounce 2s ease-in-out infinite !important;
+}
+
+/* 백업 선택자 */
+.notification-bounce {
+  animation: notificationBounce 2s ease-in-out infinite !important;
+}
+
+/* 추가 디버깅을 위한 선택자 */
+[data-bounce="true"] {
+  animation: notificationBounce 2s ease-in-out infinite !important;
+}
+
+/* 모던한 알림 패널 애니메이션 - 사이드바에서 나오는 방식 */
+@keyframes smoothSlideInFromSidebar {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes smoothSlideOutToSidebar {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+/* 모바일용 - 오른쪽에서 슬라이드 */
+@keyframes smoothSlideInMobile {
+  0% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes smoothSlideOutMobile {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes smoothFadeIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes smoothFadeOut {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+}
+
+/* 부드러운 백드롭 애니메이션 */
+@keyframes backdropFadeIn {
+  0% {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    backdrop-filter: blur(4px);
+  }
+}
+
+@keyframes backdropFadeOut {
+  0% {
+    opacity: 1;
+    backdrop-filter: blur(4px);
+  }
+  100% {
+    opacity: 0;
+    backdrop-filter: blur(0px);
   }
 }

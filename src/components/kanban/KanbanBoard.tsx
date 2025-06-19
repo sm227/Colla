@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { KanbanColumn } from "./KanbanColumn";
 import { ClipboardListIcon } from "lucide-react";
 import { useTasks } from "@/hooks/useTasks";
+import { useNotifications } from "@/app/contexts/NotificationContext";
 import { Alert } from "@/components/ui/alert";
 import { TaskDetailDialog } from "./TaskDetailDialog";
 
@@ -35,6 +36,7 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
   // console.log("KanbanBoard 렌더링 - projectId:", projectId);
   
   const { tasks, loading, error, addTask, updateTaskStatus, updateTask, deleteTask, fetchTasks } = useTasks(projectId);
+  const { refreshNotifications } = useNotifications();
   const [tasksState, setTasksState] = useState<Task[]>([]);
   
   // 작업 상세 다이얼로그 관련 상태 추가
@@ -81,15 +83,41 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
 
   // 새 태스크 추가 함수
   const handleAddTask = async (newTask: Omit<Task, "id">) => {
-    await addTask({
-      ...newTask,
-      projectId: projectId || undefined,
-    });
+    // 1. 로컬 상태에 optimistic하게 추가
+    const tempId = "temp-" + Date.now();
+    const optimisticTask = { ...newTask, id: tempId, projectId: projectId || undefined };
+    setTasksState(prev => [...prev, optimisticTask]);
+
+    try {
+      // 2. 서버에 저장
+      const created = await addTask({
+        ...newTask,
+        projectId: projectId || undefined,
+      });
+      // 3. 서버에서 받은 id로 교체
+      setTasksState(prev =>
+        prev.map(t => t.id === tempId ? { ...created } : t)
+      );
+      
+      // 4. 작업 추가 성공 시 알림 즉시 새로고침
+      setTimeout(() => {
+        refreshNotifications();
+      }, 1000); // 1초 후 새로고침 (서버에서 알림 처리 시간 고려)
+    } catch (e) {
+      // 4. 실패 시 롤백
+      setTasksState(prev => prev.filter(t => t.id !== tempId));
+      alert("작업 추가에 실패했습니다.");
+    }
   };
 
   // 태스크 상태 변경 함수
   const handleUpdateTaskStatus = async (taskId: string, newStatus: TaskStatus) => {
     await updateTaskStatus(taskId, newStatus);
+    
+    // 상태 변경 성공 시 알림 즉시 새로고침
+    setTimeout(() => {
+      refreshNotifications();
+    }, 1000); // 1초 후 새로고침 (서버에서 알림 처리 시간 고려)
   };
 
   // 작업 상세 다이얼로그 관리 함수 수정
@@ -120,6 +148,11 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
       
       if (result) {
         console.log('작업 업데이트 성공:', result);
+        
+        // 작업 업데이트 성공 시 알림 즉시 새로고침
+        setTimeout(() => {
+          refreshNotifications();
+        }, 1000); // 1초 후 새로고침 (서버에서 알림 처리 시간 고려)
       } else {
         console.error('작업 업데이트 실패');
         // 실패 시 로컬 상태 복구를 위해 다시 서버에서 데이터 가져오기
@@ -175,7 +208,7 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
         )}
       </div>
 
-      {loading ? (
+      {tasksState.length === 0 && loading ? (
         <div className={`flex items-center justify-center h-64 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
           <div className="text-center flex flex-col items-center">
             <div className="relative w-20 h-20">
