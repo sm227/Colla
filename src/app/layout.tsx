@@ -6,6 +6,8 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ProjectProvider } from './contexts/ProjectContext';
 import { UserProvider } from './contexts/UserContext';
 import { ChatButton } from '@/components/ChatButton';
+import { ThemeProvider } from 'next-themes';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -20,12 +22,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
       <body className={inter.className}>
         <AuthProvider>
           <ProjectProvider>
             <UserProvider>
-              {children}
+              <ThemeProvider 
+                attribute="class" 
+                defaultTheme="dark" 
+                enableSystem
+              >
+                <NotificationProvider>
+                  {children}
+                </NotificationProvider>
+              </ThemeProvider>
               <ChatButton />
             </UserProvider>
           </ProjectProvider>
