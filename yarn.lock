@@ -1004,6 +1004,11 @@
   resolved "https://registry.npmjs.org/@tiptap/core/-/core-2.11.5.tgz"
   integrity sha512-jb0KTdUJaJY53JaN7ooY3XAxHQNoMYti/H6ANo707PsLXVeEqJ9o8+eBup1JU5CuwzrgnDc2dECt2WIGX9f8Jw==
 
+"@tiptap/core@^2.14.0":
+  version "2.14.0"
+  resolved "https://registry.yarnpkg.com/@tiptap/core/-/core-2.14.0.tgz#9a0ffd500cc720194916475506292006d2cb69c3"
+  integrity sha512-MBSMzGYRFlwYCocvx3dU7zpCBSDQ0qWByNtStaEzuBUgzCJ6wn2DP/xG0cMcLmE3Ia0VLM4nwbLOAAvBXOtylA==
+
 "@tiptap/extension-blockquote@^2.11.5":
   version "2.11.5"
   resolved "https://registry.npmjs.org/@tiptap/extension-blockquote/-/extension-blockquote-2.11.5.tgz"
@@ -3486,9 +3491,9 @@ hast-util-whitespace@^3.0.0:
   dependencies:
     "@types/hast" "^3.0.0"
 
-highlight.js@~11.11.0:
+highlight.js@^11.11.1, highlight.js@~11.11.0:
   version "11.11.1"
-  resolved "https://registry.npmjs.org/highlight.js/-/highlight.js-11.11.1.tgz"
+  resolved "https://registry.yarnpkg.com/highlight.js/-/highlight.js-11.11.1.tgz#fca06fa0e5aeecf6c4d437239135fabc15213585"
   integrity sha512-Xwwo44whKBVCYoliBQwaPvtd/2tYFkRQtXDWj1nackaV2JPXx3L0+Jvd8/qCJ2p+ML0/XVkJ2q+Mr+UVdpJK5w==
 
 hoist-non-react-statics@^3.3.0, hoist-non-react-statics@^3.3.2:
@@ -5370,6 +5375,13 @@ prosemirror-model@^1.0.0, prosemirror-model@^1.19.0, prosemirror-model@^1.20.0, 
   dependencies:
     orderedmap "^2.0.0"
 
+prosemirror-model@^1.25.1:
+  version "1.25.1"
+  resolved "https://registry.yarnpkg.com/prosemirror-model/-/prosemirror-model-1.25.1.tgz#aeae9f1ec79fcaa76f6fc619800d91fbcf726870"
+  integrity sha512-AUvbm7qqmpZa5d9fPKMvH1Q5bqYQvAZWOGRvxsB6iFLyycvC9MwNemNVjHVrWgjaoxAfY8XVg7DbvQ/qxvI9Eg==
+  dependencies:
+    orderedmap "^2.0.0"
+
 prosemirror-schema-basic@^1.2.3:
   version "1.2.3"
   resolved "https://registry.npmjs.org/prosemirror-schema-basic/-/prosemirror-schema-basic-1.2.3.tgz"
@@ -5425,6 +5437,15 @@ prosemirror-view@^1.0.0, prosemirror-view@^1.1.0, prosemirror-view@^1.27.0, pros
   version "1.38.1"
   resolved "https://registry.npmjs.org/prosemirror-view/-/prosemirror-view-1.38.1.tgz"
   integrity sha512-4FH/uM1A4PNyrxXbD+RAbAsf0d/mM0D/wAKSVVWK7o0A9Q/oOXJBrw786mBf2Vnrs/Edly6dH6Z2gsb7zWwaUw==
+  dependencies:
+    prosemirror-model "^1.20.0"
+    prosemirror-state "^1.0.0"
+    prosemirror-transform "^1.1.0"
+
+prosemirror-view@^1.40.0:
+  version "1.40.0"
+  resolved "https://registry.yarnpkg.com/prosemirror-view/-/prosemirror-view-1.40.0.tgz#212e627a0c4f0198ac9823a1232e0099c9a92865"
+  integrity sha512-2G3svX0Cr1sJjkD/DYWSe3cfV5VPVTBOxI9XQEGWJDFEpsZb/gh4MV29ctv+OJx2RFX4BLt09i+6zaGM/ldkCw==
   dependencies:
     prosemirror-model "^1.20.0"
     prosemirror-state "^1.0.0"
