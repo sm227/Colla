@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getTokenFromCookie, verifyToken } from "@/app/lib/auth";
 
+// 동적 라우트로 설정하여 정적 생성 방지
+export const dynamic = 'force-dynamic';
+
 const prisma = new PrismaClient();
 
 // 현재 사용자의 정보 가져오기

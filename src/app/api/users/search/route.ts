@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+// 동적 라우트로 설정하여 정적 생성 방지
+export const dynamic = 'force-dynamic';
+
 // 사용자 검색 API (이름으로 검색)
 export async function GET(request: NextRequest) {
   try {
