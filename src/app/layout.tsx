@@ -8,6 +8,7 @@ import { UserProvider } from './contexts/UserContext';
 import { ChatButton } from '@/components/ChatButton';
 import { ThemeProvider } from 'next-themes';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -36,6 +37,7 @@ export default function RootLayout({
                 enableSystem
               >
                 <NotificationProvider>
+                  <SpeedInsights/>
                   {children}
                 </NotificationProvider>
               </ThemeProvider>
