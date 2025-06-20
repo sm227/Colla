@@ -9,6 +9,7 @@ import { ChatButton } from '@/components/ChatButton';
 import { ThemeProvider } from 'next-themes';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Analytics } from "@vercel/analytics/react"
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -38,8 +39,9 @@ export default function RootLayout({
                 enableSystem
               >
                 <NotificationProvider>
-                  <SpeedInsights/>
                   {children}
+                  <SpeedInsights/>
+                  <Analytics />
                 </NotificationProvider>
               </ThemeProvider>
               <ChatButton />
