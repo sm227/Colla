@@ -13,8 +13,9 @@ import { SpeedInsights } from "@vercel/speed-insights/next"
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: '워크스페이스 - 협업 플랫폼',
-  description: '팀 협업을 위한 올인원 워크스페이스 플랫폼',
+  title: 'colla - 협업 플랫폼',
+  description: '팀 협업을 위한 올인원 플랫폼',
+  keywords: ['colla', '콜라', '협업툴', '워크스페이스', '그룹웨어', '콜라 협업', '콜라 사이트', '프로젝트 관리리', '생산성'],
   verification: {
     google: 'DCHtzHquxEDqg642zkpMh2OTvt6xOdW-GlgvsmuCHlI', // content 값만 넣기
   },
