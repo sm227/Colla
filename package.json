@@ -1,6 +1,7 @@
 {
-  "name": "capstone3-2",
+  "name": "colla",
   "version": "0.1.0",
+  "description": "Colla - 팀 협업을 위한 올인원 플랫폼",
   "private": true,
   "type": "commonjs",
   "scripts": {
