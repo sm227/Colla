@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { LayoutDashboardIcon, UserIcon, LockIcon, EyeIcon, EyeOffIcon } from "lucide-react";
+import { LayoutDashboardIcon, UserIcon, LockIcon, EyeIcon, EyeOffIcon, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/app/contexts/AuthContext";
 
 function LoginPageContent() {
@@ -14,6 +14,7 @@ function LoginPageContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState("");
@@ -23,6 +24,8 @@ function LoginPageContent() {
   useEffect(() => {
     if (searchParams.get('registered') === 'true') {
       setSuccess('회원가입이 완료되었습니다. 로그인해주세요.');
+      // 5초 후 자동으로 메시지 숨김
+      setTimeout(() => setSuccess(""), 5000);
     }
   }, [searchParams]);
 
@@ -30,8 +33,18 @@ function LoginPageContent() {
   useEffect(() => {
     if (authError) {
       setError(authError);
+      // 5초 후 자동으로 메시지 숨김
+      setTimeout(() => setError(""), 5000);
     }
   }, [authError]);
+
+  // 성공 메시지 자동 숨김
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(""), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,11 +58,10 @@ function LoginPageContent() {
       setIsLoading(true);
       setError("");
       
-      // 인증 컨텍스트의 로그인 함수 사용
-      await login(email, password, callbackUrl);
+      // 인증 컨텍스트의 로그인 함수 사용 (rememberMe 상태 전달)
+      await login(email, password, callbackUrl, rememberMe);
       
-      // 로그인 성공 메시지 표시
-      setSuccess("로그인 성공! 대시보드로 이동합니다...");
+      // 성공 메시지 제거 - 바로 리디렉션
     } catch (err) { // 명시적인 타입 에러로 변경
       if (err instanceof Error) {
         setError(err.message || "로그인 중 오류가 발생했습니다.");
@@ -62,12 +74,70 @@ function LoginPageContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative">
+      {/* 토스트 메시지 */}
+      <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-md px-4">
+        <div className={`transform transition-all duration-500 ease-out ${
+          error || success 
+            ? 'translate-y-0 opacity-100 scale-100 pointer-events-auto' 
+            : '-translate-y-12 opacity-0 scale-95 pointer-events-none'
+        }`}>
+            {error && (
+              <div className="relative mb-2">
+                <div className="relative bg-red-50/95 dark:bg-red-950/95 backdrop-blur-sm border border-red-200/60 dark:border-red-800/60 rounded-lg p-4 shadow-lg hover:shadow-xl transition-all duration-200 animate-in slide-in-from-top-2 fade-in">
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 mt-0.5" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-red-800 dark:text-red-200 leading-relaxed">
+                        {error}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setError("")}
+                      className="flex-shrink-0 text-red-400 hover:text-red-600 dark:text-red-300 dark:hover:text-red-100 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {success && (
+              <div className="relative">
+                <div className="relative bg-green-50/95 dark:bg-green-950/95 backdrop-blur-sm border border-green-200/60 dark:border-green-800/60 rounded-lg p-4 shadow-lg hover:shadow-xl transition-all duration-200 animate-in slide-in-from-top-2 fade-in">
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      <CheckCircle2 className="h-5 w-5 text-green-500 dark:text-green-400 mt-0.5" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-green-800 dark:text-green-200 leading-relaxed">
+                        {success}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setSuccess("")}
+                      className="flex-shrink-0 text-green-400 hover:text-green-600 dark:text-green-300 dark:hover:text-green-100 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <div className="text-3xl font-bold text-blue-600 dark:text-primary flex items-center">
             <LayoutDashboardIcon className="w-8 h-8 mr-2" />
-            워크스페이스
+            Colla
           </div>
         </div>
         <h2 className="mt-6 text-center text-2xl font-bold text-gray-900 dark:text-foreground">
@@ -83,17 +153,6 @@ function LoginPageContent() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white dark:bg-card py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          {error && (
-            <div className="mb-4 bg-red-50 dark:bg-destructive border-l-4 border-red-500 dark:border-destructive p-4 text-red-700 dark:text-destructive-foreground">
-              <p>{error}</p>
-            </div>
-          )}
-          
-          {success && (
-            <div className="mb-4 bg-green-50 dark:bg-secondary border-l-4 border-green-500 dark:border-secondary p-4 text-green-700 dark:text-secondary-foreground">
-              <p>{success}</p>
-            </div>
-          )}
           
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
@@ -159,6 +218,8 @@ function LoginPageContent() {
                   id="remember-me"
                   name="remember-me"
                   type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
                   className="h-4 w-4 text-blue-600 dark:text-primary focus:ring-blue-500 dark:focus:ring-primary border-gray-300 dark:border-input rounded"
                 />
                 <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900 dark:text-muted-foreground">

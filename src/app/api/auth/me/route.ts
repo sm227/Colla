@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/app/lib/prisma';
 import { getTokenFromCookie, verifyToken } from '@/app/lib/auth';
 
+// 동적 라우트로 설정하여 정적 생성 방지
+export const dynamic = 'force-dynamic';
 // Edge 런타임을 사용하지 않고 Node.js 런타임을 사용하도록 설정
 export const runtime = 'nodejs';
 
@@ -73,12 +75,12 @@ export async function GET(request: NextRequest) {
     response.headers.set('Cache-Control', 'no-store, max-age=0');
     
     return response;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('사용자 정보 조회 오류:', error);
     return NextResponse.json(
       { 
         message: '사용자 정보 조회 중 오류가 발생했습니다.', 
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
         authenticated: false 
       },
       { status: 500 }

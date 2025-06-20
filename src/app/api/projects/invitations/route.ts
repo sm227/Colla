@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/app/lib/prisma';
 import { getTokenFromCookie, verifyToken } from '@/app/lib/auth';
 
+// 동적 라우트로 설정하여 정적 생성 방지
+export const dynamic = 'force-dynamic';
 // Node.js 런타임 설정
 export const runtime = 'nodejs';
 

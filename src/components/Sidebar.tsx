@@ -17,6 +17,7 @@ import {
   VideoIcon,
   CalendarIcon,
   Trello,
+  Columns3Icon,
   BarChart3Icon,
   ClockIcon,
   XIcon,
@@ -652,7 +653,7 @@ const Sidebar = memo(function Sidebar({
                 {isKanbanSubmenuOpen && (pathname?.startsWith('/kanban') || pathname?.startsWith('/timeline')) && (
                   <div className="ml-4 mt-1 space-y-1">
                     <SidebarLink
-                      icon={<Trello className="w-4 h-4" />}
+                      icon={<Columns3Icon className="w-4 h-4" />}
                       text="칸반보드"
                       href={currentProject ? `/kanban?projectId=${currentProject.id}` : "/kanban"}
                       active={pathname?.startsWith("/kanban") && !pathname?.includes("/timeline")}

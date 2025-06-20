@@ -15,7 +15,7 @@ type User = {
 type AuthContextType = {
   user: User;
   loading: boolean;
-  login: (email: string, password: string, callbackUrl?: string) => Promise<void>;
+  login: (email: string, password: string, callbackUrl?: string, rememberMe?: boolean) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updatePassword: (currentPassword: string, newPassword: string, userId?: string) => Promise<void>;
@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [pathname, router]);
 
   // 로그인 함수
-  const login = async (email: string, password: string, callbackUrl = '/') => {
+  const login = async (email: string, password: string, callbackUrl = '/', rememberMe = false) => {
     try {
       setLoading(true);
       clearError();
@@ -123,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, rememberMe }),
       });
       
       const data = await response.json();

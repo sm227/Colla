@@ -85,8 +85,15 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: { content: strin
       ListItem,
       BulletList,
       OrderedList,
-      TaskList,
+      TaskList.configure({
+        HTMLAttributes: {
+          class: 'task-list-stable',
+        },
+      }),
       TaskItem.configure({
+        HTMLAttributes: {
+          class: 'task-item-stable',
+        },
         nested: true,
       }),
       LinkExtension.configure({
@@ -114,16 +121,24 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: { content: strin
   const scrollbarStyles = getScrollbarStyles(theme);
 
   return (
-    <div className="rich-text-editor border rounded-md overflow-hidden">
+    <div className="rich-text-editor border rounded-md overflow-hidden flex flex-col">
       <style>{editorStyles}</style>
       <style>{scrollbarStyles}</style>
       
-      <div className={`border-b p-2 flex flex-wrap gap-1 ${
-        theme === 'dark' ? 'bg-[#353538] border-gray-700' : 'bg-gray-50'
+      <div className={`border-b p-2 flex flex-wrap gap-1 h-[48px] items-center flex-shrink-0 ${
+        theme === 'dark' ? 'bg-[#353538] border-gray-700' : 'bg-gray-50 border-gray-200'
       }`}>
         <button
           onClick={() => editor.chain().focus().toggleBold().run()}
-          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('bold') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
+          className={`p-1 rounded hover:bg-gray-700 min-w-[32px] min-h-[32px] flex items-center justify-center ${
+            editor.isActive('bold') 
+              ? (theme === 'dark' 
+                  ? 'bg-blue-900 text-blue-300 border border-blue-800' 
+                  : 'bg-blue-100 text-blue-700 border border-blue-200')
+              : (theme === 'dark' 
+                  ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent' 
+                  : 'text-gray-500 hover:bg-gray-200 border border-transparent')
+          }`}
           type="button"
           title="굵게"
         >
@@ -131,7 +146,15 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: { content: strin
         </button>
         <button
           onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('italic') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
+          className={`p-1 rounded hover:bg-gray-700 min-w-[32px] min-h-[32px] flex items-center justify-center ${
+            editor.isActive('italic') 
+              ? (theme === 'dark' 
+                  ? 'bg-blue-900 text-blue-300 border border-blue-800' 
+                  : 'bg-blue-100 text-blue-700 border border-blue-200')
+              : (theme === 'dark' 
+                  ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent' 
+                  : 'text-gray-500 hover:bg-gray-200 border border-transparent')
+          }`}
           type="button"
           title="기울임"
         >
@@ -140,7 +163,15 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: { content: strin
         <span className="w-px h-6 bg-gray-300 mx-1"></span>
         <button
           onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('bulletList') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
+          className={`p-1 rounded hover:bg-gray-700 min-w-[32px] min-h-[32px] flex items-center justify-center ${
+            editor.isActive('bulletList') 
+              ? (theme === 'dark' 
+                  ? 'bg-blue-900 text-blue-300 border border-blue-800' 
+                  : 'bg-blue-100 text-blue-700 border border-blue-200')
+              : (theme === 'dark' 
+                  ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent' 
+                  : 'text-gray-500 hover:bg-gray-200 border border-transparent')
+          }`}
           type="button"
           title="글머리 기호"
         >
@@ -148,15 +179,52 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: { content: strin
         </button>
         <button
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('orderedList') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
+          className={`p-1 rounded hover:bg-gray-700 min-w-[32px] min-h-[32px] flex items-center justify-center ${
+            editor.isActive('orderedList') 
+              ? (theme === 'dark' 
+                  ? 'bg-blue-900 text-blue-300 border border-blue-800' 
+                  : 'bg-blue-100 text-blue-700 border border-blue-200')
+              : (theme === 'dark' 
+                  ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent' 
+                  : 'text-gray-500 hover:bg-gray-200 border border-transparent')
+          }`}
           type="button"
           title="번호 목록"
         >
           <ListOrdered size={16} />
         </button>
         <button
-          onClick={() => editor.chain().focus().toggleTaskList().run()}
-          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('taskList') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // 현재 에디터의 위치 저장
+            const editorElement = document.querySelector('.ProseMirror');
+            const editorRect = editorElement?.getBoundingClientRect();
+            const viewportOffset = editorRect?.top || 0;
+            
+            editor.chain().focus().toggleTaskList().run();
+            
+            // 에디터 위치 복원
+            requestAnimationFrame(() => {
+              const newEditorElement = document.querySelector('.ProseMirror');
+              const newEditorRect = newEditorElement?.getBoundingClientRect();
+              const newViewportOffset = newEditorRect?.top || 0;
+              
+              if (viewportOffset !== newViewportOffset) {
+                window.scrollBy(0, newViewportOffset - viewportOffset);
+              }
+            });
+          }}
+          className={`p-1 rounded hover:bg-gray-700 min-w-[32px] min-h-[32px] flex items-center justify-center ${
+            editor.isActive('taskList') 
+              ? (theme === 'dark' 
+                  ? 'bg-blue-900 text-blue-300 border border-blue-800' 
+                  : 'bg-blue-100 text-blue-700 border border-blue-200')
+              : (theme === 'dark' 
+                  ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent' 
+                  : 'text-gray-500 hover:bg-gray-200 border border-transparent')
+          }`}
           type="button"
           title="작업 항목"
         >
@@ -170,7 +238,15 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: { content: strin
               editor.chain().focus().setLink({ href: url }).run();
             }
           }}
-          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('link') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
+          className={`p-1 rounded hover:bg-gray-700 min-w-[32px] min-h-[32px] flex items-center justify-center ${
+            editor.isActive('link') 
+              ? (theme === 'dark' 
+                  ? 'bg-blue-900 text-blue-300 border border-blue-800' 
+                  : 'bg-blue-100 text-blue-700 border border-blue-200')
+              : (theme === 'dark' 
+                  ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent' 
+                  : 'text-gray-500 hover:bg-gray-200 border border-transparent')
+          }`}
           type="button"
           title="링크"
         >
@@ -183,7 +259,11 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: { content: strin
               editor.chain().focus().setImage({ src: url }).run();
             }
           }}
-          className="p-1 rounded hover:bg-gray-700 text-gray-300"
+          className={`p-1 rounded hover:bg-gray-700 min-w-[32px] min-h-[32px] flex items-center justify-center ${
+            theme === 'dark' 
+              ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent hover:border-blue-800' 
+              : 'text-gray-500 hover:bg-gray-200 border border-transparent hover:border-blue-200'
+          }`}
           type="button"
           title="이미지"
         >
@@ -191,7 +271,15 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: { content: strin
         </button>
         <button
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('codeBlock') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
+          className={`p-1 rounded hover:bg-gray-700 min-w-[32px] min-h-[32px] flex items-center justify-center ${
+            editor.isActive('codeBlock') 
+              ? (theme === 'dark' 
+                  ? 'bg-blue-900 text-blue-300 border border-blue-800' 
+                  : 'bg-blue-100 text-blue-700 border border-blue-200')
+              : (theme === 'dark' 
+                  ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent' 
+                  : 'text-gray-500 hover:bg-gray-200 border border-transparent')
+          }`}
           type="button"
           title="코드"
         >
@@ -267,19 +355,25 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: { content: strin
               editor.chain().focus().insertContent(emoji).run();
             }
           }}
-          className="p-1 rounded hover:bg-gray-700 text-gray-300"
+          className={`p-1 rounded hover:bg-gray-700 min-w-[32px] min-h-[32px] flex items-center justify-center ${
+            theme === 'dark' 
+              ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent hover:border-blue-800' 
+              : 'text-gray-500 hover:bg-gray-200 border border-transparent hover:border-blue-200'
+          }`}
           type="button"
           title="이모지"
         >
           <Smile size={16} />
         </button>
       </div>
-      <EditorContent 
-        editor={editor} 
-        className={`p-3 min-h-[150px] prose max-w-none ${
-          theme === 'dark' ? 'bg-[#2A2A2C]' : ''
-        }`} 
-      />
+      <div className="flex-1">
+        <EditorContent 
+          editor={editor} 
+          className={`p-3 min-h-[150px] prose max-w-none ${
+            theme === 'dark' ? 'bg-[#2A2A2C]' : ''
+          }`} 
+        />
+      </div>
     </div>
   );
 };
@@ -307,18 +401,105 @@ const getEditorStyles = (theme: "light" | "dark") => {
       overflow-wrap: break-word;
       word-break: break-word;
       white-space: pre-wrap;
+      outline: none;
+      padding: 0;
+      margin: 0;
+      min-height: 150px;
       ${theme === 'dark' ? `
         background-color: #2A2A2C;
         color: #D1D5DB;
       ` : ''}
     }
+
+    .rich-text-editor {
+      position: relative;
+    }
+    
+    /* TaskList 관련 레이아웃 고정 */
+    .ProseMirror ul[data-type="taskList"],
+    .ProseMirror ul[data-type="taskList"] li {
+      margin: 0;
+      padding: 0;
+    }
+    
+    .ProseMirror li[data-type="taskItem"] {
+      display: flex;
+      align-items: flex-start;
+      min-height: 1.5em;
+      margin: 0.25rem 0;
+    }
+
     .ProseMirror p {
       margin: 0;
       line-height: 1.5;
-      ${theme === 'dark' ? 'color: #D1D5DB;' : ''}
+      ${theme === 'dark' ? 'color: #D1D5DB;' : 'color: #1F2937;'}
     }
     .ProseMirror:focus {
       outline: none;
+    }
+    .ProseMirror strong {
+      font-weight: bold;
+      ${theme === 'dark' ? 'color: #F3F4F6;' : 'color: #111827;'}
+    }
+    .ProseMirror em {
+      font-style: italic;
+      ${theme === 'dark' ? 'color: #E5E7EB;' : 'color: #1F2937;'}
+    }
+    .ProseMirror ul, .ProseMirror ol {
+      padding-left: 20px;
+      ${theme === 'dark' ? 'color: #D1D5DB;' : 'color: #1F2937;'}
+    }
+    .ProseMirror li {
+      margin-bottom: 4px;
+      ${theme === 'dark' ? 'color: #D1D5DB;' : 'color: #1F2937;'}
+    }
+    .ProseMirror ul li {
+      list-style-type: disc;
+    }
+    .ProseMirror ol li {
+      list-style-type: decimal;
+    }
+    .ProseMirror a {
+      color: ${theme === 'dark' ? '#60A5FA' : '#2563EB'};
+      text-decoration: underline;
+    }
+    .ProseMirror code {
+      background-color: ${theme === 'dark' ? '#3F3F46' : '#F3F4F6'};
+      color: ${theme === 'dark' ? '#E5E7EB' : '#111827'};
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+    .ProseMirror blockquote {
+      border-left: 4px solid ${theme === 'dark' ? '#4B5563' : '#9CA3AF'};
+      padding-left: 10px;
+      margin-left: 0;
+      font-style: italic;
+      color: ${theme === 'dark' ? '#9CA3AF' : '#4B5563'};
+    }
+
+    /* TaskList 및 TaskItem 안정성 개선 */
+    .task-list-stable {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    
+    .task-item-stable {
+      display: flex;
+      align-items: center;
+      margin: 0.25rem 0;
+      min-height: 1.5em;
+    }
+    
+    .task-item-stable > * {
+      margin: 0;
+      padding: 0;
+    }
+    
+    .task-item-stable input[type="checkbox"] {
+      margin-right: 0.5rem;
+      margin-left: 0;
     }
   `;
 };
