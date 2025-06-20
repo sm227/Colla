@@ -193,7 +193,125 @@ export const useDocumentEditor = ({
     autofocus: true,
     editable: true,
     injectCSS: false,
-    immediatelyRender: false
+    immediatelyRender: false,
+    editorProps: {
+      handleKeyDown: (view, event): boolean => {
+        // 엔터키를 눌렀을 때 스크롤 처리
+        if (event.key === 'Enter') {
+          // requestAnimationFrame으로 브라우저 렌더링과 동기화
+          requestAnimationFrame(() => {
+            // 에디터, 뷰, 상태 모두 확인
+            if (!editor || !editor.view || !editor.state || !editor.view.domAtPos) return;
+            
+            try {
+              const { selection } = editor.state;
+              if (!selection || typeof selection.from !== 'number') return;
+              
+              const dom = editor.view.domAtPos(selection.from);
+              if (dom && dom.node) {
+                const element = dom.node.nodeType === Node.TEXT_NODE 
+                  ? dom.node.parentElement 
+                  : dom.node as Element;
+                
+                if (element) {
+                  // 에디터 스크롤 컨테이너 찾기
+                  const scrollContainer = document.getElementById('editor-scroll-container');
+                  if (scrollContainer) {
+                    const elementRect = element.getBoundingClientRect();
+                    const containerRect = scrollContainer.getBoundingClientRect();
+                    
+                    // 커서가 화면 경계를 벗어났을 때만 스크롤
+                    const isAboveScreen = elementRect.top < containerRect.top;
+                    const isBelowScreen = elementRect.bottom > containerRect.bottom;
+                    
+                    if (isAboveScreen) {
+                      // 위쪽으로 벗어나면 위쪽으로 스크롤
+                      element.scrollIntoView({ 
+                        block: 'start',
+                        inline: 'nearest'
+                      });
+                    } else if (isBelowScreen) {
+                      // 아래쪽으로 벗어나면 아래쪽으로 스크롤
+                      element.scrollIntoView({ 
+                        block: 'end',
+                        inline: 'nearest'
+                      });
+                    }
+                  } else {
+                    // 폴백: 일반적인 스크롤
+                    element.scrollIntoView({ 
+                      block: 'nearest',
+                      inline: 'nearest'
+                    });
+                  }
+                }
+              }
+            } catch (error) {
+              // 스크롤 처리 중 에러가 발생해도 무시
+              console.warn('엔터키 스크롤 처리 중 에러:', error);
+            }
+          });
+        }
+        return false; // 기본 동작 유지
+      },
+      handleDOMEvents: {
+        input: (view): boolean => {
+          requestAnimationFrame(() => {
+            // 에디터, 뷰, 상태 모두 확인
+            if (!editor || !editor.view || !editor.state || !editor.view.domAtPos) return;
+            
+            try {
+              const { selection } = editor.state;
+              if (!selection || typeof selection.from !== 'number') return;
+              
+              const dom = editor.view.domAtPos(selection.from);
+              if (dom && dom.node) {
+                const element = dom.node.nodeType === Node.TEXT_NODE 
+                  ? dom.node.parentElement 
+                  : dom.node as Element;
+                
+                if (element) {
+                  // 에디터 스크롤 컨테이너 찾기
+                  const scrollContainer = document.getElementById('editor-scroll-container');
+                  if (scrollContainer) {
+                    const elementRect = element.getBoundingClientRect();
+                    const containerRect = scrollContainer.getBoundingClientRect();
+                    
+                    // 커서가 화면 경계를 벗어났을 때만 스크롤
+                    const isAboveScreen = elementRect.top < containerRect.top;
+                    const isBelowScreen = elementRect.bottom > containerRect.bottom;
+                    
+                    if (isAboveScreen) {
+                      // 위쪽으로 벗어나면 위쪽으로 스크롤
+                      element.scrollIntoView({ 
+                        block: 'start',
+                        inline: 'nearest'
+                      });
+                    } else if (isBelowScreen) {
+                      // 아래쪽으로 벗어나면 아래쪽으로 스크롤
+                      element.scrollIntoView({ 
+                        block: 'end',
+                        inline: 'nearest'
+                      });
+                    }
+                  } else {
+                    // 폴백: 일반적인 스크롤
+                    element.scrollIntoView({ 
+                      block: 'nearest',
+                      inline: 'nearest'
+                    });
+                  }
+                }
+              }
+            } catch (error) {
+              // 스크롤 처리 중 에러가 발생해도 무시
+              console.warn('입력 스크롤 처리 중 에러:', error);
+            }
+          });
+          return false;
+        }
+      }
+    }
   }, [provider, currentUser]);
 
   // 읽기 전용 모드 변경 시 에디터 편집 가능 여부 업데이트
@@ -574,22 +692,64 @@ export const useDocumentEditor = ({
     };
     
     const onEditorUpdate = () => {
-      handleDOMEvents();
+      if (showSlashMenu) {
+        setShowSlashMenu(false);
+      }
+      
+      // 커서 위치 추적 및 스크롤
+      requestAnimationFrame(() => {
+        // 에디터, 뷰, 상태 모두 확인
+        if (!editor || !editor.view || !editor.state || !editor.view.domAtPos) return;
+        
+        try {
+          const { selection } = editor.state;
+          if (!selection || typeof selection.from !== 'number') return;
+          
+          const dom = editor.view.domAtPos(selection.from);
+          if (dom && dom.node) {
+            const element = dom.node.nodeType === Node.TEXT_NODE 
+              ? dom.node.parentElement 
+              : dom.node as Element;
+            
+            if (element) {
+              const scrollContainer = document.getElementById('editor-scroll-container');
+              if (scrollContainer) {
+                const elementRect = element.getBoundingClientRect();
+                const containerRect = scrollContainer.getBoundingClientRect();
+                
+                // 커서가 화면 경계를 벗어났을 때만 스크롤
+                const isAboveScreen = elementRect.top < containerRect.top;
+                const isBelowScreen = elementRect.bottom > containerRect.bottom;
+                
+                if (isAboveScreen) {
+                  // 위쪽으로 벗어나면 위쪽으로 스크롤
+                  element.scrollIntoView({ 
+                    block: 'start',
+                    inline: 'nearest'
+                  });
+                } else if (isBelowScreen) {
+                  // 아래쪽으로 벗어나면 아래쪽으로 스크롤
+                  element.scrollIntoView({ 
+                    block: 'end',
+                    inline: 'nearest'
+                  });
+                }
+              }
+            }
+          }
+        } catch (error) {
+          // 스크롤 처리 중 에러가 발생해도 무시
+          console.warn('스크롤 처리 중 에러:', error);
+        }
+      });
     };
     
     editor.on('update', onEditorUpdate);
-    handleDOMEvents();
+    editor.on('selectionUpdate', onEditorUpdate);
     
     return () => {
       editor.off('update', onEditorUpdate);
-      
-      const editorElement = document.querySelector('.ProseMirror');
-      if (editorElement) {
-        const newEvent = new Event('keydown');
-        const newInputEvent = new Event('input');
-        editorElement.removeEventListener('keydown', () => {});
-        editorElement.removeEventListener('input', () => {});
-      }
+      editor.off('selectionUpdate', onEditorUpdate);
     };
   }, [editor, showSlashMenu]);
 

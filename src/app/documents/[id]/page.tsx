@@ -56,7 +56,14 @@ import {
   useDocumentData,
   useDocumentProject
 } from "@/hooks/documents";
-import { SummaryModal, TemplateModal, PasswordModal } from "@/components/modals";
+import { 
+  SummaryModal, 
+  TemplateModal, 
+  PasswordModal, 
+  SettingsModal, 
+  FolderModal, 
+  SecurityDropdown 
+} from "@/components/modals";
 
 // 문서 에디터 CSS 스타일 import
 import "@/styles/documents/index.css";
@@ -1084,44 +1091,20 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
                   <ChevronDown className="w-3 h-3 text-gray-500 dark:text-gray-400" />
               </button>
               
-              {showSecurityMenu && (
-                  <div className="absolute right-0 mt-1 w-56 bg-white dark:bg-[#2a2a2c] rounded-xl shadow-lg z-10 border border-gray-100 dark:border-gray-700 py-1 overflow-hidden">
-                  <div className="py-1">
-                    <button 
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" 
-                      onClick={() => {
+              <SecurityDropdown 
+                isOpen={showSecurityMenu}
+                onClose={() => setShowSecurityMenu(false)}
+                onAccessPermissions={() => {
                         // 문서 접근 권한 설정
-                        setShowSecurityMenu(false);
-                      }}
-                    >
-                      <UsersIcon className="w-4 h-4 mr-2" />
-                      <span>접근 권한 설정</span>
-                    </button>
-                    
-                    <button 
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" 
-                      onClick={() => {
+                  console.log('접근 권한 설정');
+                }}
+                onPermissionHistory={() => {
                         // 문서 권한 이력
-                        setShowSecurityMenu(false);
-                      }}
-                    >
-                      <ShieldIcon className="w-4 h-4 mr-2" />
-                      <span>권한 이력 보기</span>
-                    </button>
-                    
-                    <button 
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" 
-                      onClick={() => {
-                        // 문서 암호 설정
-                        handleOpenPasswordModal();
-                      }}
-                    >
-                      <KeyIcon className="w-4 h-4 mr-2" />
-                      <span>{isPasswordProtected ? "암호 변경" : "암호 설정"}</span>
-                    </button>
-                  </div>
-                </div>
-              )}
+                  console.log('권한 이력 보기');
+                }}
+                onPasswordSettings={handleOpenPasswordModal}
+                isPasswordProtected={isPasswordProtected}
+              />
             </div>
             </div>
           </div>
@@ -1166,7 +1149,7 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
         </div>
       </div>
         {/* 문서 편집 영역 */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto" id="editor-scroll-container">
       
       {/* 로딩 및 오류 상태 표시 */}
       {isLoading && (
@@ -1483,230 +1466,26 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
       />
       
       {/* 설정 모달 */}
-      {showSettingsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="rounded-lg shadow-xl bg-card text-card-foreground">
-              {/* 헤더 */}
-              <div className="flex items-center justify-between p-6 border-b border-border">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mr-4">
-                    <SettingsIcon className="w-5 h-5 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-foreground">설정</h3>
-                    <p className="text-sm text-muted-foreground">애플리케이션 설정을 관리합니다</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setShowSettingsModal(false)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <XIcon className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* 설정 내용 */}
-              <div className="p-6 space-y-6">
-                {/* 외관 설정 */}
-                <div>
-                  <h4 className="text-sm font-medium text-foreground mb-4">외관</h4>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium text-foreground">테마</label>
-                      <div className="mt-2 flex space-x-3">
-                        <button
-                          onClick={() => setTempSettings(prev => ({ ...prev, theme: 'light' }))}
-                          className={`px-3 py-2 rounded-md text-sm ${
-                            tempSettings.theme === 'light'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                          }`}
-                        >
-                          라이트
-                        </button>
-                        <button
-                          onClick={() => setTempSettings(prev => ({ ...prev, theme: 'dark' }))}
-                          className={`px-3 py-2 rounded-md text-sm ${
-                            tempSettings.theme === 'dark'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                          }`}
-                        >
-                          다크
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 알림 설정 */}
-                <div>
-                  <h4 className="text-sm font-medium text-foreground mb-4">알림</h4>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm text-foreground">이메일 알림</label>
-                      <input
-                        type="checkbox"
-                        checked={tempSettings.notifications.email}
-                        onChange={(e) => setTempSettings(prev => ({
-                          ...prev,
-                          notifications: { ...prev.notifications, email: e.target.checked }
-                        }))}
-                        className="rounded"
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm text-foreground">푸시 알림</label>
-                      <input
-                        type="checkbox"
-                        checked={tempSettings.notifications.push}
-                        onChange={(e) => setTempSettings(prev => ({
-                          ...prev,
-                          notifications: { ...prev.notifications, push: e.target.checked }
-                        }))}
-                        className="rounded"
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm text-foreground">데스크톱 알림</label>
-                      <input
-                        type="checkbox"
-                        checked={tempSettings.notifications.desktop}
-                        onChange={(e) => setTempSettings(prev => ({
-                          ...prev,
-                          notifications: { ...prev.notifications, desktop: e.target.checked }
-                        }))}
-                        className="rounded"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* 개인정보 설정 */}
-                <div>
-                  <h4 className="text-sm font-medium text-foreground mb-4">개인정보</h4>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm text-foreground">프로필 공개</label>
-                      <input
-                        type="checkbox"
-                        checked={tempSettings.privacy.profileVisible}
-                        onChange={(e) => setTempSettings(prev => ({
-                          ...prev,
-                          privacy: { ...prev.privacy, profileVisible: e.target.checked }
-                        }))}
-                        className="rounded"
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm text-foreground">활동 공개</label>
-                      <input
-                        type="checkbox"
-                        checked={tempSettings.privacy.activityVisible}
-                        onChange={(e) => setTempSettings(prev => ({
-                          ...prev,
-                          privacy: { ...prev.privacy, activityVisible: e.target.checked }
-                        }))}
-                        className="rounded"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 푸터 */}
-              <div className="flex justify-end space-x-3 p-6 border-t border-border">
-                <button
-                  onClick={() => setShowSettingsModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-muted-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors"
-                >
-                  취소
-                </button>
-                <button
-                  onClick={handleSaveSettings}
-                  className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors"
-                >
-                  저장
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <SettingsModal 
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        tempSettings={tempSettings}
+        onSettingsChange={setTempSettings}
+        onSave={handleSaveSettings}
+      />
       
       {/* 폴더 생성 모달 */}
-      {showFolderModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-          <div className="w-full max-w-md mx-4">
-            <div className="rounded-xl shadow-xl bg-card p-6">
-              {/* 헤더 */}
-              <div className="mb-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mr-4">
-                    <FolderIcon className="w-5 h-5 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-foreground">새 폴더 만들기</h3>
-                  </div>
-                </div>
-              </div>
-              
-              {/* 본문 */}
-              <div className="mb-6">
-                <label htmlFor="folderName" className="block text-sm font-medium text-foreground mb-2">
-                  폴더 이름
-                </label>
-                <input
-                  type="text"
-                  id="folderName"
-                  value={folderModalName}
-                  onChange={(e) => setFolderModalName(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-                  placeholder="폴더 이름을 입력하세요"
-                  disabled={isFolderCreating}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && !isFolderCreating) {
-                      createFolderFromSidebar();
-                    }
-                  }}
-                />
-              </div>
-              
-              {/* 버튼 */}
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => {
+      <FolderModal 
+        isOpen={showFolderModal}
+        onClose={() => {
                     setShowFolderModal(false);
                     setFolderModalName('');
                   }}
-                  className="px-4 py-2 text-sm font-medium text-muted-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors"
-                  disabled={isFolderCreating}
-                >
-                  취소
-                </button>
-                <button
-                  onClick={createFolderFromSidebar}
-                  disabled={isFolderCreating || !folderModalName.trim()}
-                  className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                >
-                  {isFolderCreating ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      생성 중...
-                    </>
-                  ) : (
-                    '폴더 만들기'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+        folderName={folderModalName}
+        onFolderNameChange={setFolderModalName}
+        onCreateFolder={createFolderFromSidebar}
+        isCreating={isFolderCreating}
+      />
         </div>
       </div>
     </div>
