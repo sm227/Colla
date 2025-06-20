@@ -123,7 +123,15 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: { content: strin
       }`}>
         <button
           onClick={() => editor.chain().focus().toggleBold().run()}
-          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('bold') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
+          className={`p-1 rounded hover:bg-gray-700 ${
+            editor.isActive('bold') 
+              ? (theme === 'dark' 
+                  ? 'bg-blue-900 text-blue-300 border border-blue-800' 
+                  : 'bg-blue-100 text-blue-700 border border-blue-200')
+              : (theme === 'dark' 
+                  ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent' 
+                  : 'text-gray-500 hover:bg-gray-200 border border-transparent')
+          }`}
           type="button"
           title="굵게"
         >
@@ -131,7 +139,15 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: { content: strin
         </button>
         <button
           onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('italic') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
+          className={`p-1 rounded hover:bg-gray-700 ${
+            editor.isActive('italic') 
+              ? (theme === 'dark' 
+                  ? 'bg-blue-900 text-blue-300 border border-blue-800' 
+                  : 'bg-blue-100 text-blue-700 border border-blue-200')
+              : (theme === 'dark' 
+                  ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent' 
+                  : 'text-gray-500 hover:bg-gray-200 border border-transparent')
+          }`}
           type="button"
           title="기울임"
         >
@@ -140,7 +156,15 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: { content: strin
         <span className="w-px h-6 bg-gray-300 mx-1"></span>
         <button
           onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('bulletList') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
+          className={`p-1 rounded hover:bg-gray-700 ${
+            editor.isActive('bulletList') 
+              ? (theme === 'dark' 
+                  ? 'bg-blue-900 text-blue-300 border border-blue-800' 
+                  : 'bg-blue-100 text-blue-700 border border-blue-200')
+              : (theme === 'dark' 
+                  ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent' 
+                  : 'text-gray-500 hover:bg-gray-200 border border-transparent')
+          }`}
           type="button"
           title="글머리 기호"
         >
@@ -148,7 +172,15 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: { content: strin
         </button>
         <button
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('orderedList') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
+          className={`p-1 rounded hover:bg-gray-700 ${
+            editor.isActive('orderedList') 
+              ? (theme === 'dark' 
+                  ? 'bg-blue-900 text-blue-300 border border-blue-800' 
+                  : 'bg-blue-100 text-blue-700 border border-blue-200')
+              : (theme === 'dark' 
+                  ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent' 
+                  : 'text-gray-500 hover:bg-gray-200 border border-transparent')
+          }`}
           type="button"
           title="번호 목록"
         >
@@ -156,7 +188,15 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: { content: strin
         </button>
         <button
           onClick={() => editor.chain().focus().toggleTaskList().run()}
-          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('taskList') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
+          className={`p-1 rounded hover:bg-gray-700 ${
+            editor.isActive('taskList') 
+              ? (theme === 'dark' 
+                  ? 'bg-blue-900 text-blue-300 border border-blue-800' 
+                  : 'bg-blue-100 text-blue-700 border border-blue-200')
+              : (theme === 'dark' 
+                  ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent' 
+                  : 'text-gray-500 hover:bg-gray-200 border border-transparent')
+          }`}
           type="button"
           title="작업 항목"
         >
@@ -170,7 +210,15 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: { content: strin
               editor.chain().focus().setLink({ href: url }).run();
             }
           }}
-          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('link') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
+          className={`p-1 rounded hover:bg-gray-700 ${
+            editor.isActive('link') 
+              ? (theme === 'dark' 
+                  ? 'bg-blue-900 text-blue-300 border border-blue-800' 
+                  : 'bg-blue-100 text-blue-700 border border-blue-200')
+              : (theme === 'dark' 
+                  ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent' 
+                  : 'text-gray-500 hover:bg-gray-200 border border-transparent')
+          }`}
           type="button"
           title="링크"
         >
@@ -183,7 +231,11 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: { content: strin
               editor.chain().focus().setImage({ src: url }).run();
             }
           }}
-          className="p-1 rounded hover:bg-gray-700 text-gray-300"
+          className={`p-1 rounded hover:bg-gray-700 ${
+            theme === 'dark' 
+              ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent hover:border-blue-800' 
+              : 'text-gray-500 hover:bg-gray-200 border border-transparent hover:border-blue-200'
+          }`}
           type="button"
           title="이미지"
         >
@@ -191,7 +243,15 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: { content: strin
         </button>
         <button
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          className={`p-1 rounded hover:bg-gray-700 ${editor.isActive('codeBlock') ? 'bg-gray-700 text-white' : 'text-gray-300'}`}
+          className={`p-1 rounded hover:bg-gray-700 ${
+            editor.isActive('codeBlock') 
+              ? (theme === 'dark' 
+                  ? 'bg-blue-900 text-blue-300 border border-blue-800' 
+                  : 'bg-blue-100 text-blue-700 border border-blue-200')
+              : (theme === 'dark' 
+                  ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent' 
+                  : 'text-gray-500 hover:bg-gray-200 border border-transparent')
+          }`}
           type="button"
           title="코드"
         >
@@ -267,7 +327,11 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: { content: strin
               editor.chain().focus().insertContent(emoji).run();
             }
           }}
-          className="p-1 rounded hover:bg-gray-700 text-gray-300"
+          className={`p-1 rounded hover:bg-gray-700 ${
+            theme === 'dark' 
+              ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent hover:border-blue-800' 
+              : 'text-gray-500 hover:bg-gray-200 border border-transparent hover:border-blue-200'
+          }`}
           type="button"
           title="이모지"
         >
@@ -315,10 +379,50 @@ const getEditorStyles = (theme: "light" | "dark") => {
     .ProseMirror p {
       margin: 0;
       line-height: 1.5;
-      ${theme === 'dark' ? 'color: #D1D5DB;' : ''}
+      ${theme === 'dark' ? 'color: #D1D5DB;' : 'color: #1F2937;'}
     }
     .ProseMirror:focus {
       outline: none;
+    }
+    .ProseMirror strong {
+      font-weight: bold;
+      ${theme === 'dark' ? 'color: #F3F4F6;' : 'color: #111827;'}
+    }
+    .ProseMirror em {
+      font-style: italic;
+      ${theme === 'dark' ? 'color: #E5E7EB;' : 'color: #1F2937;'}
+    }
+    .ProseMirror ul, .ProseMirror ol {
+      padding-left: 20px;
+      ${theme === 'dark' ? 'color: #D1D5DB;' : 'color: #1F2937;'}
+    }
+    .ProseMirror li {
+      margin-bottom: 4px;
+      ${theme === 'dark' ? 'color: #D1D5DB;' : 'color: #1F2937;'}
+    }
+    .ProseMirror ul li {
+      list-style-type: disc;
+    }
+    .ProseMirror ol li {
+      list-style-type: decimal;
+    }
+    .ProseMirror a {
+      color: ${theme === 'dark' ? '#60A5FA' : '#2563EB'};
+      text-decoration: underline;
+    }
+    .ProseMirror code {
+      background-color: ${theme === 'dark' ? '#3F3F46' : '#F3F4F6'};
+      color: ${theme === 'dark' ? '#E5E7EB' : '#111827'};
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+    .ProseMirror blockquote {
+      border-left: 4px solid ${theme === 'dark' ? '#4B5563' : '#9CA3AF'};
+      padding-left: 10px;
+      margin-left: 0;
+      font-style: italic;
+      color: ${theme === 'dark' ? '#9CA3AF' : '#4B5563'};
     }
   `;
 };
@@ -784,7 +888,7 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
         className={`
           ${theme === 'dark' ? 'dark-scrollbar' : ''} 
           ${theme === 'dark' ? 'bg-[#2A2A2C] text-gray-200' : 'bg-white'} 
-          rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col
+          rounded-lg shadow-xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col
         `}
         onClick={(e) => e.stopPropagation()}
       >
@@ -1056,7 +1160,7 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
           </div>
 
           {/* 사이드바 영역 */}
-          <div className={`w-80 border-l overflow-y-auto ${theme === 'dark' ? 'dark-scrollbar bg-[#353538] border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
+          <div className={`w-96 border-l overflow-y-auto ${theme === 'dark' ? 'dark-scrollbar bg-[#353538] border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
             <div className="p-4">
               <div className="mb-6">
                 <div className="flex justify-between items-center mb-2">
