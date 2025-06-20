@@ -80,14 +80,16 @@ export async function verifyTokenEdge(token: string) {
 }
 
 // 쿠키에 토큰 설정
-export function setTokenCookie(token: string) {
+export function setTokenCookie(token: string, rememberMe = false) {
   const cookieStore = cookies();
+  const maxAge = rememberMe ? 60 * 60 * 24 * 15 : 60 * 60 * 24 * 7; // 15일 또는 7일
+  
   cookieStore.set('token', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    maxAge: 60 * 60 * 24 * 7, // 7일
+    maxAge: maxAge,
     path: '/',
-    sameSite: 'strict',
+    sameSite: 'lax', // 외부 사이트에서 링크로 접속할 때도 쿠키 전송 허용
   });
 }
 
