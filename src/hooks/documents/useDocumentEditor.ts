@@ -96,11 +96,17 @@ interface UseDocumentEditorReturn {
   documentSummary: string;
   isSummarizing: boolean;
   
+  // 이미지 업로드
+  isUploadingImage: boolean;
+  fileInputRef: React.RefObject<HTMLInputElement>;
+  
   // 함수들
   applyBlockType: (type: string) => void;
   summarizeDocument: () => Promise<void>;
   createDocumentTemplate: (templateType: string) => Promise<void>;
   showTemplates: () => void;
+  handleImageUpload: (file: File) => Promise<void>;
+  openFileDialog: () => void;
 }
 
 export const useDocumentEditor = ({
@@ -125,6 +131,10 @@ export const useDocumentEditor = ({
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [documentSummary, setDocumentSummary] = useState('');
   const [isSummarizing, setIsSummarizing] = useState(false);
+  
+  // 이미지 업로드 관련 상태
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // 템플릿 타입
   const templates = [
@@ -369,10 +379,7 @@ export const useDocumentEditor = ({
         editor.chain().focus().setHorizontalRule().run();
         break;
       case 'image':
-        const url = window.prompt('이미지 URL을 입력하세요');
-        if (url) {
-          editor.chain().focus().setImage({ src: url }).run();
-        }
+        openFileDialog();
         break;
       case 'ai':
         summarizeDocument();
@@ -474,6 +481,46 @@ export const useDocumentEditor = ({
     setShowTemplateMenu(true);
   };
 
+  // 이미지 업로드 함수
+  const handleImageUpload = async (file: File) => {
+    if (!editor) return;
+    
+    try {
+      setIsUploadingImage(true);
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/documents/upload-image', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `이미지 업로드에 실패했습니다. (${response.status})`);
+      }
+      
+      const data = await response.json();
+      
+      // 에디터에 이미지 삽입
+      editor.chain().focus().setImage({ src: data.url }).run();
+      
+    } catch (error) {
+      console.error('이미지 업로드 오류:', error);
+      alert(error instanceof Error ? error.message : '이미지 업로드에 실패했습니다.');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  // 파일 선택 다이얼로그 열기
+  const openFileDialog = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
   // 단축키 핸들러
   useEffect(() => {
     if (!editor) return;
@@ -538,6 +585,54 @@ export const useDocumentEditor = ({
       document.removeEventListener('keydown', handleKeyboardShortcuts, false);
     };
   }, [editor]);
+
+  // 클립보드 이미지 붙여넣기 기능
+  useEffect(() => {
+    if (!editor) return;
+    
+    const handlePaste = async (event: Event) => {
+      const clipboardEvent = event as ClipboardEvent;
+      const items = clipboardEvent.clipboardData?.items;
+      if (!items) return;
+      
+      console.log('클립보드 붙여넣기 이벤트 감지');
+      
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        console.log('클립보드 아이템:', item.type);
+        
+        // 이미지 파일인지 확인
+        if (item.type.startsWith('image/')) {
+          console.log('이미지 파일 감지:', item.type);
+          event.preventDefault();
+          
+          const file = item.getAsFile();
+          if (file) {
+            console.log('이미지 파일 업로드 시작');
+            await handleImageUpload(file);
+          }
+          break;
+        }
+      }
+    };
+    
+    // document 전체에 이벤트 리스너 추가
+    const handleGlobalPaste = (event: ClipboardEvent) => {
+      // 에디터가 포커스되어 있는지 확인
+      const activeElement = document.activeElement;
+      const proseMirrorElement = document.querySelector('.ProseMirror');
+      
+      if (proseMirrorElement && (activeElement === proseMirrorElement || proseMirrorElement.contains(activeElement))) {
+        handlePaste(event);
+      }
+    };
+    
+    document.addEventListener('paste', handleGlobalPaste);
+    
+    return () => {
+      document.removeEventListener('paste', handleGlobalPaste);
+    };
+  }, [editor, handleImageUpload]);
 
   // 슬래시 키 입력 감지
   useEffect(() => {
@@ -691,6 +786,9 @@ export const useDocumentEditor = ({
       };
     };
     
+    // handleDOMEvents 함수 호출
+    const cleanup = handleDOMEvents();
+    
     const onEditorUpdate = () => {
       if (showSlashMenu) {
         setShowSlashMenu(false);
@@ -748,6 +846,10 @@ export const useDocumentEditor = ({
     editor.on('selectionUpdate', onEditorUpdate);
     
     return () => {
+      // cleanup 함수가 있으면 호출
+      if (cleanup && typeof cleanup === 'function') {
+        cleanup();
+      }
       editor.off('update', onEditorUpdate);
       editor.off('selectionUpdate', onEditorUpdate);
     };
@@ -803,10 +905,16 @@ export const useDocumentEditor = ({
     documentSummary,
     isSummarizing,
     
+    // 이미지 업로드
+    isUploadingImage,
+    fileInputRef,
+    
     // 함수들
     applyBlockType,
     summarizeDocument,
     createDocumentTemplate,
-    showTemplates
+    showTemplates,
+    handleImageUpload,
+    openFileDialog
   };
 }; 

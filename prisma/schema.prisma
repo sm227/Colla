@@ -184,3 +184,14 @@ model TaskEvent {
   previousUser      User?     @relation("PreviousAssignee", fields: [previousAssignee], references: [id])
   newUser           User?     @relation("NewAssignee", fields: [newAssignee], references: [id])
 }
+
+model Image {
+  id          String   @id @default(cuid())
+  fileName    String
+  originalName String
+  mimeType    String
+  size        Int
+  data        Bytes    // 이미지 바이너리 데이터
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
