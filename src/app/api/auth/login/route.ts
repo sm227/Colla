@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     // 요청 본문에서 데이터 추출
-    const { email, password } = await request.json();
+    const { email, password, rememberMe = false } = await request.json();
 
     // 필수 필드 검증
     if (!email || !password) {
@@ -40,8 +40,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // JWT 토큰 생성
-    const token = await createTokenEdge({ id: user.id, email: user.email });
+    // JWT 토큰 생성 (rememberMe 옵션 전달)
+    const token = await createTokenEdge({ id: user.id, email: user.email }, rememberMe);
 
     // 비밀번호를 제외한 사용자 정보 반환
     const userWithoutPassword = {
@@ -61,10 +61,13 @@ export async function POST(request: NextRequest) {
     );
 
     // 쿠키에 토큰 설정 (Next.js 13+ 방식)
+    // rememberMe가 true면 15일, false면 기본 1일
+    const maxAge = rememberMe ? 60 * 60 * 24 * 15 : 60 * 60 * 24; // 15일 또는 1일
+    
     response.cookies.set('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 7, // 7일
+      maxAge: maxAge,
       path: '/',
       sameSite: 'strict',
     });

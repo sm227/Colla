@@ -25,15 +25,18 @@ export function createToken(payload: any): string {
 }
 
 // Edge 호환 JWT 토큰 생성 (jose 라이브러리 사용)
-export async function createTokenEdge(payload: any): Promise<string> {
+export async function createTokenEdge(payload: any, rememberMe = false): Promise<string> {
   const secret = new TextEncoder().encode(
     process.env.JWT_SECRET || 'fallback_secret'
   );
   
+  // rememberMe가 true면 15일, false면 1일
+  const expirationTime = rememberMe ? '15d' : '1d';
+  
   const token = await new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('7d')
+    .setExpirationTime(expirationTime)
     .sign(secret);
   
   return token;
