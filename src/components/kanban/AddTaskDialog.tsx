@@ -30,7 +30,15 @@ interface AddTaskDialogProps {
 
 export function AddTaskDialog({ isOpen, onClose, onAddTask, projectId }: AddTaskDialogProps) {
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [description, setDescription] = useState<any>({
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        content: []
+      }
+    ]
+  });
   const [status, setStatus] = useState<TaskStatus>("todo");
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
   const [assignee, setAssignee] = useState("");
@@ -112,7 +120,15 @@ export function AddTaskDialog({ isOpen, onClose, onAddTask, projectId }: AddTask
   const handleCancel = () => {
     // 폼 초기화
     setTitle("");
-    setDescription("");
+    setDescription({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: []
+        }
+      ]
+    });
     setStatus("todo");
     setPriority("medium");
     setAssignee("");
@@ -246,8 +262,21 @@ export function AddTaskDialog({ isOpen, onClose, onAddTask, projectId }: AddTask
                 설명
               </label>
               <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                value={description.content[0].text}
+                onChange={(e) => setDescription({
+                  type: 'doc',
+                  content: [
+                    {
+                      type: 'paragraph',
+                      content: [
+                        {
+                          type: 'text',
+                          text: e.target.value
+                        }
+                      ]
+                    }
+                  ]
+                })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 rows={3}
                 placeholder="작업에 대한 설명 입력"

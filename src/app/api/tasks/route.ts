@@ -174,7 +174,15 @@ export async function PUT(req: NextRequest) {
       where: { id },
       data: {
         title,
-        description,
+        description: typeof description === 'string' 
+          ? { 
+              type: 'doc', 
+              content: [{ 
+                type: 'paragraph', 
+                content: [{ type: 'text', text: description }] 
+              }] 
+            }
+          : description,
         status,
         priority,
         assignee,
@@ -216,7 +224,18 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json(updatedTask);
   } catch (error) {
     console.error("작업 업데이트 중 오류 발생:", error);
-    return NextResponse.json({ error: "작업 업데이트에 실패했습니다." }, { status: 500 });
+    
+    // 상세 에러 로깅 추가
+    if (error instanceof Error) {
+      console.error("에러 이름:", error.name);
+      console.error("에러 메시지:", error.message);
+      console.error("에러 스택:", error.stack);
+    }
+    
+    return NextResponse.json({ 
+      error: "작업 업데이트에 실패했습니다.", 
+      details: error instanceof Error ? error.message : "알 수 없는 오류" 
+    }, { status: 500 });
   }
 }
 

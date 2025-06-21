@@ -63,7 +63,10 @@ export function KanbanTask({ task, onUpdate, onDelete, theme = "light" }: Kanban
   };
 
   // 설명에서 HTML 태그 제거
-  const cleanDescription = task.description ? stripHtmlTags(task.description) : '';
+  const cleanDescription = typeof task.description === 'string'
+  ? stripHtmlTags(task.description)
+  : '';
+
 
   const handleClick = () => {
     setIsDetailOpen(true);

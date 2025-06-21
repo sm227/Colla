@@ -14,7 +14,16 @@ export type TaskStatus = "todo" | "in-progress" | "review" | "done";
 export interface Task {
   id: string;
   title: string;
-  description?: string;
+  description?: string | {
+    type: string;
+    content: {
+      type: string;
+      content?: {
+        type: string;
+        text?: string;
+      }[];
+    }[];
+  };
   status: TaskStatus;
   priority: string;
   assignee?: string | null;
