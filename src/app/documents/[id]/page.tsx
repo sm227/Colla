@@ -358,10 +358,14 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
     setShowSummaryModal,
     documentSummary,
     isSummarizing,
+    isUploadingImage,
+    fileInputRef,
     applyBlockType,
     summarizeDocument,
     createDocumentTemplate,
-    showTemplates
+    showTemplates,
+    handleImageUpload,
+    openFileDialog
   } = useDocumentEditor({
     ydoc,
     provider,
@@ -979,6 +983,15 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
         <div className="bg-white dark:bg-[#2a2a2c] py-4 px-6">
           <div className="flex items-center justify-between gap-4">
           <div className="flex items-center space-x-4 flex-1 min-w-0">
+              {/* 뒤로가기 버튼 */}
+              <button
+                onClick={() => router.push(currentProject?.id ? `/documents?projectId=${currentProject.id}` : '/documents')}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title="문서 목록으로 돌아가기"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              </button>
+              
               {/* 모바일 메뉴 버튼 */}
               <button
                 className="md:hidden"
@@ -1293,134 +1306,147 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
           {showSlashMenu && (
             <div
               ref={slashMenuRef}
-              className="absolute bg-white dark:bg-[#2a2a2c] shadow-xl rounded-xl p-1 z-50 border border-gray-200 dark:border-gray-700 max-h-[420px] overflow-auto w-[280px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-200"
+              className="absolute bg-white dark:bg-[#1f1f21] shadow-lg rounded-lg border border-gray-200 dark:border-gray-700 max-h-[400px] overflow-auto w-[240px] z-50"
               style={{
-                top: slashMenuPosition.y + 15, // 커서 위치보다 더 아래로 위치하도록 15px 추가
-                left: slashMenuPosition.x
+                top: slashMenuPosition.y + 15,
+                left: slashMenuPosition.x,
               }}
             >
-              <div className="text-sm font-medium text-slate-800 dark:text-slate-200 p-3 border-b border-slate-100 dark:border-slate-700 sticky top-0 bg-white dark:bg-[#2a2a2c] backdrop-blur-sm">
-                <span className="flex items-center gap-1.5">
-                  <span className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 rounded-md p-0.5">
-                    <span className="text-xs">/</span>
-                  </span>
-                  블록 선택
-                </span>
+              {/* 헤더 */}
+              <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-800">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center w-6 h-6 rounded bg-gray-100 dark:bg-gray-800">
+                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400">/</span>
+                  </div>
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">블록 선택</span>
+                </div>
               </div>
-              <div className="grid grid-cols-1 gap-0.5 p-1">
+              
+              {/* 메뉴 항목들 */}
+              <div className="py-1">
                 <button
                   onClick={() => applyBlockType('ai')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-left text-gray-700 dark:text-gray-300 transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400 group-hover:bg-purple-200 dark:group-hover:bg-purple-800 transition-colors">
-                    <SparklesIcon className="w-4 h-4" />
-                  </span>
-                  <div className="flex flex-col">
-                    <span className="font-medium">문서 요약</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">AI로 문서를 요약합니다</span>
+                  <div className="flex items-center justify-center w-6 h-6 rounded bg-gray-100 dark:bg-gray-800">
+                    <SparklesIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                   </div>
+                  <span>문서 요약</span>
                 </button>
+                
                 <button
                   onClick={() => applyBlockType('paragraph')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-left text-gray-700 dark:text-gray-300 transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-gray-600 transition-colors">
-                    <AlignLeft className="w-4 h-4" />
-                  </span>
-                  <span className="font-medium">본문</span>
+                  <div className="flex items-center justify-center w-6 h-6 rounded bg-gray-100 dark:bg-gray-800">
+                    <AlignLeft className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                  </div>
+                  <span>본문</span>
                 </button>
+                
                 <button
                   onClick={() => applyBlockType('heading1')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-left text-gray-700 dark:text-gray-300 transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 group-hover:bg-blue-200 dark:group-hover:bg-blue-800 transition-colors">
-                    <TypeIcon className="w-4 h-4" />
-                  </span>
-                  <span className="font-medium">제목 1</span>
+                  <div className="flex items-center justify-center w-6 h-6 rounded bg-gray-100 dark:bg-gray-800">
+                    <span className="text-xs font-bold text-gray-600 dark:text-gray-400">H1</span>
+                  </div>
+                  <span>제목 1</span>
                 </button>
+                
                 <button
                   onClick={() => applyBlockType('heading2')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-left text-gray-700 dark:text-gray-300 transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 group-hover:bg-blue-200 dark:group-hover:bg-blue-800 transition-colors">
-                    <TypeIcon className="w-4 h-4" />
-                  </span>
-                  <span className="font-medium">제목 2</span>
+                  <div className="flex items-center justify-center w-6 h-6 rounded bg-gray-100 dark:bg-gray-800">
+                    <span className="text-xs font-bold text-gray-600 dark:text-gray-400">H2</span>
+                  </div>
+                  <span>제목 2</span>
                 </button>
+                
                 <button
                   onClick={() => applyBlockType('heading3')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-left text-gray-700 dark:text-gray-300 transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 group-hover:bg-blue-200 dark:group-hover:bg-blue-800 transition-colors">
-                    <TypeIcon className="w-4 h-4" />
-                  </span>
-                  <span className="font-medium">제목 3</span>
+                  <div className="flex items-center justify-center w-6 h-6 rounded bg-gray-100 dark:bg-gray-800">
+                    <span className="text-xs font-bold text-gray-600 dark:text-gray-400">H3</span>
+                  </div>
+                  <span>제목 3</span>
                 </button>
+                
                 <button
                   onClick={() => applyBlockType('bulletList')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-left text-gray-700 dark:text-gray-300 transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400 group-hover:bg-green-200 dark:group-hover:bg-green-800 transition-colors">
-                    <ListIcon className="w-4 h-4" />
-                  </span>
-                  <span className="font-medium">글머리 기호</span>
+                  <div className="flex items-center justify-center w-6 h-6 rounded bg-gray-100 dark:bg-gray-800">
+                    <ListIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                  </div>
+                  <span>글머리 기호</span>
                 </button>
+                
                 <button
                   onClick={() => applyBlockType('orderedList')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-left text-gray-700 dark:text-gray-300 transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400 group-hover:bg-green-200 dark:group-hover:bg-green-800 transition-colors">
-                    <ListIcon className="w-4 h-4" />
-                  </span>
-                  <span className="font-medium">번호 매기기</span>
+                  <div className="flex items-center justify-center w-6 h-6 rounded bg-gray-100 dark:bg-gray-800">
+                    <span className="text-xs font-bold text-gray-600 dark:text-gray-400">1.</span>
+                  </div>
+                  <span>번호 매기기</span>
                 </button>
+                
                 <button
                   onClick={() => applyBlockType('taskList')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-left text-gray-700 dark:text-gray-300 transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900 text-amber-600 dark:text-amber-400 group-hover:bg-amber-200 dark:group-hover:bg-amber-800 transition-colors">
-                    <CheckSquareIcon className="w-4 h-4" />
-                  </span>
-                  <span className="font-medium">할 일 목록</span>
+                  <div className="flex items-center justify-center w-6 h-6 rounded bg-gray-100 dark:bg-gray-800">
+                    <CheckSquareIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                  </div>
+                  <span>할 일 목록</span>
                 </button>
+                
                 <button
                   onClick={() => applyBlockType('blockquote')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-left text-gray-700 dark:text-gray-300 transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-400 group-hover:bg-orange-200 dark:group-hover:bg-orange-800 transition-colors">
-                    <QuoteIcon className="w-4 h-4" />
-                  </span>
-                  <span className="font-medium">인용</span>
+                  <div className="flex items-center justify-center w-6 h-6 rounded bg-gray-100 dark:bg-gray-800">
+                    <QuoteIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                  </div>
+                  <span>인용</span>
                 </button>
+                
                 <button
                   onClick={() => applyBlockType('codeBlock')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-left text-gray-700 dark:text-gray-300 transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-200 dark:group-hover:bg-indigo-800 transition-colors">
-                    <CodeIcon className="w-4 h-4" />
-                  </span>
-                  <span className="font-medium">코드</span>
+                  <div className="flex items-center justify-center w-6 h-6 rounded bg-gray-100 dark:bg-gray-800">
+                    <CodeIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                  </div>
+                  <span>코드</span>
                 </button>
+                
                 <button
                   onClick={() => applyBlockType('image')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-left text-gray-700 dark:text-gray-300 transition-colors"
+                  disabled={isUploadingImage}
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-900 text-rose-600 dark:text-rose-400 group-hover:bg-rose-200 dark:group-hover:bg-rose-800 transition-colors">
-                    <ImageIcon className="w-4 h-4" />
-                  </span>
-                  <span className="font-medium">이미지</span>
+                  <div className="flex items-center justify-center w-6 h-6 rounded bg-gray-100 dark:bg-gray-800">
+                    {isUploadingImage ? (
+                      <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <ImageIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                    )}
+                  </div>
+                  <span>{isUploadingImage ? '업로드 중...' : '이미지'}</span>
                 </button>
+                
                 <button
                   onClick={() => applyBlockType('template')}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-left text-slate-800 dark:text-slate-200 group transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-left text-gray-700 dark:text-gray-300 transition-colors"
                 >
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-900 text-teal-600 dark:text-teal-400 group-hover:bg-teal-200 dark:group-hover:bg-teal-800 transition-colors">
-                    <FileTextIcon className="w-4 h-4" />
-                  </span>
-                  <div className="flex flex-col">
-                    <span className="font-medium">문서 템플릿</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">템플릿으로 문서 생성</span>
+                  <div className="flex items-center justify-center w-6 h-6 rounded bg-gray-100 dark:bg-gray-800">
+                    <FileTextIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                   </div>
+                  <span>문서 템플릿</span>
                 </button>
               </div>
             </div>
@@ -1436,6 +1462,22 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
             selectedTemplate={selectedTemplate}
           />
           
+          {/* 숨겨진 파일 input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                handleImageUpload(file);
+                // input 값 초기화 (같은 파일 다시 선택 가능하게)
+                e.target.value = '';
+              }
+            }}
+          />
+
           {/* Tiptap 에디터 */}
           <div className="prose max-w-none bg-white dark:bg-[#2a2a2c] rounded-lg">
             <EditorContent 
