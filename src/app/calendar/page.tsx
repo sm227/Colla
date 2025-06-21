@@ -124,6 +124,11 @@ const CalendarPageContent: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<string | null>(null);
 
+  // 토스트 알림 상태
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastVisible, setToastVisible] = useState(false);
+
   // useCallback hooks
   const fetchCalendarEvents = useCallback(async () => {
     setIsLoading(true);
@@ -888,8 +893,9 @@ const CalendarPageContent: React.FC = () => {
         }
         return task;
       }));
-      alert("이벤트가 수정되었습니다.");
+      showToastMessage("일정이 수정되었습니다.");
       setEditEventDialog({ show: false, event: null });
+      setActiveTab('none');
     } catch (error) {
       console.error("캘린더 이벤트 수정 오류:", error);
       alert("이벤트를 수정하는 도중 오류가 발생했습니다.");
@@ -1015,6 +1021,27 @@ const CalendarPageContent: React.FC = () => {
     }
     return 'bg-red-500/10 text-red-700 border-red-500/20';
   }
+
+  // 토스트 표시 함수
+  const showToastMessage = (message: string) => {
+    setToastMessage(message);
+    setShowToast(true);
+    
+    // 약간의 지연 후 애니메이션 시작
+    setTimeout(() => {
+      setToastVisible(true);
+    }, 50);
+    
+    // 2.5초 후 사라지는 애니메이션 시작
+    setTimeout(() => {
+      setToastVisible(false);
+    }, 2500);
+    
+    // 3초 후 완전히 제거
+    setTimeout(() => {
+      setShowToast(false);
+    }, 3000);
+  };
 
   return (
     <div className="flex h-screen bg-background text-foreground">
@@ -2297,6 +2324,28 @@ const CalendarPageContent: React.FC = () => {
         title="일정을 삭제하시겠습니까?"
         description="삭제된 일정은 복구할 수 없습니다."
       />
+
+      {/* 토스트 알림 */}
+      {showToast && (
+        <div className={`
+          fixed top-4 left-1/2 transform -translate-x-1/2 z-[10000] 
+          transition-all duration-500 ease-out
+          ${toastVisible ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0'}
+        `}>
+          <div className={`
+            px-6 py-4 rounded-lg shadow-lg border
+            ${theme === 'dark' 
+              ? 'bg-[#1f1f21] border-gray-700' 
+              : 'bg-white border-gray-200'
+            }
+            flex items-center justify-center min-w-[200px]
+            transform transition-all duration-500 ease-out
+            ${toastVisible ? 'scale-100' : 'scale-95'}
+          `}>
+            <span className="text-sm font-medium text-green-600">{toastMessage}</span>
+          </div>
+        </div>
+      )}
 
       {/* 예약되지 않은 업무 사이드바 스크롤바 스타일 */}
       <style jsx global>{`
