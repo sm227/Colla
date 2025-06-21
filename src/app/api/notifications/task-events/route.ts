@@ -196,8 +196,23 @@ export async function POST(req: NextRequest) {
     
   } catch (error) {
     console.error("작업 이벤트 처리 중 오류 발생:", error);
+    
+    // 상세 에러 로깅 추가
+    if (error instanceof Error) {
+      console.error("에러 이름:", error.name);
+      console.error("에러 메시지:", error.message);
+      console.error("에러 스택:", error.stack);
+    }
+    
     return NextResponse.json(
-      { error: "작업 이벤트 처리 중 오류가 발생했습니다" },
+      { 
+        error: "작업 이벤트 처리 중 오류가 발생했습니다",
+        details: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : "알 수 없는 오류"
+      },
       { status: 500 }
     );
   }

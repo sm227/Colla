@@ -1,224 +1,204 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { prisma } from '../../../../lib/prisma';
 import { stripHtmlTags } from '@/lib/utils';
 
-// 특정 태스크 가져오기
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+// 개별 작업 조회 (GET)
+export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const id = params.id;
+    const { id } = params;
     
+    // 개발 중 인증 체크 임시 우회
+    const session = { user: { id: "temp-user-id" } };
+
     const task = await prisma.task.findUnique({
       where: { id },
+      include: {
+        project: {
+          select: {
+            name: true
+          }
+        }
+      }
     });
-    
+
     if (!task) {
-      return NextResponse.json(
-        { error: '태스크를 찾을 수 없습니다.' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "작업을 찾을 수 없습니다." }, { status: 404 });
     }
-    
+
     return NextResponse.json(task);
   } catch (error) {
-    console.error('태스크 조회 오류:', error);
-    return NextResponse.json(
-      { error: '태스크를 가져오는 중 오류가 발생했습니다.' },
-      { status: 500 }
-    );
+    console.error("작업 조회 중 오류 발생:", error);
+    return NextResponse.json({ error: "작업 조회에 실패했습니다." }, { status: 500 });
   }
 }
 
-// 태스크 업데이트 (부분 업데이트)
-export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+// 개별 작업 업데이트 (PUT)
+export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
-    const id = params.id;
+    const { id } = params;
+    console.log("🔍 PUT 요청 받음 - ID:", id);
+    
+    // 개발 중 인증 체크 임시 우회
+    const session = { user: { id: "temp-user-id" } };
+
     const body = await request.json();
+    console.log("🔍 요청 본문:", JSON.stringify(body, null, 2));
     
-    const { title, description, status, priority, assignee, dueDate } = body;
-    
+    const { title, description, status, priority, assignee, projectId, epicId, dueDate, startDate, endDate } = body;
+
     // 변경 전 작업 정보 조회 (담당자 변경 추적용)
     const previousTask = await prisma.task.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        project: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
     });
 
     if (!previousTask) {
-      return NextResponse.json(
-        { error: '작업을 찾을 수 없습니다.' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "작업을 찾을 수 없습니다." }, { status: 404 });
     }
-    
-    // HTML 태그 제거
-    const cleanDescription = description !== undefined 
-      ? stripHtmlTags(description) 
-      : undefined;
-    
+
+    // description 처리: 문자열이면 JSON 형식으로 변환, 아니면 그대로 사용
+    let processedDescription = description;
+    if (typeof description === 'string') {
+      processedDescription = {
+        type: 'doc',
+        content: [{
+          type: 'paragraph',
+          content: [{ type: 'text', text: description }]
+        }]
+      };
+    }
+
+    // 작업 업데이트
     const updatedTask = await prisma.task.update({
       where: { id },
       data: {
-        ...(title && { title }),
-        ...(description !== undefined && { description: cleanDescription }),
-        ...(status && { status }),
-        ...(priority && { priority }),
+        ...(title !== undefined && { title }),
+        ...(description !== undefined && { description: processedDescription }),
+        ...(status !== undefined && { status }),
+        ...(priority !== undefined && { priority }),
         ...(assignee !== undefined && { assignee }),
+        ...(projectId !== undefined && { projectId }),
+        ...(epicId !== undefined && { epicId }),
         ...(dueDate !== undefined && { dueDate: dueDate ? new Date(dueDate) : null }),
-      },
+        ...(startDate !== undefined && { startDate: startDate ? new Date(startDate) : null }),
+        ...(endDate !== undefined && { endDate: endDate ? new Date(endDate) : null }),
+        updatedAt: new Date()
+      }
     });
 
+    console.log("✅ 작업 업데이트 성공:", updatedTask.id);
+
     // 담당자 변경 여부 확인
-    const assigneeChanged = previousTask.assignee !== assignee && assignee !== undefined;
+    const assigneeChanged = previousTask.assignee !== assignee;
     
-    // 알림 이벤트 트리거 (담당자가 변경된 경우에만)
-    if (assigneeChanged) {
-      try {
-        const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-        await fetch(`${baseUrl}/api/notifications/task-events`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            eventType: 'task_updated',
-            taskId: updatedTask.id,
-            projectId: updatedTask.projectId,
-            assigneeChanged: true,
-            previousAssignee: previousTask.assignee,
-            newAssignee: assignee,
-          }),
-        });
-      } catch (notificationError) {
-        console.error('담당자 변경 알림 발생 중 오류:', notificationError);
-      }
+    // 작업 업데이트 알림 이벤트 발생
+    try {
+      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+      await fetch(`${baseUrl}/api/notifications/task-events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventType: 'task_updated',
+          taskId: updatedTask.id,
+          projectId: updatedTask.projectId,
+          newStatus: status,
+          assigneeChanged,
+          previousAssignee: previousTask.assignee,
+          newAssignee: assignee,
+        }),
+      });
+    } catch (notificationError) {
+      console.error('작업 업데이트 알림 발생 중 오류:', notificationError);
+      // 알림 실패해도 작업 업데이트는 성공으로 처리
     }
-    
+
     return NextResponse.json(updatedTask);
   } catch (error) {
-    console.error('태스크 업데이트 오류:', error);
-    return NextResponse.json(
-      { error: '태스크를 업데이트하는 중 오류가 발생했습니다.' },
-      { status: 500 }
-    );
+    console.error("❌ PUT 에러 상세:", {
+      name: error?.name,
+      message: error?.message,
+      stack: error?.stack,
+      cause: error?.cause
+    });
+    
+    return NextResponse.json({ 
+      error: "작업 업데이트에 실패했습니다.", 
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
 }
 
-// 태스크 전체 업데이트 (전체 리소스 교체)
-export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+// 개별 작업 상태 업데이트 (PATCH)
+export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const id = params.id;
+    const { id } = params;
+    console.log("🔍 PATCH 요청 받음 - ID:", id);
+    
+    // 개발 중 인증 체크 임시 우회
+    const session = { user: { id: "temp-user-id" } };
+
     const body = await request.json();
+    console.log("🔍 PATCH 요청 본문:", JSON.stringify(body, null, 2));
     
-    // 유효성 검사
-    if (!body.title || !body.status || !body.priority) {
-      return NextResponse.json(
-        { error: '필수 필드가 누락되었습니다 (title, status, priority)' },
-        { status: 400 }
-      );
+    const { status } = body;
+
+    if (!status) {
+      return NextResponse.json({ error: "상태 정보가 필요합니다." }, { status: 400 });
     }
 
-    // 변경 전 작업 정보 조회 (담당자 변경 추적용)
-    const previousTask = await prisma.task.findUnique({
-      where: { id }
-    });
-
-    if (!previousTask) {
-      return NextResponse.json(
-        { error: '작업을 찾을 수 없습니다.' },
-        { status: 404 }
-      );
-    }
-    
-    // 날짜 데이터 변환 (dueDate만 처리)
-    let formattedDueDate = null;
-    if (body.dueDate) {
-      formattedDueDate = new Date(body.dueDate);
-      // 날짜 유효성 검사
-      if (isNaN(formattedDueDate.getTime())) {
-        return NextResponse.json(
-          { error: '유효하지 않은 날짜 형식입니다.' },
-          { status: 400 }
-        );
-      }
-    }
-    
-    // HTML 태그 제거
-    const cleanDescription = body.description ? stripHtmlTags(body.description) : '';
-    
+    // 작업 상태 업데이트
     const updatedTask = await prisma.task.update({
       where: { id },
       data: {
-        title: body.title,
-        description: cleanDescription, // HTML 태그가 제거된 설명 저장
-        status: body.status,
-        priority: body.priority,
-        assignee: body.assignee || null,
-        dueDate: formattedDueDate,
-        projectId: body.projectId || null,
-      },
+        status,
+        updatedAt: new Date()
+      }
     });
 
-    // 담당자 변경 여부 확인
-    const assigneeChanged = previousTask.assignee !== (body.assignee || null);
-    
-    // 알림 이벤트 트리거 (담당자가 변경된 경우에만)
-    if (assigneeChanged) {
-      try {
-        const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-        await fetch(`${baseUrl}/api/notifications/task-events`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            eventType: 'task_updated',
-            taskId: updatedTask.id,
-            projectId: updatedTask.projectId,
-            assigneeChanged: true,
-            previousAssignee: previousTask.assignee,
-            newAssignee: body.assignee || null,
-          }),
-        });
-      } catch (notificationError) {
-        console.error('담당자 변경 알림 발생 중 오류:', notificationError);
-      }
-    }
-    
+    console.log("✅ 작업 상태 업데이트 성공:", updatedTask.id, "->", status);
+
     return NextResponse.json(updatedTask);
   } catch (error) {
-    console.error('태스크 전체 업데이트 오류:', error);
-    return NextResponse.json(
-      { error: '태스크를 업데이트하는 중 오류가 발생했습니다.' },
-      { status: 500 }
-    );
+    console.error("❌ PATCH 에러 상세:", {
+      name: error?.name,
+      message: error?.message,
+      stack: error?.stack
+    });
+    
+    return NextResponse.json({ 
+      error: "작업 상태 업데이트에 실패했습니다.", 
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
 }
 
-// 태스크 삭제
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+// 개별 작업 삭제 (DELETE)
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const id = params.id;
+    const { id } = params;
     
+    // 개발 중 인증 체크 임시 우회
+    const session = { user: { id: "temp-user-id" } };
+
+    // 작업 삭제 (연결된 댓글도 CASCADE로 삭제됨)
     await prisma.task.delete({
-      where: { id },
+      where: { id }
     });
-    
-    return NextResponse.json({ message: '태스크가 삭제되었습니다.' });
+
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('태스크 삭제 오류:', error);
-    return NextResponse.json(
-      { error: '태스크를 삭제하는 중 오류가 발생했습니다.' },
-      { status: 500 }
-    );
+    console.error("작업 삭제 중 오류 발생:", error);
+    return NextResponse.json({ error: "작업 삭제에 실패했습니다." }, { status: 500 });
   }
 } 

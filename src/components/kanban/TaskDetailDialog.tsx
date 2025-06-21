@@ -70,9 +70,25 @@ const processTiptapContent = (content: string): string => {
   return content;
 };
 
-const RichTextEditor = ({ content, onChange, theme = "light" }: { content: string, onChange: (html: string) => void, theme?: "light" | "dark" }) => {
-  // 초기 콘텐츠에서 HTML 태그 처리
-  const processedContent = processTiptapContent(content);
+const RichTextEditor = ({ content, onChange, theme = "light" }: { 
+  content: string | { 
+    type: string; 
+    content: { 
+      type: string; 
+      content?: { type: string; text?: string }[] 
+    }[] 
+  }, 
+  onChange: (html: string) => void, 
+  theme?: "light" | "dark" 
+}) => {
+  // JSON 형식의 content 처리
+  const processedContent = typeof content === 'object' && content.type === 'doc'
+    ? content.content.map(para => 
+        para.content ? para.content.map(c => c.text || '').join('') : ''
+      ).join('')
+    : typeof content === 'string' 
+      ? content 
+      : '';
   
   const editor = useEditor({
     extensions: [
@@ -618,7 +634,10 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
   // 작업 저장 함수 (서버에 업데이트)
   const saveTask = async (taskToSave: Task) => {
     try {
-      const response = await fetch('/api/tasks', {
+      console.log('💾 작업 저장 시작:', taskToSave.id);
+      
+      // 개별 작업 API 엔드포인트 사용
+      const response = await fetch(`/api/tasks/${taskToSave.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -627,32 +646,56 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
       });
 
       if (!response.ok) {
-        throw new Error('작업 업데이트에 실패했습니다.');
+        const errorData = await response.json();
+        console.error('❌ 작업 업데이트 실패:', errorData);
+        throw new Error(errorData.details || '작업 업데이트에 실패했습니다.');
       }
 
       const updatedTask = await response.json();
+      console.log('✅ 작업 저장 성공:', updatedTask.id);
+      
       onUpdate(updatedTask);
     } catch (error) {
-      console.error('작업 업데이트 중 오류 발생:', error);
+      console.error('❌ 작업 업데이트 중 오류 발생:', error);
+      // 사용자에게 에러 메시지 표시
+      alert(error instanceof Error ? error.message : '작업 업데이트 중 오류가 발생했습니다.');
     }
   };
   
   // 설명 변경 처리를 위한 특별 핸들러
   const handleDescriptionChange = (html: string) => {
-    // 빈 p 태그 처리
-    if (html === '<p></p>') {
-      html = '';
-    }
-    
-    // 서버로 보내기 전에 HTML 태그를 제거하지 않음
-    // stripHtmlTags 함수는 서버 측에서 적용되므로 여기서는 원본 HTML을 유지
-    // 우리는 저장할 때만 텍스트를 변환해야 함
-    handleChange({...editedTask, description: html});
+    // HTML을 JSON 형식으로 변환
+    const descriptionJson = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: html ? [{ type: 'text', text: html }] : []
+        }
+      ]
+    };
+
+    // 기존 task 객체에 새로운 description 병합
+    const updatedTask = {
+      ...task,
+      description: descriptionJson
+    };
+
+    handleChange(updatedTask);
   };
   
   // 설명 표시용 - HTML 태그 제거
   const getCleanDescription = (): string => {
-    return removeHtmlTags(editedTask.description || '');
+    // JSON 형식의 description 처리
+    if (typeof task.description === 'object' && task.description?.type === 'doc') {
+      const paragraphs = task.description.content.map(para => 
+        para.content ? para.content.map(content => content.text || '').join('') : ''
+      );
+      return paragraphs.join('\n');
+    }
+    
+    // 기존 문자열 형식의 description 처리
+    return typeof task.description === 'string' ? task.description : '';
   };
   
   // 모달을 닫을 때 변경사항이 있으면 저장 (useCallback으로 감싸기)
