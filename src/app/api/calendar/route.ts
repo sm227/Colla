@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
-
-const prisma = new PrismaClient();
+import { prisma } from '../../lib/prisma';
 
 // 실제 로그인된 사용자 정보 가져오기
 async function getCurrentUserId(request: NextRequest) {

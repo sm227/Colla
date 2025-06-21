@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-
-const prisma = new PrismaClient();
+import { prisma } from '../../../lib/prisma';
 
 // 작업 이벤트 처리 API (작업 생성, 상태 변경 등)
 export async function POST(req: NextRequest) {

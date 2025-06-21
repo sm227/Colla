@@ -1,13 +1,10 @@
 import { NextRequest } from 'next/server';
 import { Server } from '@hocuspocus/server';
 import { Database } from '@hocuspocus/extension-database';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 
 // 동적 라우트로 설정하여 정적 생성 방지
 export const dynamic = 'force-dynamic';
-
-// Prisma 클라이언트 인스턴스
-const prisma = new PrismaClient();
 
 // Hocuspocus 서버 인스턴스 생성
 const server = Server.configure({
