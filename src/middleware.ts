@@ -14,6 +14,8 @@ const publicPaths = [
   '/_next',
   '/favicon.ico',
   '/api/socket', // WebSocket 연결은 인증 없이 허용
+  '/sitemap.xml', // 사이트맵
+  '/robots.txt', // robots.txt
 ];
 
 // 환경 변수 확인 로그
@@ -24,6 +26,11 @@ export async function middleware(request: NextRequest) {
   
   // 디버깅을 위한 로그 (실제 배포 시 제거)
   console.log('미들웨어 실행:', pathname);
+  
+  // 사이트맵 관련 경로는 바로 통과
+  if (pathname === '/sitemap.xml' || pathname === '/robots.txt') {
+    return NextResponse.next();
+  }
   
   // WebSocket 경로 특별 처리
   if (pathname.startsWith('/api/socket')) {
@@ -102,20 +109,34 @@ export async function middleware(request: NextRequest) {
     const url = new URL('/auth/login', request.url);
     url.searchParams.set('callbackUrl', pathname);
     console.log('토큰 없음, 리디렉션:', url.toString());
+    console.log('요청 출처:', request.headers.get('referer') || '직접 접근');
     return NextResponse.redirect(url);
   }
   
   // 토큰 검증
   try {
     console.log('토큰 검증 시도:', token.substring(0, 20) + '...');
+    console.log('요청 출처:', request.headers.get('referer') || '직접 접근');
+    console.log('사용자 에이전트:', request.headers.get('user-agent') || '알 수 없음');
+    
     const decoded = await verifyTokenEdge(token);
     
     // 토큰이 유효하지 않은 경우
     if (!decoded) {
       console.log('유효하지 않은 토큰 - 검증 실패');
+      console.log('토큰 삭제 및 로그인 페이지로 리다이렉트');
+      
       // 토큰이 유효하지 않은 경우 쿠키 삭제 및 로그인 페이지로 리디렉션
-      const response = NextResponse.redirect(new URL('/auth/login', request.url));
-      response.cookies.delete('token');
+      const url = new URL('/auth/login', request.url);
+      url.searchParams.set('callbackUrl', pathname);
+      const response = NextResponse.redirect(url);
+      response.cookies.set('token', '', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 0,
+        path: '/',
+        sameSite: 'lax',
+      });
       return response;
     }
     
@@ -131,9 +152,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   } catch (error) {
     console.error('토큰 검증 예외 발생:', error);
+    console.log('요청 출처:', request.headers.get('referer') || '직접 접근');
+    
     // 토큰 검증 오류 시 쿠키 삭제 및 로그인 페이지로 리디렉션
-    const response = NextResponse.redirect(new URL('/auth/login', request.url));
-    response.cookies.delete('token');
+    const url = new URL('/auth/login', request.url);
+    url.searchParams.set('callbackUrl', pathname);
+    const response = NextResponse.redirect(url);
+    response.cookies.set('token', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 0,
+      path: '/',
+      sameSite: 'lax',
+    });
     return response;
   }
 }

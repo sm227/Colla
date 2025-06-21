@@ -1345,7 +1345,7 @@ function HomeContent() {
             </button>
             
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-black dark:bg-blue-600 rounded-lg flex items-center justify-center mr-2">
+              <div className="w-8 h-8 bg-blue-600 dark:bg-blue-600 rounded-lg flex items-center justify-center mr-2">
                 <span className="text-white font-bold text-lg">C</span>
               </div>
               <span className="text-xl font-semibold text-gray-900 dark:text-gray-100">Colla</span>

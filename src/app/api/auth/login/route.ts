@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       maxAge: maxAge,
       path: '/',
-      sameSite: 'strict',
+      sameSite: 'lax', // 외부 사이트에서 링크로 접속할 때도 쿠키 전송 허용
     });
 
     // 응답 헤더에 캐시 방지 설정 추가
