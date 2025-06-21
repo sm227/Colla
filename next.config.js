@@ -13,12 +13,7 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: [],
   },
-  // API routes 설정
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
+
 }
 
 module.exports = nextConfig 

@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/prisma';
 
+// API 라우트 설정 - 파일 업로드를 위한 크기 제한
+export const runtime = 'nodejs';
+export const maxDuration = 30;
+
 export async function POST(request: NextRequest) {
   try {
     console.log('이미지 업로드 요청 시작');
@@ -35,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     console.log('파일 데이터 읽기 시작');
     const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    const buffer = new Uint8Array(bytes);
     console.log('파일 데이터 읽기 완료, 크기:', buffer.length);
 
     // 파일 확장자 추출

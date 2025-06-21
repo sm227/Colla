@@ -169,7 +169,12 @@ export const useDocumentEditor = ({
       TaskItem.configure({
         nested: true,
       }),
-      Image,
+      Image.configure({
+        HTMLAttributes: {
+          class: 'max-w-full h-auto rounded-lg',
+        },
+        allowBase64: true,
+      }),
       BulletList,
       OrderedList,
       ListItem,
@@ -179,6 +184,7 @@ export const useDocumentEditor = ({
       Typography,
       Collaboration.configure({
         document: ydoc,
+        field: 'prosemirror',
       }),
       ...(provider ? [
         CustomCollaborationCursor.configure({
@@ -503,8 +509,62 @@ export const useDocumentEditor = ({
       
       const data = await response.json();
       
+      console.log('이미지 업로드 완료:', data.url);
+      console.log('Y.js 문서 상태 (이미지 삽입 전):', ydoc.toJSON());
+      
+      // 절대 URL 생성 (다른 사용자들이 접근할 수 있도록)
+      const absoluteUrl = data.url.startsWith('http') 
+        ? data.url 
+        : `${window.location.origin}${data.url}`;
+      
+      console.log('절대 이미지 URL:', absoluteUrl);
+      
       // 에디터에 이미지 삽입
-      editor.chain().focus().setImage({ src: data.url }).run();
+      editor.chain().focus().setImage({ 
+        src: absoluteUrl,
+        alt: file.name || '업로드된 이미지',
+        title: file.name || '업로드된 이미지'
+      }).run();
+      
+      // Y.js 동기화 강제 트리거 및 문서 업데이트 알림
+      if (provider) {
+        // Y.js 문서 상태 직접 업데이트
+        const yXmlFragment = ydoc.getXmlFragment('prosemirror');
+        
+        // 트랜잭션을 통해 강제로 업데이트 신호 전송
+        ydoc.transact(() => {
+          // 빈 트랜잭션으로 동기화 트리거
+        });
+        
+        // 프로바이더에 변경사항 전송
+        provider.sendStateless('sync-request');
+        
+        // Awareness 업데이트 (다른 사용자들에게 알림)
+        if (provider.awareness) {
+          const currentState = provider.awareness.getLocalState();
+          provider.awareness.setLocalState({
+            ...currentState,
+            lastAction: 'image-uploaded',
+            timestamp: Date.now()
+          });
+        }
+      }
+      
+      // 이미지 삽입 후 Y.js 문서 상태 확인
+      setTimeout(() => {
+        console.log('Y.js 문서 상태 (이미지 삽입 후):', ydoc.toJSON());
+        console.log('프로바이더 연결 상태:', provider?.status);
+        console.log('협업 사용자 수:', connectedUsers.length);
+        
+        // Y.js 문서 내용 직접 출력
+        const yXmlFragment = ydoc.getXmlFragment('prosemirror');
+        console.log('Y.js XML Fragment:', yXmlFragment.toString());
+        
+        // 다른 사용자들에게 변경사항이 전파되었는지 확인
+        if (provider && provider.awareness) {
+          console.log('프로바이더 awareness 상태:', provider.awareness.getStates());
+        }
+      }, 1000);
       
     } catch (error) {
       console.error('이미지 업로드 오류:', error);
@@ -854,6 +914,38 @@ export const useDocumentEditor = ({
       editor.off('selectionUpdate', onEditorUpdate);
     };
   }, [editor, showSlashMenu]);
+
+  // Y.js 문서 변경 감지 (이미지 동기화 확인용)
+  useEffect(() => {
+    if (!ydoc) return;
+    
+    const handleYDocUpdate = (update: Uint8Array, origin: any) => {
+      console.log('Y.js 문서 업데이트 감지:', origin);
+      
+      // 이미지 관련 업데이트인지 확인
+      const docJSON = ydoc.toJSON();
+      const hasImages = JSON.stringify(docJSON).includes('"type":"image"');
+      
+      if (hasImages) {
+        console.log('이미지 노드가 포함된 문서 업데이트:', docJSON);
+        
+        // 다른 사용자들에게 이미지 동기화 알림
+        if (provider && provider.awareness && origin !== ydoc) {
+          provider.awareness.setLocalState({
+            ...provider.awareness.getLocalState(),
+            hasImages: true,
+            lastImageSync: Date.now()
+          });
+        }
+      }
+    };
+    
+    ydoc.on('update', handleYDocUpdate);
+    
+    return () => {
+      ydoc.off('update', handleYDocUpdate);
+    };
+  }, [ydoc, provider]);
 
   // 바깥 영역 클릭 감지
   useEffect(() => {
