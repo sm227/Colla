@@ -1337,22 +1337,12 @@ function DocumentsPageContent() {
         </div>
       
               {/* 메인 콘텐츠 */}
-        <main className="flex flex-col flex-1 p-6 lg:p-8 overflow-y-auto bg-background">
+        <main className="flex flex-col flex-1 pl-6 pr-6 lg:p-4 overflow-y-auto bg-background">
         {/* 페이지 헤더 */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <FileTextIcon className="w-6 h-6 text-primary" />
-            </div>
-            <h1 className="text-3xl font-bold text-foreground">문서</h1>
-          </div>
-          <p className="text-lg text-muted-foreground">
-            {selectedFolder ? `'${selectedFolder}' 폴더의 문서를 관리하세요` : (selectedProjectId ? '프로젝트 문서를 관리하고 공유하세요' : '팀의 지식을 체계적으로 관리하고 공유하세요')}
-          </p>
-        </div>
+        
         
         {/* 검색 및 필터 위젯 */}
-        <div className="bg-background rounded-lg p-6 mb-8">
+        <div className="bg-background rounded-lg p-6 mb-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="relative flex-1">
                               <input

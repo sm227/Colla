@@ -51,6 +51,7 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
   // 작업 상세 다이얼로그 관련 상태 추가
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [clickedElement, setClickedElement] = useState<HTMLElement | undefined>(undefined);
   
   // projectId가 변경될 때마다 태스크를 다시 불러옵니다.
   useEffect(() => {
@@ -130,8 +131,9 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
   };
 
   // 작업 상세 다이얼로그 관리 함수 수정
-  const handleOpenDialog = (task: Task) => {
+  const handleOpenDialog = (task: Task, element?: HTMLElement) => {
     setSelectedTask(task);
+    setClickedElement(element);
     setIsDialogOpen(true);
   };
 
@@ -139,6 +141,7 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
     // 즉시 상태 업데이트
     setIsDialogOpen(false);
     setSelectedTask(null);
+    setClickedElement(undefined);
   };
 
   // 작업 업데이트 함수 - 서버에 변경사항 저장하도록 수정
@@ -295,6 +298,7 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
           onUpdate={handleUpdateTask}
           onDelete={handleDeleteTask}
           theme={theme}
+          clickedElement={clickedElement}
         />
       )}
     </div>

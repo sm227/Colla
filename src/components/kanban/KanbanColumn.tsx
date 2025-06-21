@@ -12,7 +12,7 @@ interface KanbanColumnProps {
   tasks: Task[];
   status: TaskStatus;
   updateTaskStatus: (taskId: string, newStatus: TaskStatus) => void;
-  onTaskClick: (task: Task) => void;
+  onTaskClick: (task: Task, element?: HTMLElement) => void;
   color?: 'gray' | 'blue' | 'yellow' | 'green' | 'purple' | 'red';
   onTaskDelete?: (taskId: string) => void; 
   onAddTask?: (task: Omit<Task, "id">) => void;
@@ -200,7 +200,24 @@ export function KanbanColumn({
           <div
             key={task.id}
             ref={idx === tasks.length - 1 ? lastTaskRef : undefined}
-            onClick={() => onTaskClick(task)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              
+              const target = e.currentTarget;
+              
+              // 클릭 피드백 애니메이션
+              target.style.transform = 'scale(0.98)';
+              target.style.transition = 'transform 0.1s ease-out';
+              
+              setTimeout(() => {
+                target.style.transform = 'scale(1)';
+              }, 100);
+              
+              // 모달 열기 (클릭한 요소 전달)
+              onTaskClick(task, target);
+            }}
+            className="cursor-pointer transition-all duration-200 ease-out hover:scale-[1.02] hover:shadow-md hover:shadow-blue-100/50 active:scale-95"
           >
             <KanbanTask 
               task={task} 
