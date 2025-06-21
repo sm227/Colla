@@ -12,6 +12,7 @@ import { useTasks } from "@/hooks/useTasks";
 import { Task as KanbanTask, TaskStatus } from "@/components/kanban/KanbanBoard";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { useTheme } from "next-themes";
+import { DeleteConfirmModal } from "@/components/modals/DeleteConfirmModal";
 
 export interface Task {
   id: string;
@@ -118,6 +119,10 @@ const CalendarPageContent: React.FC = () => {
   
   // 통합 탭 상태 관리 - 하나의 탭만 열리도록 제어
   const [activeTab, setActiveTab] = useState<ActiveTab>('none');
+
+  // 삭제 확인 모달 상태
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [eventToDelete, setEventToDelete] = useState<string | null>(null);
 
   // useCallback hooks
   const fetchCalendarEvents = useCallback(async () => {
@@ -485,14 +490,30 @@ const CalendarPageContent: React.FC = () => {
       return;
     }
     try {
-      // datetime-local 값 그대로 ISO로 변환
-      const startDateTime = new Date(event.startDate);
-      let endDateTime;
-      if (!event.endDate || event.endDate.trim() === '') {
-        endDateTime = new Date(event.startDate);
+      let startDateTime: Date;
+      let endDateTime: Date;
+      
+      // 시간이 설정되지 않은 경우 (월별 뷰에서 더블클릭으로 생성된 경우)
+      if (event.startDate && !event.startDate.includes('T')) {
+        // 현재 시간으로 설정
+        const now = new Date();
+        const baseDate = new Date(event.startDate);
+        
+        startDateTime = new Date(baseDate);
+        startDateTime.setHours(now.getHours(), now.getMinutes(), 0, 0);
+        
+        endDateTime = new Date(startDateTime);
+        endDateTime.setTime(startDateTime.getTime() + (60 * 60 * 1000)); // 1시간 후
       } else {
-        endDateTime = new Date(event.endDate);
+        // 시간이 설정된 경우 기존 로직 사용
+        startDateTime = new Date(event.startDate);
+        if (!event.endDate || event.endDate.trim() === '') {
+          endDateTime = new Date(event.startDate);
+        } else {
+          endDateTime = new Date(event.endDate);
+        }
       }
+      
       const response = await fetch('/api/calendar', {
         method: 'POST',
         headers: {
@@ -519,7 +540,6 @@ const CalendarPageContent: React.FC = () => {
         createdAt: new Date(newEvent.createdAt),
         isCalendarEvent: true
       }]);
-      alert("이벤트가 추가되었습니다.");
       setAddEventDialog({ show: false, date: null });
       setNewEvent({
         title: '',
@@ -878,10 +898,6 @@ const CalendarPageContent: React.FC = () => {
 
   // 일정 삭제 함수
   const deleteCalendarEvent = async (eventId: string) => {
-    if (!confirm("정말로 이 일정을 삭제하시겠습니까?")) {
-      return;
-    }
-
     try {
       // 캘린더 API로 이벤트 삭제
       const response = await fetch(`/api/calendar/${eventId}`, {
@@ -895,13 +911,26 @@ const CalendarPageContent: React.FC = () => {
       // 상태 업데이트 (삭제된 일정 제거)
       setTasks(prev => prev.filter(task => task.id !== eventId));
 
-      alert("이벤트가 삭제되었습니다.");
-
       // 다이얼로그 닫기
       setEditEventDialog({ show: false, event: null });
+      setActiveTab('none');
     } catch (error) {
       console.error("캘린더 이벤트 삭제 오류:", error);
       alert("이벤트를 삭제하는 도중 오류가 발생했습니다.");
+    }
+  };
+
+  // 삭제 버튼 클릭 핸들러
+  const handleDeleteClick = (eventId: string) => {
+    setEventToDelete(eventId);
+    setShowDeleteModal(true);
+  };
+
+  // 삭제 확인 핸들러
+  const handleConfirmDelete = () => {
+    if (eventToDelete) {
+      deleteCalendarEvent(eventToDelete);
+      setEventToDelete(null);
     }
   };
 
@@ -921,8 +950,8 @@ const CalendarPageContent: React.FC = () => {
         id: event.id,
         title: event.title,
         description: event.description || '',
-        startDate: event.startDate ? format(new Date(event.startDate), 'yyyy-MM-dd') : '',
-        endDate: event.dueDate ? format(new Date(event.dueDate), 'yyyy-MM-dd') : '',
+        startDate: event.startDate ? format(new Date(event.startDate), 'yyyy-MM-dd\'T\'HH:mm') : '',
+        endDate: event.dueDate ? format(new Date(event.dueDate), 'yyyy-MM-dd\'T\'HH:mm') : '',
         projectId: event.projectId || ''
       });
     } else {
@@ -1400,49 +1429,50 @@ const CalendarPageContent: React.FC = () => {
                                   return a.endMinute - b.endMinute;
                                 });
                                 
-                                // 겹침 처리 알고리즘 - 그룹별로 처리
+                                // 겹침 처리 알고리즘 - 개선된 버전
                                 const finalEvents: Array<any> = [];
-                                const processedEvents = new Set();
                                 
+                                // 시간 순으로 정렬된 이벤트들을 순차적으로 처리
                                 for (let i = 0; i < sortedEvents.length; i++) {
-                                  if (processedEvents.has(i)) continue;
-                                  
                                   const currentEvent = sortedEvents[i];
                                   
-                                  // 현재 이벤트와 겹치는 모든 이벤트 찾기
-                                  const overlappingGroup = [currentEvent];
-                                  const overlappingIndexes = [i];
-                                  
-                                  for (let j = i + 1; j < sortedEvents.length; j++) {
-                                    if (processedEvents.has(j)) continue;
-                                    
-                                    const otherEvent = sortedEvents[j];
-                                    const isOverlapping = overlappingGroup.some(groupEvent => 
-                                      otherEvent.startMinute < groupEvent.endMinute && 
-                                      otherEvent.endMinute > groupEvent.startMinute
-                                    );
-                                    
-                                    if (isOverlapping) {
-                                      overlappingGroup.push(otherEvent);
-                                      overlappingIndexes.push(j);
-                                    }
-                                  }
-                                  
-                                  // 겹치는 그룹의 totalColumns 계산
-                                  const groupTotalColumns = overlappingGroup.length;
-                                  
-                                  // 각 이벤트에 컬럼 할당
-                                  overlappingGroup.forEach((event, index) => {
-                                    finalEvents.push({
-                                      ...event,
-                                      column: index,
-                                      totalColumns: groupTotalColumns
-                                    });
+                                  // 현재 이벤트와 겹치는 이미 배치된 이벤트들 찾기
+                                  const conflictingEvents = finalEvents.filter(placedEvent => {
+                                    // 겹침 조건: 시간대가 겹치는 경우
+                                    return (currentEvent.startMinute < placedEvent.endMinute && 
+                                            currentEvent.endMinute > placedEvent.startMinute);
                                   });
                                   
-                                  // 처리된 이벤트들 마킹
-                                  overlappingIndexes.forEach(index => processedEvents.add(index));
+                                  // 사용 중인 컬럼 번호들 수집
+                                  const usedColumns = new Set(conflictingEvents.map(event => event.column));
+                                  
+                                  // 사용되지 않은 가장 작은 컬럼 번호 찾기
+                                  let column = 0;
+                                  while (usedColumns.has(column)) {
+                                    column++;
+                                  }
+                                  
+                                  // 이벤트에 컬럼 정보 할당
+                                  const eventWithColumn = {
+                                    ...currentEvent,
+                                    column,
+                                    totalColumns: 1 // 임시로 1로 설정, 나중에 업데이트
+                                  };
+                                  
+                                  finalEvents.push(eventWithColumn);
                                 }
+                                
+                                // 겹치는 이벤트 그룹별로 totalColumns 업데이트
+                                finalEvents.forEach(event => {
+                                  // 현재 이벤트와 겹치는 모든 이벤트 찾기
+                                  const overlappingEvents = finalEvents.filter(otherEvent => 
+                                    event.startMinute < otherEvent.endMinute && 
+                                    event.endMinute > otherEvent.startMinute
+                                  );
+                                  
+                                  const maxColumn = Math.max(...overlappingEvents.map(e => e.column));
+                                  event.totalColumns = maxColumn + 1;
+                                });
                                 
                                 return finalEvents.map((processedTask) => {
                                   const { column, totalColumns, topPosition, height } = processedTask;
@@ -1698,9 +1728,9 @@ const CalendarPageContent: React.FC = () => {
                         
                         // 현재 이벤트와 겹치는 이미 배치된 이벤트들 찾기
                         const conflictingEvents = finalEvents.filter(placedEvent => {
-                          // 겹침 조건을 더 엄격하게: 시작시간이 같거나 시간대가 겹치는 경우
-                          return (currentEvent.startMinute <= placedEvent.endMinute && 
-                                  currentEvent.endMinute >= placedEvent.startMinute);
+                          // 겹침 조건: 시간대가 겹치는 경우
+                          return (currentEvent.startMinute < placedEvent.endMinute && 
+                                  currentEvent.endMinute > placedEvent.startMinute);
                         });
                         
                         // 사용 중인 컬럼 번호들 수집
@@ -1722,22 +1752,17 @@ const CalendarPageContent: React.FC = () => {
                         finalEvents.push(eventWithColumn);
                       }
                       
-                      // 모든 이벤트의 totalColumns를 최대 컬럼 수로 업데이트
-                      const maxColumns = finalEvents.length > 0 ? Math.max(...finalEvents.map(event => event.column)) + 1 : 1;
+                      // 겹치는 이벤트 그룹별로 totalColumns 업데이트
                       finalEvents.forEach(event => {
-                        event.totalColumns = maxColumns;
+                        // 현재 이벤트와 겹치는 모든 이벤트 찾기
+                        const overlappingEvents = finalEvents.filter(otherEvent => 
+                          event.startMinute < otherEvent.endMinute && 
+                          event.endMinute > otherEvent.startMinute
+                        );
+                        
+                        const maxColumn = Math.max(...overlappingEvents.map(e => e.column));
+                        event.totalColumns = maxColumn + 1;
                       });
-                      
-                      // 디버깅 로그
-                      if (finalEvents.length > 1) {
-                        console.log('[일별뷰] 겹침 처리 결과:', finalEvents.map(e => ({
-                          title: e.title,
-                          column: e.column,
-                          totalColumns: e.totalColumns,
-                          startMinute: e.startMinute,
-                          endMinute: e.endMinute
-                        })));
-                      }
                       
                       return finalEvents;
                     })();
@@ -1832,56 +1857,76 @@ const CalendarPageContent: React.FC = () => {
       <aside className="w-80 border-l border-border bg-card text-card-foreground flex flex-col p-4 overflow-y-auto">
         {/* 일정 추가 폼: activeTab이 'addEvent'일 때만 표시 */}
         {activeTab === 'addEvent' && (
-          <div className="mb-6 border-b pb-4">
-            <div className="font-bold text-lg mb-4">새 일정 추가</div>
-            <div className="space-y-6">
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-medium text-foreground">새 일정 추가</h3>
+              <Button variant="ghost" size="sm" onClick={() => {
+                setActiveTab('none');
+                setNewEvent({ title: '', description: '', startDate: '', endDate: '', projectId: '' });
+              }}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <div className="space-y-4">
               {/* 제목 */}
               <div>
+                <label className="text-xs text-muted-foreground mb-2 block">제목</label>
                 <input
                   type="text"
                   value={newEvent.title}
                   onChange={e => setNewEvent({ ...newEvent, title: e.target.value })}
-                  className="w-full bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-lg font-semibold placeholder-gray-400"
-                  placeholder="제목을 입력하세요"
+                  className="w-full bg-transparent border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-muted-foreground"
+                  placeholder="일정 제목을 입력하세요"
                   required
                 />
               </div>
+              
               {/* 설명 */}
               <div>
+                <label className="text-xs text-muted-foreground mb-2 block">설명</label>
                 <textarea
                   value={newEvent.description}
                   onChange={e => setNewEvent({ ...newEvent, description: e.target.value })}
-                  className="w-full bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-base placeholder-gray-400 resize-none"
-                  rows={2}
-                  placeholder="설명을 입력하세요"
+                  className="w-full bg-transparent border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-muted-foreground resize-none"
+                  rows={3}
+                  placeholder="일정 설명을 입력하세요"
                 />
               </div>
-              {/* 날짜+시간 */}
-              <div className="flex flex-col gap-2">
+              
+              {/* 시작 시간 */}
+              <div>
+                <label className="text-xs text-muted-foreground mb-2 block">시작 시간</label>
                 <input
                   type="datetime-local"
                   value={newEvent.startDate}
                   onChange={e => setNewEvent({ ...newEvent, startDate: e.target.value })}
-                  className="w-full min-w-0 block bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-base placeholder-gray-400"
+                  className="w-full bg-transparent border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                   required
                 />
+              </div>
+              
+              {/* 종료 시간 */}
+              <div>
+                <label className="text-xs text-muted-foreground mb-2 block">종료 시간</label>
                 <input
                   type="datetime-local"
                   value={newEvent.endDate}
                   onChange={e => setNewEvent({ ...newEvent, endDate: e.target.value })}
-                  className="w-full min-w-0 block bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-base placeholder-gray-400"
+                  className="w-full bg-transparent border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                 />
               </div>
+              
               {/* 버튼 */}
               <div className="flex gap-2 pt-2">
-                <Button className="flex-1" onClick={() => {
+                <Button size="sm" className="flex-1" onClick={() => {
                   addCalendarEvent(newEvent);
                   setActiveTab('none');
                   setNewEvent({ title: '', description: '', startDate: '', endDate: '', projectId: '' });
                 }}>
-                  일정 추가
+                  추가
                 </Button>
-                <Button className="flex-1" variant="outline" onClick={() => {
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => {
                   setActiveTab('none');
                   setNewEvent({ title: '', description: '', startDate: '', endDate: '', projectId: '' });
                 }}>
@@ -1893,71 +1938,97 @@ const CalendarPageContent: React.FC = () => {
         )}
         {/* 일정 수정 폼: activeTab이 'editEvent'일 때만 표시 */}
         {activeTab === 'editEvent' && editEventDialog.event && (
-          <div className="mb-6 border-b pb-4">
-            <div className="font-bold text-lg mb-4">일정 수정</div>
-            <div className="space-y-6">
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-medium text-foreground">일정 수정</h3>
+              <Button variant="ghost" size="sm" onClick={() => {
+                setEditEventDialog({ show: false, event: null });
+                setActiveTab('none');
+              }}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <div className="space-y-4">
               {/* 제목 */}
               <div>
+                <label className="text-xs text-muted-foreground mb-2 block">제목</label>
                 <input
                   type="text"
                   value={editingEvent.title}
                   onChange={e => setEditingEvent({ ...editingEvent, title: e.target.value })}
-                  className="w-full bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-lg font-semibold placeholder-gray-400"
-                  placeholder="제목을 입력하세요"
+                  className="w-full bg-transparent border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-muted-foreground"
+                  placeholder="일정 제목을 입력하세요"
                   required
                 />
               </div>
+              
               {/* 설명 */}
               <div>
+                <label className="text-xs text-muted-foreground mb-2 block">설명</label>
                 <textarea
                   value={editingEvent.description}
                   onChange={e => setEditingEvent({ ...editingEvent, description: e.target.value })}
-                  className="w-full bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-base placeholder-gray-400 resize-none"
-                  rows={2}
-                  placeholder="설명을 입력하세요"
+                  className="w-full bg-transparent border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-muted-foreground resize-none"
+                  rows={3}
+                  placeholder="일정 설명을 입력하세요"
                 />
               </div>
-              {/* 날짜+시간 */}
-              <div className="flex flex-col gap-2">
+              
+              {/* 시작 시간 */}
+              <div>
+                <label className="text-xs text-muted-foreground mb-2 block">시작 시간</label>
                 <input
                   type="datetime-local"
                   value={editingEvent.startDate}
                   onChange={e => setEditingEvent({ ...editingEvent, startDate: e.target.value })}
-                  className="w-full min-w-0 block bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-base placeholder-gray-400"
+                  className="w-full bg-transparent border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                   required
                 />
+              </div>
+              
+              {/* 종료 시간 */}
+              <div>
+                <label className="text-xs text-muted-foreground mb-2 block">종료 시간</label>
                 <input
                   type="datetime-local"
                   value={editingEvent.endDate}
                   onChange={e => setEditingEvent({ ...editingEvent, endDate: e.target.value })}
-                  className="w-full min-w-0 block bg-transparent border-0 border-b border-gray-300 focus:border-blue-500 focus:ring-0 text-base placeholder-gray-400"
+                  className="w-full bg-transparent border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                 />
               </div>
+              
               {/* 버튼 */}
               <div className="flex gap-2 pt-2">
-                <Button className="flex-1" onClick={() => updateCalendarEvent(editingEvent)}>
-                  수정 완료
+                <Button size="sm" className="flex-1" onClick={() => updateCalendarEvent(editingEvent)}>
+                  수정
                 </Button>
-                <Button className="flex-1" variant="outline" onClick={() => setEditEventDialog({ show: false, event: null })}>
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => {
+                  setEditEventDialog({ show: false, event: null });
+                  setActiveTab('none');
+                }}>
                   취소
                 </Button>
-                <Button className="flex-1" variant="destructive" onClick={() => deleteCalendarEvent(editingEvent.id)}>
+                <Button size="sm" variant="destructive" className="flex-1" onClick={() => handleDeleteClick(editingEvent.id)}>
                   삭제
                 </Button>
               </div>
+              
               {/* 일정 생성자 정보 표시 */}
-              <div className="mt-4 text-xs text-gray-500 border-t pt-3">
-                {editEventDialog.event?.user ? (
-                  <>
-                    <span className="font-semibold">생성자:</span> {editEventDialog.event.user.name} ({editEventDialog.event.user.email})
-                  </>
-                ) : editEventDialog.event?.userId ? (
-                  <>
-                    <span className="font-semibold">생성자 ID:</span> {editEventDialog.event.userId}
-                  </>
-                ) : (
-                  <span className="font-semibold">생성자 정보 없음</span>
-                )}
+              <div className="pt-4 border-t border-border">
+                <div className="text-xs text-muted-foreground">
+                  {editEventDialog.event?.user ? (
+                    <>
+                      <span className="font-medium">생성자:</span> {editEventDialog.event.user.name}
+                    </>
+                  ) : editEventDialog.event?.userId ? (
+                    <>
+                      <span className="font-medium">생성자 ID:</span> {editEventDialog.event.userId}
+                    </>
+                  ) : (
+                    <span className="font-medium">생성자 정보 없음</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -2050,21 +2121,87 @@ const CalendarPageContent: React.FC = () => {
             </div>
           </div>
         )}
-        {/* 기존 우측 안내/예정된 회의/단축키 안내 */}
-        <div className="mb-6">
-          <div className="font-bold text-lg mb-2">예정된 회의</div>
-          <div className="text-xs text-gray-500">예정된 회의가 없습니다</div>
-        </div>
-        <div className="mb-6">
-          <div className="font-bold text-lg mb-2">캘린더 안내</div>
-          <ul className="text-xs text-gray-600 list-disc pl-4">
-            <li>날짜 더블클릭으로 새 일정 추가</li>
-            <li>월/주/일 뷰 전환 가능</li>
-            <li>일정 클릭으로 수정 및 삭제</li>
-            <li>프로젝트별 일정 관리</li>
-            <li>예약되지 않은 업무 관리</li>
-          </ul>
-        </div>
+        {/* 기존 우측 안내/예정된 회의/단축키 안내 - 탭이 활성화되지 않았을 때만 표시 */}
+        {activeTab === 'none' && (
+          <>
+            <div className="mb-6">
+              <h3 className="text-sm font-medium text-foreground mb-3">예정된 회의</h3>
+              <div className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-3">
+                오늘 예정된 회의가 없습니다
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <h3 className="text-sm font-medium text-foreground mb-3">캘린더 기능</h3>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-xs text-muted-foreground">날짜에 메뉴</span>
+                  <div className="flex items-center gap-1">
+                    <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded border text-muted-foreground">더블클릭</kbd>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-xs text-muted-foreground">일정 편집 메뉴</span>
+                  <div className="flex items-center gap-1">
+                    <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded border text-muted-foreground">클릭</kbd>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-xs text-muted-foreground">칸반일정 이동</span>
+                  <div className="flex items-center gap-1">
+                    <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded border text-muted-foreground">드래그</kbd>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-xs text-muted-foreground">월별 뷰</span>
+                  {/* <div className="flex items-center gap-1">
+                    <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded border text-muted-foreground">M</kbd>
+                  </div> */}
+                </div>
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-xs text-muted-foreground">주별 뷰</span>
+                  {/* <div className="flex items-center gap-1">
+                    <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded border text-muted-foreground">W</kbd>
+                  </div> */}
+                </div>
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-xs text-muted-foreground">일별 뷰</span>
+                  {/* <div className="flex items-center gap-1">
+                    <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded border text-muted-foreground">D</kbd>
+                  </div> */}
+                </div>
+              </div>
+            </div>
+            
+            {/* <div className="mb-6">
+              <h3 className="text-sm font-medium text-foreground mb-3">캘린더 기능</h3>
+              <div className="space-y-2">
+                <div className="text-xs text-muted-foreground py-1">
+                  • 프로젝트별 일정 관리
+                </div>
+                <div className="text-xs text-muted-foreground py-1">
+                  • 예약되지 않은 업무 관리
+                </div>
+                <div className="text-xs text-muted-foreground py-1">
+                  • 테마별 색상 구분
+                </div>
+                <div className="text-xs text-muted-foreground py-1">
+                  • 드래그 앤 드롭 일정 이동
+                </div>
+                <div className="text-xs text-muted-foreground py-1">
+                  • 월/주/일 뷰 전환
+                </div>
+              </div>
+            </div> */}
+            
+            {/* <div className="p-3 bg-muted/20 rounded-lg border-l-2 border-primary/50"></div> */}
+            <div className="p-3 bg-muted/20 rounded-lg border-primary/50 ">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                <span className="font-medium text-foreground">팁:</span> 시간 설정 없이 일정을 만들면 현재 시간으로 자동 설정됩니다
+              </p>
+            </div>
+          </>
+        )}
       </aside>
 
       {/* 예약되지 않은 업무 사이드바 (드래그 앤 드롭) */}
@@ -2148,6 +2285,18 @@ const CalendarPageContent: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* 삭제 확인 모달 */}
+      <DeleteConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setEventToDelete(null);
+        }}
+        onDelete={handleConfirmDelete}
+        title="일정을 삭제하시겠습니까?"
+        description="삭제된 일정은 복구할 수 없습니다."
+      />
 
       {/* 예약되지 않은 업무 사이드바 스크롤바 스타일 */}
       <style jsx global>{`
