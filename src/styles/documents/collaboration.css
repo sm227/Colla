@@ -22,7 +22,7 @@
   font-size: 11px !important;
   font-weight: 500 !important;
   color: white !important;
-  z-index: 1000 !important;
+  z-index: 30 !important;
   font-family: system-ui, -apple-system, sans-serif !important;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
   max-width: 100px !important;
