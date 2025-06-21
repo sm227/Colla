@@ -18,53 +18,6 @@ import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
 import * as Y from 'yjs';
 import { HocuspocusProvider } from '@hocuspocus/provider';
 
-// 커스텀 협업 커서 확장
-const CustomCollaborationCursor = CollaborationCursor.extend({
-  addNodeView() {
-    return (node: any, view: any, getPos: any) => {
-      const cursor = document.createElement('div');
-      cursor.className = 'collaboration-cursor';
-      cursor.contentEditable = 'false';
-      cursor.style.position = 'absolute';
-      cursor.style.zIndex = '20';
-      cursor.style.pointerEvents = 'none';
-
-      const update = (view: any, lastState: any) => {
-        const { user } = node.attrs;
-        
-        if (user && getPos) {
-          const pos = getPos();
-          const coords = view.coordsAtPos(pos);
-          
-          if (coords) {
-            cursor.style.display = 'block';
-            cursor.style.left = `${coords.left}px`;
-            cursor.style.top = `${coords.top}px`;
-          } else {
-            cursor.style.display = 'none';
-          }
-        }
-        
-        return true;
-      };
-      
-      if (node.attrs.user) {
-        const { user } = node.attrs;
-        cursor.style.borderLeft = `2px solid ${user.color || '#1e88e5'}`;
-        cursor.style.height = '1.5em';
-      }
-
-      return {
-        dom: cursor,
-        update,
-        destroy: () => {
-          cursor.remove();
-        }
-      };
-    };
-  }
-});
-
 interface UseDocumentEditorProps {
   ydoc: Y.Doc;
   provider: HocuspocusProvider | null;
@@ -187,18 +140,20 @@ export const useDocumentEditor = ({
         field: 'prosemirror',
       }),
       ...(provider ? [
-        CustomCollaborationCursor.configure({
+        CollaborationCursor.configure({
           provider: provider,
           user: currentUser,
-          render: user => {
+          render: (user: any) => {
             const cursor = document.createElement('span');
-            cursor.classList.add('collaboration-cursor');
+            cursor.className = 'collaboration-cursor';
+            cursor.style.borderLeftColor = user.color;
             
-            cursor.style.position = 'absolute';
-            cursor.style.pointerEvents = 'none';
-            cursor.style.zIndex = '10';
-            cursor.style.borderLeft = `2px solid ${user.color}`;
-            cursor.style.height = '1.5em';
+            const nameTag = document.createElement('span');
+            nameTag.className = 'collaboration-cursor-label';
+            nameTag.textContent = user.name || '익명 사용자';
+            nameTag.style.backgroundColor = user.color;
+            
+            cursor.appendChild(nameTag);
             
             return cursor;
           },
