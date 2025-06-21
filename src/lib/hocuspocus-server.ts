@@ -1,10 +1,7 @@
 import { Server } from '@hocuspocus/server';
 import { Logger } from '@hocuspocus/extension-logger';
 import { Database } from '@hocuspocus/extension-database';
-import { PrismaClient } from '@prisma/client';
-
-// Prisma 클라이언트 인스턴스
-const prisma = new PrismaClient();
+import { prisma } from './prisma';
 
 export type YDocData = {
   documentId: string;

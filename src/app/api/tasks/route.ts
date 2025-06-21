@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { stripHtmlTags } from '@/lib/utils';
-
-const prisma = new PrismaClient();
+import { prisma } from '../../lib/prisma';
 
 // 작업 목록 조회 (GET)
 export async function GET(req: NextRequest) {

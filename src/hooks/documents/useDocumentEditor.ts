@@ -18,53 +18,6 @@ import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
 import * as Y from 'yjs';
 import { HocuspocusProvider } from '@hocuspocus/provider';
 
-// 커스텀 협업 커서 확장
-const CustomCollaborationCursor = CollaborationCursor.extend({
-  addNodeView() {
-    return (node: any, view: any, getPos: any) => {
-      const cursor = document.createElement('div');
-      cursor.className = 'collaboration-cursor';
-      cursor.contentEditable = 'false';
-      cursor.style.position = 'absolute';
-      cursor.style.zIndex = '20';
-      cursor.style.pointerEvents = 'none';
-
-      const update = (view: any, lastState: any) => {
-        const { user } = node.attrs;
-        
-        if (user && getPos) {
-          const pos = getPos();
-          const coords = view.coordsAtPos(pos);
-          
-          if (coords) {
-            cursor.style.display = 'block';
-            cursor.style.left = `${coords.left}px`;
-            cursor.style.top = `${coords.top}px`;
-          } else {
-            cursor.style.display = 'none';
-          }
-        }
-        
-        return true;
-      };
-      
-      if (node.attrs.user) {
-        const { user } = node.attrs;
-        cursor.style.borderLeft = `2px solid ${user.color || '#1e88e5'}`;
-        cursor.style.height = '1.5em';
-      }
-
-      return {
-        dom: cursor,
-        update,
-        destroy: () => {
-          cursor.remove();
-        }
-      };
-    };
-  }
-});
-
 interface UseDocumentEditorProps {
   ydoc: Y.Doc;
   provider: HocuspocusProvider | null;
@@ -96,11 +49,17 @@ interface UseDocumentEditorReturn {
   documentSummary: string;
   isSummarizing: boolean;
   
+  // 이미지 업로드
+  isUploadingImage: boolean;
+  fileInputRef: React.RefObject<HTMLInputElement>;
+  
   // 함수들
   applyBlockType: (type: string) => void;
   summarizeDocument: () => Promise<void>;
   createDocumentTemplate: (templateType: string) => Promise<void>;
   showTemplates: () => void;
+  handleImageUpload: (file: File) => Promise<void>;
+  openFileDialog: () => void;
 }
 
 export const useDocumentEditor = ({
@@ -125,6 +84,10 @@ export const useDocumentEditor = ({
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [documentSummary, setDocumentSummary] = useState('');
   const [isSummarizing, setIsSummarizing] = useState(false);
+  
+  // 이미지 업로드 관련 상태
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // 템플릿 타입
   const templates = [
@@ -159,7 +122,12 @@ export const useDocumentEditor = ({
       TaskItem.configure({
         nested: true,
       }),
-      Image,
+      Image.configure({
+        HTMLAttributes: {
+          class: 'max-w-full h-auto rounded-lg',
+        },
+        allowBase64: true,
+      }),
       BulletList,
       OrderedList,
       ListItem,
@@ -169,20 +137,23 @@ export const useDocumentEditor = ({
       Typography,
       Collaboration.configure({
         document: ydoc,
+        field: 'prosemirror',
       }),
       ...(provider ? [
-        CustomCollaborationCursor.configure({
+        CollaborationCursor.configure({
           provider: provider,
           user: currentUser,
-          render: user => {
+          render: (user: any) => {
             const cursor = document.createElement('span');
-            cursor.classList.add('collaboration-cursor');
+            cursor.className = 'collaboration-cursor';
+            cursor.style.borderLeftColor = user.color;
             
-            cursor.style.position = 'absolute';
-            cursor.style.pointerEvents = 'none';
-            cursor.style.zIndex = '10';
-            cursor.style.borderLeft = `2px solid ${user.color}`;
-            cursor.style.height = '1.5em';
+            const nameTag = document.createElement('span');
+            nameTag.className = 'collaboration-cursor-label';
+            nameTag.textContent = user.name || '익명 사용자';
+            nameTag.style.backgroundColor = user.color;
+            
+            cursor.appendChild(nameTag);
             
             return cursor;
           },
@@ -369,10 +340,7 @@ export const useDocumentEditor = ({
         editor.chain().focus().setHorizontalRule().run();
         break;
       case 'image':
-        const url = window.prompt('이미지 URL을 입력하세요');
-        if (url) {
-          editor.chain().focus().setImage({ src: url }).run();
-        }
+        openFileDialog();
         break;
       case 'ai':
         summarizeDocument();
@@ -474,6 +442,100 @@ export const useDocumentEditor = ({
     setShowTemplateMenu(true);
   };
 
+  // 이미지 업로드 함수
+  const handleImageUpload = async (file: File) => {
+    if (!editor) return;
+    
+    try {
+      setIsUploadingImage(true);
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/documents/upload-image', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `이미지 업로드에 실패했습니다. (${response.status})`);
+      }
+      
+      const data = await response.json();
+      
+      console.log('이미지 업로드 완료:', data.url);
+      console.log('Y.js 문서 상태 (이미지 삽입 전):', ydoc.toJSON());
+      
+      // 절대 URL 생성 (다른 사용자들이 접근할 수 있도록)
+      const absoluteUrl = data.url.startsWith('http') 
+        ? data.url 
+        : `${window.location.origin}${data.url}`;
+      
+      console.log('절대 이미지 URL:', absoluteUrl);
+      
+      // 에디터에 이미지 삽입
+      editor.chain().focus().setImage({ 
+        src: absoluteUrl,
+        alt: file.name || '업로드된 이미지',
+        title: file.name || '업로드된 이미지'
+      }).run();
+      
+      // Y.js 동기화 강제 트리거 및 문서 업데이트 알림
+      if (provider) {
+        // Y.js 문서 상태 직접 업데이트
+        const yXmlFragment = ydoc.getXmlFragment('prosemirror');
+        
+        // 트랜잭션을 통해 강제로 업데이트 신호 전송
+        ydoc.transact(() => {
+          // 빈 트랜잭션으로 동기화 트리거
+        });
+        
+        // 프로바이더에 변경사항 전송
+        provider.sendStateless('sync-request');
+        
+        // Awareness 업데이트 (다른 사용자들에게 알림)
+        if (provider.awareness) {
+          const currentState = provider.awareness.getLocalState();
+          provider.awareness.setLocalState({
+            ...currentState,
+            lastAction: 'image-uploaded',
+            timestamp: Date.now()
+          });
+        }
+      }
+      
+      // 이미지 삽입 후 Y.js 문서 상태 확인
+      setTimeout(() => {
+        console.log('Y.js 문서 상태 (이미지 삽입 후):', ydoc.toJSON());
+        console.log('프로바이더 연결 상태:', provider?.status);
+        console.log('협업 사용자 수:', connectedUsers.length);
+        
+        // Y.js 문서 내용 직접 출력
+        const yXmlFragment = ydoc.getXmlFragment('prosemirror');
+        console.log('Y.js XML Fragment:', yXmlFragment.toString());
+        
+        // 다른 사용자들에게 변경사항이 전파되었는지 확인
+        if (provider && provider.awareness) {
+          console.log('프로바이더 awareness 상태:', provider.awareness.getStates());
+        }
+      }, 1000);
+      
+    } catch (error) {
+      console.error('이미지 업로드 오류:', error);
+      alert(error instanceof Error ? error.message : '이미지 업로드에 실패했습니다.');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  // 파일 선택 다이얼로그 열기
+  const openFileDialog = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
   // 단축키 핸들러
   useEffect(() => {
     if (!editor) return;
@@ -538,6 +600,54 @@ export const useDocumentEditor = ({
       document.removeEventListener('keydown', handleKeyboardShortcuts, false);
     };
   }, [editor]);
+
+  // 클립보드 이미지 붙여넣기 기능
+  useEffect(() => {
+    if (!editor) return;
+    
+    const handlePaste = async (event: Event) => {
+      const clipboardEvent = event as ClipboardEvent;
+      const items = clipboardEvent.clipboardData?.items;
+      if (!items) return;
+      
+      console.log('클립보드 붙여넣기 이벤트 감지');
+      
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        console.log('클립보드 아이템:', item.type);
+        
+        // 이미지 파일인지 확인
+        if (item.type.startsWith('image/')) {
+          console.log('이미지 파일 감지:', item.type);
+          event.preventDefault();
+          
+          const file = item.getAsFile();
+          if (file) {
+            console.log('이미지 파일 업로드 시작');
+            await handleImageUpload(file);
+          }
+          break;
+        }
+      }
+    };
+    
+    // document 전체에 이벤트 리스너 추가
+    const handleGlobalPaste = (event: ClipboardEvent) => {
+      // 에디터가 포커스되어 있는지 확인
+      const activeElement = document.activeElement;
+      const proseMirrorElement = document.querySelector('.ProseMirror');
+      
+      if (proseMirrorElement && (activeElement === proseMirrorElement || proseMirrorElement.contains(activeElement))) {
+        handlePaste(event);
+      }
+    };
+    
+    document.addEventListener('paste', handleGlobalPaste);
+    
+    return () => {
+      document.removeEventListener('paste', handleGlobalPaste);
+    };
+  }, [editor, handleImageUpload]);
 
   // 슬래시 키 입력 감지
   useEffect(() => {
@@ -691,6 +801,9 @@ export const useDocumentEditor = ({
       };
     };
     
+    // handleDOMEvents 함수 호출
+    const cleanup = handleDOMEvents();
+    
     const onEditorUpdate = () => {
       if (showSlashMenu) {
         setShowSlashMenu(false);
@@ -748,10 +861,46 @@ export const useDocumentEditor = ({
     editor.on('selectionUpdate', onEditorUpdate);
     
     return () => {
+      // cleanup 함수가 있으면 호출
+      if (cleanup && typeof cleanup === 'function') {
+        cleanup();
+      }
       editor.off('update', onEditorUpdate);
       editor.off('selectionUpdate', onEditorUpdate);
     };
   }, [editor, showSlashMenu]);
+
+  // Y.js 문서 변경 감지 (이미지 동기화 확인용)
+  useEffect(() => {
+    if (!ydoc) return;
+    
+    const handleYDocUpdate = (update: Uint8Array, origin: any) => {
+      console.log('Y.js 문서 업데이트 감지:', origin);
+      
+      // 이미지 관련 업데이트인지 확인
+      const docJSON = ydoc.toJSON();
+      const hasImages = JSON.stringify(docJSON).includes('"type":"image"');
+      
+      if (hasImages) {
+        console.log('이미지 노드가 포함된 문서 업데이트:', docJSON);
+        
+        // 다른 사용자들에게 이미지 동기화 알림
+        if (provider && provider.awareness && origin !== ydoc) {
+          provider.awareness.setLocalState({
+            ...provider.awareness.getLocalState(),
+            hasImages: true,
+            lastImageSync: Date.now()
+          });
+        }
+      }
+    };
+    
+    ydoc.on('update', handleYDocUpdate);
+    
+    return () => {
+      ydoc.off('update', handleYDocUpdate);
+    };
+  }, [ydoc, provider]);
 
   // 바깥 영역 클릭 감지
   useEffect(() => {
@@ -803,10 +952,16 @@ export const useDocumentEditor = ({
     documentSummary,
     isSummarizing,
     
+    // 이미지 업로드
+    isUploadingImage,
+    fileInputRef,
+    
     // 함수들
     applyBlockType,
     summarizeDocument,
     createDocumentTemplate,
-    showTemplates
+    showTemplates,
+    handleImageUpload,
+    openFileDialog
   };
 }; 

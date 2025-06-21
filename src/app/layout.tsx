@@ -14,11 +14,50 @@ import { Analytics } from "@vercel/analytics/react"
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'colla - 협업 플랫폼',
-  description: '팀 협업을 위한 올인원 플랫폼',
-  keywords: ['colla', '콜라', '협업툴', '워크스페이스', '그룹웨어', '콜라 협업', '콜라 사이트', '프로젝트 관리리', '생산성'],
+  title: {
+    default: 'Colla - 팀 협업 플랫폼',
+    template: '%s | Colla'
+  },
+  description: 'Colla는 팀 협업을 위한 올인원 플랫폼입니다. 프로젝트 관리, 칸반보드, 문서 협업, 화상회의, 캘린더를 한 곳에서 사용하세요.',
+  keywords: ['colla', '콜라', '협업툴', '워크스페이스', '그룹웨어', '콜라 협업', '콜라 사이트', '프로젝트 관리', '생산성', '팀협업', '업무관리'],
+  authors: [{ name: 'Colla Team' }],
+  creator: 'Colla',
+  publisher: 'Colla',
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  metadataBase: new URL('https://colla-peach.vercel.app'),
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    title: 'Colla - 팀 협업 플랫폼',
+    description: 'Colla는 팀 협업을 위한 올인원 플랫폼입니다. 프로젝트 관리, 칸반보드, 문서 협업, 화상회의, 캘린더를 한 곳에서 사용하세요.',
+    url: 'https://colla-peach.vercel.app',
+    siteName: 'Colla',
+    locale: 'ko_KR',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Colla - 팀 협업 플랫폼',
+    description: 'Colla는 팀 협업을 위한 올인원 플랫폼입니다. 프로젝트 관리, 칸반보드, 문서 협업, 화상회의, 캘린더를 한 곳에서 사용하세요.',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
   verification: {
-    google: 'DCHtzHquxEDqg642zkpMh2OTvt6xOdW-GlgvsmuCHlI', // content 값만 넣기
+    google: 'DCHtzHquxEDqg642zkpMh2OTvt6xOdW-GlgvsmuCHlI',
   },
 };
 

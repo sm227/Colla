@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { cookies } from 'next/headers';
-
-const prisma = new PrismaClient();
+import { prisma } from '../../../../lib/prisma';
 
 /**
  * 사용자 정보 가져오기
