@@ -288,16 +288,17 @@ function KanbanPageContent() {
 
         {/* 메인 콘텐츠 */}
         <main className="flex flex-col flex-1 p-6 lg:p-8 overflow-y-auto bg-background">
-          {/* 페이지 헤더 */}
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold mb-2 flex items-center">
-              <Trello className="w-8 h-8 text-gray-600 dark:text-gray-400 mr-3" />
-              칸반보드
+          {/* 페이지 헤더 - Jira 스타일 칸반보드용 */}
+          <div className="mb-8 bg-white dark:bg-[#1e1e20] p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 transition-all duration-300">
+            <h2 className="text-3xl md:text-4xl font-bold mb-2 flex items-center text-gray-900 dark:text-white tracking-tight">
+              <Trello className="w-8 h-8 text-blue-600 dark:text-blue-400 mr-3 animate-pulse" />
+              프로젝트 칸반 보드
             </h2>
-            <p className={`text-lg ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-              {currentProjectName}의 작업을 시각적으로 관리하세요
+            <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400">
+            <span className="font-bold text-gray-800 dark:text-gray-200">{currentProjectName}</span>의 업무 진행 상황을 실시간으로 시각화하고, 팀과 함께 유연하게 관리하세요.
             </p>
           </div>
+
 
           {/* 칸반보드 위젯 */}
           <div className="rounded-xl shadow-sm bg-white dark:bg-[#2a2a2c] p-6 flex flex-col flex-1">
