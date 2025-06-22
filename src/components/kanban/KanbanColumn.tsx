@@ -13,24 +13,24 @@ interface KanbanColumnProps {
   status: TaskStatus;
   updateTaskStatus: (taskId: string, newStatus: TaskStatus) => void;
   onTaskClick: (task: Task, element?: HTMLElement) => void;
-  color?: 'gray' | 'blue' | 'yellow' | 'green' | 'purple' | 'red';
-  onTaskDelete?: (taskId: string) => void; 
+  color?: "gray" | "blue" | "yellow" | "green" | "purple" | "red";
+  onTaskDelete?: (taskId: string) => void;
   onAddTask?: (task: Omit<Task, "id">) => void;
   loading: boolean;
   theme?: "light" | "dark";
 }
 
-export function KanbanColumn({ 
-  title, 
-  tasks, 
-  status, 
+export function KanbanColumn({
+  title,
+  tasks,
+  status,
   updateTaskStatus,
   onTaskClick,
-  color = 'gray',
+  color = "gray",
   onTaskDelete,
   onAddTask,
   loading,
-  theme = "light"
+  theme = "light",
 }: KanbanColumnProps) {
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -41,17 +41,17 @@ export function KanbanColumn({
   const isFirstMount = useRef(true);
   const isAddingTaskFromButton = useRef(false);
   const lastTaskRef = useRef<HTMLDivElement>(null);
-  
+  const isProcessing = useRef(false);
+
   // 고유한 컬럼 ID 생성
   const columnElementId = `kanban-column-${status}`;
-  
 
   // 작업 개수가 변경되면 스크롤 위치 복원 및 작업 추가 버튼 클릭
   useEffect(() => {
     // 로딩이 완료되고 tasks가 있을 때만 실행
     if (!loading && tasks.length > 0) {
       setTasksLength(tasks.length);
-      
+
       // 첫 마운트 시에는 실행하지 않음
       if (isFirstMount.current) {
         isFirstMount.current = false;
@@ -66,13 +66,13 @@ export function KanbanColumn({
       updateTaskStatus(taskId, status);
     },
   });
-  
+
   // 보드 밖 클릭 감지
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
-        isAddingTask && 
-        inputContainerRef.current && 
+        isAddingTask &&
+        inputContainerRef.current &&
         !inputContainerRef.current.contains(event.target as Node)
       ) {
         setIsAddingTask(false);
@@ -80,9 +80,9 @@ export function KanbanColumn({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isAddingTask]);
 
@@ -101,18 +101,40 @@ export function KanbanColumn({
   // 컬럼 헤더 색상 설정
   const getColorClasses = () => {
     // 다크 모드에서는 모두 동일한 헤더 배경(어두운 회색)
-    if (theme === 'dark') {
+    if (theme === "dark") {
       return {
-        bg: 'bg-[#353538]',
-        text: 'text-gray-300',
-        indicator: color === 'blue' ? 'bg-blue-500' : color === 'green' ? 'bg-green-500' : color === 'yellow' ? 'bg-yellow-500' : color === 'purple' ? 'bg-purple-500' : color === 'red' ? 'bg-red-500' : 'bg-gray-500'
+        bg: "bg-[#353538]",
+        text: "text-gray-300",
+        indicator:
+          color === "blue"
+            ? "bg-blue-500"
+            : color === "green"
+            ? "bg-green-500"
+            : color === "yellow"
+            ? "bg-yellow-500"
+            : color === "purple"
+            ? "bg-purple-500"
+            : color === "red"
+            ? "bg-red-500"
+            : "bg-gray-500",
       };
     } else {
       // 라이트 모드에서는 모두 흰색 헤더
       return {
-        bg: 'bg-white',
-        text: 'text-gray-800',
-        indicator: color === 'blue' ? 'bg-blue-500' : color === 'green' ? 'bg-green-500' : color === 'yellow' ? 'bg-yellow-500' : color === 'purple' ? 'bg-purple-500' : color === 'red' ? 'bg-red-500' : 'bg-gray-500'
+        bg: "bg-white",
+        text: "text-gray-800",
+        indicator:
+          color === "blue"
+            ? "bg-blue-500"
+            : color === "green"
+            ? "bg-green-500"
+            : color === "yellow"
+            ? "bg-yellow-500"
+            : color === "purple"
+            ? "bg-purple-500"
+            : color === "red"
+            ? "bg-red-500"
+            : "bg-gray-500",
       };
     }
   };
@@ -128,44 +150,56 @@ export function KanbanColumn({
   };
 
   // 작업 추가(엔터) 핸들러
-  const handleQuickAddTask = async () => {
+  const handleQuickAddTask = () => {
     if (!newTaskTitle.trim()) return;
-    const trimmedTitle = newTaskTitle.trim();
-    
-    // 입력창 상태 즉시 초기화
-    setIsAddingTask(false);
-    setNewTaskTitle("");
 
-    try {
-      if (onAddTask) {
-        // 작업 추가
-        await onAddTask({
+    // 중복 실행 방지
+    if (isProcessing.current) return;
+    isProcessing.current = true;
+
+    const trimmedTitle = newTaskTitle.trim();
+
+    // 다음 입력창 즉시 표시
+    requestAnimationFrame(() => {
+      // UI 상태 업데이트 (입력창 클리어)
+      setNewTaskTitle("");
+
+      // 다음 프레임에서 포커스 (클리어 후 포커스)
+      requestAnimationFrame(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          // 혹시 남아있을 수 있는 값 강제 클리어
+          inputRef.current.value = "";
+        }
+        // 처리 완료 후 플래그 리셋
+        setTimeout(() => {
+          isProcessing.current = false;
+        }, 100);
+      });
+    });
+
+    // 백그라운드에서 DB 저장 (비동기, UI 블로킹 없음)
+    if (onAddTask) {
+      try {
+        onAddTask({
           title: trimmedTitle,
           description: "",
           status: status,
           priority: "medium",
         });
-
-        // 다음 입력창 즉시 표시 (비동기로 처리)
-        requestAnimationFrame(() => {
-          setIsAddingTask(true);
-        });
+      } catch (error) {
+        console.error("작업 추가 중 오류 발생:", error);
+        // TODO: 에러 토스트 표시 또는 다른 에러 처리 방식 구현
       }
-    } catch (error) {
-      // 에러 처리
-      console.error("작업 추가 중 오류 발생:", error);
-      // 오류 발생 시 입력 상태 복원
-      setNewTaskTitle(trimmedTitle);
-      setIsAddingTask(true);
     }
   };
 
   // 입력창 키보드 이벤트
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       e.preventDefault();
       handleQuickAddTask();
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       e.preventDefault();
       setIsAddingTask(false);
       setNewTaskTitle("");
@@ -176,24 +210,38 @@ export function KanbanColumn({
     <div
       ref={setNodeRef}
       id={columnElementId}
-      className={`${theme === 'dark' ? 'bg-[#353538] border-gray-700' : 'bg-white border-gray-200'} rounded-lg border shadow-sm overflow-hidden flex flex-col ${
+      className={`${
+        theme === "dark"
+          ? "bg-[#353538] border-gray-700"
+          : "bg-white border-gray-200"
+      } rounded-lg border shadow-sm overflow-hidden flex flex-col ${
         isOver ? "ring-2 ring-blue-500" : ""
       }`}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      <div className={`${colorClasses.bg} px-4 py-3 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+      <div
+        className={`${colorClasses.bg} px-4 py-3 border-b ${
+          theme === "dark" ? "border-gray-700" : "border-gray-200"
+        }`}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <div className={`w-3 h-3 rounded-full ${colorClasses.indicator} mr-2`}></div>
+            <div
+              className={`w-3 h-3 rounded-full ${colorClasses.indicator} mr-2`}
+            ></div>
             <h3 className={`font-medium ${colorClasses.text}`}>{title}</h3>
           </div>
-          <span className={`${colorClasses.bg} ${colorClasses.text} border ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} rounded-full px-2 py-0.5 text-xs font-medium`}>
+          <span
+            className={`${colorClasses.bg} ${colorClasses.text} border ${
+              theme === "dark" ? "border-gray-700" : "border-gray-200"
+            } rounded-full px-2 py-0.5 text-xs font-medium`}
+          >
             {tasks.length}
           </span>
         </div>
       </div>
-      
+
       <div className="flex flex-col gap-1 p-3 flex-grow group">
         {/* 작업 목록 */}
         {tasks.map((task, idx) => (
@@ -203,24 +251,24 @@ export function KanbanColumn({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              
+
               const target = e.currentTarget;
-              
+
               // 클릭 피드백 애니메이션
-              target.style.transform = 'scale(0.98)';
-              target.style.transition = 'transform 0.1s ease-out';
-              
+              target.style.transform = "scale(0.98)";
+              target.style.transition = "transform 0.1s ease-out";
+
               setTimeout(() => {
-                target.style.transform = 'scale(1)';
+                target.style.transform = "scale(1)";
               }, 100);
-              
+
               // 모달 열기 (클릭한 요소 전달)
               onTaskClick(task, target);
             }}
             className="cursor-pointer transition-all duration-200 ease-out hover:scale-[1.02] hover:shadow-md hover:shadow-blue-100/50 active:scale-95"
           >
-            <KanbanTask 
-              task={task} 
+            <KanbanTask
+              task={task}
               onUpdate={(updatedTask) => {
                 // 업데이트 로직
               }}
@@ -229,12 +277,16 @@ export function KanbanColumn({
             />
           </div>
         ))}
-        
+
         {/* 작업 추가 입력창 (하단에 배치) */}
         {isAddingTask ? (
           <div
             ref={inputContainerRef}
-            className={`mt-2 border ${theme === 'dark' ? 'border-blue-700 bg-[#2A2A2C]' : 'border-blue-300 bg-white'} rounded-md shadow-sm focus-within:border-blue-500`}
+            className={`mt-2 border ${
+              theme === "dark"
+                ? "border-blue-700 bg-[#2A2A2C]"
+                : "border-blue-300 bg-white"
+            } rounded-md shadow-sm focus-within:border-blue-500`}
           >
             <input
               ref={inputRef}
@@ -243,7 +295,11 @@ export function KanbanColumn({
               onChange={(e) => setNewTaskTitle(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="새 작업을 입력하세요"
-              className={`w-full px-3 py-2 rounded-md outline-none ${theme === 'dark' ? 'bg-[#2A2A2C] text-gray-200 placeholder:text-gray-500' : 'bg-white'}`}
+              className={`w-full px-3 py-2 rounded-md outline-none ${
+                theme === "dark"
+                  ? "bg-[#2A2A2C] text-gray-200 placeholder:text-gray-500"
+                  : "bg-white"
+              }`}
             />
             <div className="flex justify-end p-2 border-t">
               <button
@@ -251,13 +307,21 @@ export function KanbanColumn({
                   setIsAddingTask(false);
                   setNewTaskTitle("");
                 }}
-                className={`mr-2 px-3 py-1 text-sm ${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'} rounded`}
+                className={`mr-2 px-3 py-1 text-sm ${
+                  theme === "dark"
+                    ? "text-gray-300 hover:bg-gray-700"
+                    : "text-gray-600 hover:bg-gray-100"
+                } rounded`}
               >
                 취소
               </button>
               <button
                 onClick={handleQuickAddTask}
-                className={`px-3 py-1 text-sm text-white ${newTaskTitle.trim() ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-400 cursor-not-allowed'} rounded`}
+                className={`px-3 py-1 text-sm text-white ${
+                  newTaskTitle.trim()
+                    ? "bg-blue-600 hover:bg-blue-700"
+                    : "bg-blue-400 cursor-not-allowed"
+                } rounded`}
                 disabled={!newTaskTitle.trim()}
               >
                 추가
@@ -269,7 +333,11 @@ export function KanbanColumn({
             onClick={handleShowAddTask}
             variant="ghost"
             size="sm"
-            className={`w-full mt-2 justify-start text-sm opacity-0 group-hover:opacity-100 transition-opacity ${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700 hover:text-gray-200' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
+            className={`w-full mt-2 justify-start text-sm opacity-0 group-hover:opacity-100 transition-opacity ${
+              theme === "dark"
+                ? "text-gray-300 hover:bg-gray-700 hover:text-gray-200"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            }`}
           >
             <Plus className="h-4 w-4 mr-1" />
             작업 추가
