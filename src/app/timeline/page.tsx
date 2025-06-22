@@ -28,7 +28,8 @@ import {
   LogOutIcon,
   SunIcon,
   MoonIcon,
-  MenuIcon
+  MenuIcon,
+  ChartGanttIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Timeline } from "@/components/timeline/Timeline";
@@ -57,7 +58,7 @@ function TimelinePageContent() {
   const { showNotificationPanel, setShowNotificationPanel, hasNewNotifications } = useNotifications();
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [isKanbanSubmenuOpen, setIsKanbanSubmenuOpen] = useState(true); // 칸반 하위 메뉴 상태
+  const [isKanbanSubmenuOpen, setIsKanbanSubmenuOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
   
   // 테마 관련 코드 수정 (next-themes 사용)
@@ -278,16 +279,7 @@ function TimelinePageContent() {
 
         {/* 메인 콘텐츠 */}
         <main className="flex flex-col flex-1 p-6 lg:p-8 overflow-y-auto bg-background">
-          {/* 페이지 헤더 */}
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold mb-2 flex items-center">
-              <ClockIcon className="w-8 h-8 text-gray-600 dark:text-gray-400 mr-3" />
-              타임라인
-            </h2>
-            <p className={`text-lg ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-              {currentProjectName}의 작업 일정을 시간순으로 확인하세요
-            </p>
-          </div>
+          
 
           {/* 타임라인 위젯 */}
           <div className="rounded-xl shadow-sm bg-white dark:bg-[#2a2a2c] p-6 flex flex-col flex-1">
@@ -299,9 +291,18 @@ function TimelinePageContent() {
               </div>
             </div>
             
-            <div className="flex-1 overflow-hidden">
-              <Timeline projectId={selectedProjectId} theme={theme} />
+            {/* 프로젝트 에픽 헤더 */}
+            <div className="flex items-center mb-5">
+              <ChartGanttIcon className={`h-5 w-5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-700'} mr-2`} />
+              <h2 className={`text-xl font-semibold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>
+                {currentProjectName ? "프로젝트 에픽" : "모든 에픽"}
+              </h2>
             </div>
+
+            <Timeline 
+              projectId={selectedProjectId} 
+              theme={theme} 
+            />
           </div>
         </main>
       </div>

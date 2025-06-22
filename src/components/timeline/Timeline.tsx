@@ -50,15 +50,68 @@ interface TimelineProps {
 }
 
 // string 타입 status를 TaskStatus로 변환하는 함수
-function toTaskStatus(status: string): TaskStatus {
-  if (status === "todo" || status === "in-progress" || status === "review" || status === "done") return status;
-  return "todo";
+function toTaskStatus(status: string): import("../kanban/KanbanBoard").TaskStatus {
+  switch (status.toLowerCase()) {
+    case "todo": return "todo";
+    case "in-progress":
+    case "inprogress":
+    case "progress": return "in-progress";
+    case "review": return "review";
+    case "done": return "done";
+    default: return "todo";
+  }
 }
 
-function convertTaskStatus(task: Task): import("../kanban/KanbanBoard").Task {
+function convertTaskDescription(description?: string | { type: string; content: any[] } | undefined): string | undefined {
+  if (!description) return undefined;
+  
+  // 이미 문자열인 경우 그대로 반환
+  if (typeof description === 'string') return description;
+  
+  // 객체 형태인 경우 텍스트 추출 시도
+  try {
+    // 첫 번째 content의 text 추출 또는 전체 객체를 문자열로 변환
+    if (description.content && description.content.length > 0) {
+      const firstContent = description.content[0];
+      if (firstContent.content && firstContent.content.length > 0) {
+        return firstContent.content[0].text || JSON.stringify(description);
+      }
+    }
+    return JSON.stringify(description);
+  } catch (error) {
+    console.error('description 변환 중 오류:', error);
+    return undefined;
+  }
+}
+
+function convertTaskStatus(task: import("../kanban/KanbanBoard").Task): import("../kanban/KanbanBoard").Task {
   return {
     ...task,
     status: toTaskStatus(task.status),
+    description: convertTaskDescription(task.description)
+  };
+}
+
+// 기존 Task를 KanbanBoard의 Task로 변환하는 함수
+function convertLocalTaskToKanbanTask(task: Task): import("../kanban/KanbanBoard").Task {
+  return {
+    id: task.id,
+    title: task.title,
+    description: task.description ? { 
+      type: 'doc', 
+      content: [{ 
+        type: 'paragraph', 
+        content: [{ type: 'text', text: task.description }] 
+      }] 
+    } : undefined,
+    status: toTaskStatus(task.status),
+    priority: task.priority,
+    assignee: task.assignee,
+    dueDate: task.dueDate,
+    startDate: task.startDate,
+    endDate: task.endDate,
+    projectId: task.projectId,
+    epicId: task.epicId
   };
 }
 
@@ -605,7 +658,7 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
                               : 'hover:bg-gray-100'
                           } flex items-center justify-between group/task`}
                           onClick={() => {
-                            setSelectedTask(convertTaskStatus(task));
+                            setSelectedTask(convertLocalTaskToKanbanTask(task));
                             setIsDialogOpen(true);
                           }}
                         >
@@ -812,7 +865,26 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
             const fixedTask = convertTaskStatus(updatedTask);
             setEpics((prevEpics) => prevEpics.map(epic =>
               epic.id === fixedTask.epicId
-                ? { ...epic, tasks: epic.tasks.map(t => t.id === fixedTask.id ? fixedTask : t) }
+                ? { 
+                    ...epic, 
+                    tasks: epic.tasks.map(t => 
+                      t.id === fixedTask.id 
+                        ? {
+                            id: fixedTask.id,
+                            title: fixedTask.title,
+                            description: convertTaskDescription(fixedTask.description),
+                            status: fixedTask.status,
+                            priority: fixedTask.priority,
+                            assignee: fixedTask.assignee,
+                            dueDate: fixedTask.dueDate,
+                            startDate: fixedTask.startDate,
+                            endDate: fixedTask.endDate,
+                            projectId: fixedTask.projectId,
+                            epicId: fixedTask.epicId
+                          } 
+                        : t
+                    ) 
+                  }
                 : epic
             ));
           }}
