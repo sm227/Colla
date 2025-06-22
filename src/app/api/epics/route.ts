@@ -163,4 +163,40 @@ export async function DELETE(req: NextRequest) {
     console.error("에픽 삭제 중 오류 발생:", error);
     return NextResponse.json({ error: "에픽 삭제에 실패했습니다." }, { status: 500 });
   }
+}
+
+// 에픽 부분 수정 (PATCH)
+export async function PATCH(req: NextRequest) {
+  try {
+    // 개발 중 인증 체크 임시 우회
+    // const session = await getServerSession(authOptions);
+    // if (!session) {
+    //   return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+    // }
+    
+    // 임시 세션 정보
+    const session = { user: { id: "temp-user-id" } };
+
+    const url = new URL(req.url);
+    const id = url.searchParams.get("id");
+    const body = await req.json();
+    const { title } = body;
+
+    if (!id || !title) {
+      return NextResponse.json({ error: "ID와 제목은 필수 항목입니다." }, { status: 400 });
+    }
+
+    // 에픽 부분 수정 (제목만)
+    const updatedEpic = await prisma.epic.update({
+      where: { id },
+      data: {
+        title
+      }
+    });
+
+    return NextResponse.json(updatedEpic);
+  } catch (error) {
+    console.error("에픽 부분 수정 중 오류 발생:", error);
+    return NextResponse.json({ error: "에픽 부분 수정에 실패했습니다." }, { status: 500 });
+  }
 } 
