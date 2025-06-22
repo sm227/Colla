@@ -952,6 +952,7 @@ export function TaskDetailDialog({
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
   const [showActivity, setShowActivity] = useState(false);
   const [showMembersList, setShowMembersList] = useState(false);
@@ -1769,18 +1770,45 @@ export function TaskDetailDialog({
                         <div className="flex-1">
                           {editingCommentId === comment.id ? (
                             <div>
-                              <Textarea
-                                value={editedCommentContent}
-                                onChange={(e) =>
-                                  setEditedCommentContent(e.target.value)
-                                }
-                                className={`w-full border focus-visible:ring-1 focus-visible:ring-blue-500 resize-none min-h-[80px] p-2 rounded-md mb-2 ${
-                                  theme === "dark"
-                                    ? "bg-[#2A2A2C] border-gray-700 text-gray-200"
-                                    : "bg-white text-gray-800"
-                                }`}
-                                rows={3}
-                              />
+                              <div className="relative">
+                                <Textarea
+                                  value={editedCommentContent}
+                                  onChange={(e) =>
+                                    setEditedCommentContent(e.target.value)
+                                  }
+                                  className={`w-full border focus-visible:ring-1 focus-visible:ring-blue-500 resize-none min-h-[80px] p-2 rounded-md mb-2 ${
+                                    theme === "dark"
+                                      ? "bg-[#2A2A2C] border-gray-700 text-gray-200"
+                                      : "bg-white text-gray-800"
+                                  }`}
+                                  rows={3}
+                                />
+                                {/* 이모지 버튼 추가 */}
+                                <button
+                                  type="button"
+                                  onClick={() => setShowEditEmojiPicker(!showEditEmojiPicker)}
+                                  className={`absolute bottom-4 left-2 p-1 rounded hover:bg-gray-200 ${
+                                    theme === "dark"
+                                      ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200"
+                                      : "text-gray-500 hover:text-gray-700"
+                                  }`}
+                                  title="이모지 추가"
+                                >
+                                  <Smile size={16} />
+                                </button>
+
+                                {/* 이모티콘 피커 */}
+                                {showEditEmojiPicker && (
+                                  <div className="absolute bottom-12 left-0 z-50">
+                                    <EmojiPicker
+                                      onEmojiClick={(emojiData) => {
+                                        setEditedCommentContent((prev) => prev + emojiData.emoji);
+                                        setShowEditEmojiPicker(false);
+                                      }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
                               <div className="flex justify-end gap-2">
                                 <Button
                                   variant="outline"
@@ -1924,20 +1952,8 @@ export function TaskDetailDialog({
                         )}
                       </div>
                       <div className="flex justify-between items-center mt-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                          className={`${
-                            theme === "dark"
-                              ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700"
-                              : "text-gray-500 hover:text-gray-700"
-                          }`}
-                        >
-                          <Smile size={16} className="mr-1" />
-                          이모지
-                        </Button>
+                        {/* 박스 밖 이모지 버튼 제거 */}
+                        <div></div>
                         <Button
                           onClick={handleAddComment}
                           size="sm"
