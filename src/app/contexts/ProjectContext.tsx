@@ -338,34 +338,78 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   // 컴포넌트 마운트 시 프로젝트 목록 가져오기
   useEffect(() => {
     // 로그인 상태일 때만 프로젝트 가져오기
-    if (user && !authLoading) {
+    if (user && !authLoading && !initialized) {
       fetchProjects();
     } else if (!authLoading && !user) {
       // 인증 로딩이 끝났고 사용자가 없으면 로딩 상태 해제
       setLoading(false);
+      setInitialized(true);
     }
-  }, [user, authLoading]); // 사용자와 인증 로딩 상태가 변경될 때 실행
+  }, [user, authLoading, initialized]); // 사용자와 인증 로딩 상태가 변경될 때 실행
 
-  // localStorage에서 현재 프로젝트 ID 로드 및 프로젝트 설정
+  // URL과 localStorage에서 현재 프로젝트 ID 로드 및 프로젝트 설정
   useEffect(() => {
     if (!loading && projects.length > 0) {
-      const savedProjectId = localStorage.getItem("currentProjectId");
-
-      if (savedProjectId) {
-        const foundProject = projects.find((p) => p.id === savedProjectId);
-
-        if (foundProject) {
+      // URL에서 projectId 매개변수 확인
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlProjectId = urlParams.get("projectId");
+      
+      if (urlProjectId) {
+        // URL에 projectId가 있으면 해당 프로젝트로 설정
+        const foundProject = projects.find((p) => p.id === urlProjectId);
+        if (foundProject && currentProject?.id !== foundProject.id) {
           setCurrentProject(foundProject);
-        } else {
-          // 저장된 프로젝트를 찾을 수 없는 경우 첫 번째 프로젝트 선택
-          setCurrentProject(projects[0]);
+          localStorage.setItem("currentProjectId", foundProject.id);
         }
-      } else if (!currentProject) {
-        // 저장된 프로젝트 ID가 없고 선택된 프로젝트가 없는 경우 첫 번째 프로젝트 선택
-        setCurrentProject(projects[0]);
+      } else {
+        // URL에 projectId가 없으면 localStorage에서 가져오기
+        const savedProjectId = localStorage.getItem("currentProjectId");
+
+        if (savedProjectId) {
+          const foundProject = projects.find((p) => p.id === savedProjectId);
+
+          if (foundProject && currentProject?.id !== foundProject.id) {
+            setCurrentProject(foundProject);
+          } else if (!foundProject) {
+            // 저장된 프로젝트를 찾을 수 없는 경우 첫 번째 프로젝트 선택
+            setCurrentProject(projects[0]);
+            localStorage.setItem("currentProjectId", projects[0].id);
+          }
+        } else if (!currentProject) {
+          // 저장된 프로젝트 ID가 없고 선택된 프로젝트가 없는 경우 첫 번째 프로젝트 선택
+          setCurrentProject(projects[0]);
+          localStorage.setItem("currentProjectId", projects[0].id);
+        }
       }
     }
   }, [loading, projects, currentProject]);
+
+  // URL 변화 감지를 위한 추가 useEffect
+  useEffect(() => {
+    if (typeof window !== 'undefined' && projects.length > 0) {
+      const handlePopState = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlProjectId = urlParams.get("projectId");
+        
+        if (urlProjectId) {
+          const foundProject = projects.find((p) => p.id === urlProjectId);
+          if (foundProject && currentProject?.id !== foundProject.id) {
+            setCurrentProject(foundProject);
+            localStorage.setItem("currentProjectId", foundProject.id);
+          }
+        }
+      };
+
+      window.addEventListener('popstate', handlePopState);
+      
+      // 현재 URL도 즉시 체크
+      handlePopState();
+
+      return () => {
+        window.removeEventListener('popstate', handlePopState);
+      };
+    }
+  }, [projects, currentProject]);
 
   // 사용자의 프로젝트가 없는 경우 리디렉션 로직 개선
   useEffect(() => {

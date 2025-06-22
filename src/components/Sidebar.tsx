@@ -248,7 +248,7 @@ const Sidebar = memo(function Sidebar({
     setMounted(true);
   }, []);
 
-  // 현재 선택된 프로젝트 ID 가져오기
+  // 현재 선택된 프로젝트 ID 가져오기 (currentProject 우선, 없으면 URL에서)
   const getProjectIdFromUrl = () => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
@@ -257,7 +257,7 @@ const Sidebar = memo(function Sidebar({
     return null;
   };
 
-  const selectedProjectId = getProjectIdFromUrl();
+  const selectedProjectId = currentProject?.id || getProjectIdFromUrl();
 
   // 폴더 목록 가져오기
   const fetchFolders = async () => {
@@ -581,6 +581,8 @@ const Sidebar = memo(function Sidebar({
                   active={selectedProjectId === project.id}
                   onClick={(e) => {
                     e.preventDefault();
+                    // currentProject도 함께 업데이트
+                    setCurrentProject(project);
                     const newUrl = `/?projectId=${project.id}`;
                     router.push(newUrl);
                   }}

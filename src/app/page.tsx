@@ -1096,15 +1096,36 @@ function HomeContent() {
 
   // URL 파라미터의 프로젝트 ID에 따라 현재 프로젝트 설정
   useEffect(() => {
-    if (urlProjectId && projects.length > 0) {
-      const projectFromUrl = projects.find(
-        (project) => project.id === urlProjectId
-      );
-      if (projectFromUrl && projectFromUrl !== currentProject) {
-        setCurrentProject(projectFromUrl);
+    if (projects.length > 0) {
+      if (urlProjectId) {
+        const projectFromUrl = projects.find(
+          (project) => project.id === urlProjectId
+        );
+        if (projectFromUrl && projectFromUrl.id !== currentProject?.id) {
+          setCurrentProject(projectFromUrl);
+        }
+      } else if (!currentProject) {
+        // URL에 projectId가 없고 currentProject도 없으면 localStorage에서 가져오거나 첫 번째 프로젝트 선택
+        const savedProjectId = localStorage.getItem("currentProjectId");
+        if (savedProjectId) {
+          const savedProject = projects.find((p) => p.id === savedProjectId);
+          if (savedProject) {
+            setCurrentProject(savedProject);
+            // URL도 업데이트
+            router.replace(`/?projectId=${savedProject.id}`);
+          } else {
+            // 저장된 프로젝트가 없으면 첫 번째 프로젝트 선택
+            setCurrentProject(projects[0]);
+            router.replace(`/?projectId=${projects[0].id}`);
+          }
+        } else {
+          // localStorage에도 없으면 첫 번째 프로젝트 선택
+          setCurrentProject(projects[0]);
+          router.replace(`/?projectId=${projects[0].id}`);
+        }
       }
     }
-  }, [urlProjectId, projects, currentProject, setCurrentProject]);
+  }, [urlProjectId, projects, currentProject, setCurrentProject, router]);
 
   const loadNotifications = async (isPanelOpening?: boolean) => {
     if (user) {
@@ -1533,7 +1554,14 @@ function HomeContent() {
                 }`}
               >
                 {currentProject
-                  ? `${currentProject.name} 프로젝트의 요약을 확인하세요.`
+                  ? (
+                      <>
+                        <span className="font-semibold text-blue-600 dark:text-blue-400">
+                          {currentProject.name}
+                        </span>
+                        {" 프로젝트의 요약을 확인하세요."}
+                      </>
+                    )
                   : "프로젝트를 선택하면 요약 정보를 확인할 수 있습니다."}
               </p>
             </div>
