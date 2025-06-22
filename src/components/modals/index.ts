@@ -4,3 +4,5 @@ export { PasswordModal } from "./PasswordModal";
 export { SettingsModal } from './SettingsModal';
 export { FolderModal } from './FolderModal';
 export { SecurityDropdown } from './SecurityDropdown';
+export { DeleteConfirmModal } from "./DeleteConfirmModal";
+export { EpicDeleteModal } from "./EpicDeleteModal";

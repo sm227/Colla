@@ -15,6 +15,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { TaskDetailDialog } from "../kanban/TaskDetailDialog";
 import type { TaskStatus } from "../kanban/KanbanBoard";
+import { EpicDeleteModal } from '../modals/EpicDeleteModal'
+import { Task as KanbanTask } from '../kanban/KanbanBoard';
 
 // 타입 정의
 interface Epic {
@@ -33,7 +35,7 @@ interface Task {
   id: string;
   title: string;
   description?: string;
-  status: string;
+  status: TaskStatus;
   priority: string;
   assignee?: string | null;
   dueDate?: Date | null;
@@ -54,12 +56,24 @@ function toTaskStatus(status: string): TaskStatus {
   return "todo";
 }
 
-function convertTaskStatus(task: Task): import("../kanban/KanbanBoard").Task {
+// 칸반 Task를 Timeline의 Task로 변환하는 함수
+const convertTaskStatus = (task: KanbanTask): Task => {
   return {
-    ...task,
-    status: toTaskStatus(task.status),
+    id: task.id,
+    title: task.title,
+    description: typeof task.description === 'string' 
+      ? task.description 
+      : task.description?.content?.map(c => c.content?.[0]?.text).filter(Boolean).join(' ') || '',
+    status: task.status,
+    priority: task.priority,
+    assignee: task.assignee,
+    dueDate: task.dueDate,
+    startDate: task.startDate,
+    endDate: task.endDate,
+    projectId: task.projectId,
+    epicId: task.epicId
   };
-}
+};
 
 export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
   const [epics, setEpics] = useState<Epic[]>([]);
@@ -73,6 +87,8 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
   const [showTaskMenu, setShowTaskMenu] = useState<{ epicId: string, taskId: string } | null>(null);
   const [selectedTask, setSelectedTask] = useState<import("../kanban/KanbanBoard").Task | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEpicDeleteModalOpen, setIsEpicDeleteModalOpen] = useState(false);
+  const [epicToDelete, setEpicToDelete] = useState<string | null>(null);
   
   const newEpicInputRef = useRef<HTMLInputElement>(null);
   const newTaskInputRef = useRef<HTMLInputElement>(null);
@@ -325,12 +341,17 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
   const handleDeleteEpic = async (epicId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // 이벤트 버블링 방지
     
-    if (!window.confirm('정말로 이 에픽을 삭제하시겠습니까? 포함된 모든 작업이 에픽에서 분리됩니다.')) {
-      return;
-    }
+    // 삭제 모달 열기
+    setEpicToDelete(epicId);
+    setIsEpicDeleteModalOpen(true);
+  };
+
+  // 에픽 삭제 확인 함수
+  const confirmDeleteEpic = async () => {
+    if (!epicToDelete) return;
     
     try {
-      const response = await fetch(`/api/epics?id=${epicId}`, {
+      const response = await fetch(`/api/epics?id=${epicToDelete}`, {
         method: 'DELETE',
       });
       
@@ -339,15 +360,19 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
       }
       
       // UI에서 삭제된 에픽 제거
-      setEpics(prevEpics => prevEpics.filter(epic => epic.id !== epicId));
+      setEpics(prevEpics => prevEpics.filter(epic => epic.id !== epicToDelete));
       setShowEpicMenu(null);
       
     } catch (err) {
       console.error('에픽 삭제 중 오류 발생:', err);
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
+    } finally {
+      // 모달 닫기
+      setIsEpicDeleteModalOpen(false);
+      setEpicToDelete(null);
     }
   };
-  
+
   // 작업 삭제 함수
   const handleDeleteTask = async (taskId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // 이벤트 버블링 방지
@@ -659,166 +684,29 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
                       ))}
                     </ul>
                   ) : (
-                    <div className={`text-center py-4 ${
-                      theme === 'dark' ? 'text-gray-500' : 'text-gray-400'
-                    }`}>
-                      <p>이 에픽에는 아직 작업이 없습니다.</p>
-                    </div>
-                  )}
-                  
-                  {/* 작업 추가 입력 또는 버튼 */}
-                  {addingTaskToEpicId === epic.id ? (
-                    <div className={`mt-3 ${
-                      theme === 'dark' ? 'bg-[#353538]' : 'bg-white'
-                    } p-3 rounded-md border ${
-                      theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
-                    }`}>
-                      <input
-                        ref={newTaskInputRef}
-                        type="text"
-                        placeholder="작업 제목 입력 후 엔터 (Esc로 취소)"
-                        className={`w-full p-2 rounded border ${
-                          theme === 'dark' 
-                            ? 'bg-[#2A2A2C] border-gray-700 text-gray-200' 
-                            : 'bg-white border-gray-300 text-gray-800'
-                        }`}
-                        value={newTaskTitle}
-                        onChange={(e) => setNewTaskTitle(e.target.value)}
-                        onKeyDown={handleTaskKeyDown}
-                      />
-                      
-                      <div className="flex mt-2 space-x-2 justify-end">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={handleCancelAddTask}
-                          className={`${theme === 'dark' ? 'text-gray-300 hover:text-white' : ''}`}
-                        >
-                          <XIcon className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          onClick={handleSubmitNewTask}
-                          className={`${
-                            theme === 'dark' 
-                              ? 'bg-blue-700 hover:bg-blue-600 text-white' 
-                              : 'bg-blue-600 hover:bg-blue-700 text-white'
-                          }`}
-                        >
-                          추가
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleStartAddTask(epic.id)}
-                      className={`mt-2 w-full flex items-center justify-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity ${
-                        theme === 'dark' 
-                          ? 'bg-[#2A2A2C] text-gray-300 border-gray-700 hover:bg-blue-900 hover:text-blue-300 hover:border-blue-800' 
-                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                      }`}
-                    >
-                      <PlusIcon className="w-4 h-4" />
-                      <span>작업 추가</span>
-                    </Button>
+                    <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                      아직 작업이 없습니다.
+                    </p>
                   )}
                 </div>
               )}
             </div>
           ))}
-
-          {/* 새 에픽 추가 버튼 또는 입력 폼 */}
-          {isAddingEpic ? (
-            <div className={`mt-3 ${theme === 'dark' ? 'bg-[#353538]' : 'bg-gray-100'} p-3 rounded-md`}>
-              <input
-                ref={newEpicInputRef}
-                type="text"
-                placeholder="에픽 제목 입력 후 엔터 (Esc로 취소)"
-                className={`w-full p-2 rounded border ${
-                  theme === 'dark' 
-                    ? 'bg-[#2A2A2C] border-gray-700 text-gray-200' 
-                    : 'bg-white border-gray-300 text-gray-800'
-                }`}
-                value={newEpicTitle}
-                onChange={(e) => setNewEpicTitle(e.target.value)}
-                onKeyDown={handleEpicKeyDown}
-              />
-              
-              <div className="flex mt-2 space-x-2 justify-end">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleCancelAddEpic}
-                  className={`${theme === 'dark' ? 'text-gray-300 hover:text-white' : ''}`}
-                >
-                  취소
-                </Button>
-                <Button 
-                  size="sm" 
-                  onClick={handleSubmitNewEpic}
-                  className={`${
-                    theme === 'dark' 
-                      ? 'bg-blue-700 hover:bg-blue-600 text-white' 
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  }`}
-                >
-                  추가
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="relative mt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleStartAddEpic}
-                className={`w-full flex items-center justify-center space-x-2 ${
-                  theme === 'dark' 
-                    ? 'bg-[#2A2A2C] text-gray-300 border-gray-700 hover:bg-blue-900 hover:text-blue-300 hover:border-blue-800 border border-dashed' 
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 border border-dashed'
-                }`}
-              >
-                <PlusIcon className="w-4 h-4" />
-                <span>새 에픽 추가</span>
-              </Button>
-            </div>
-          )}
         </div>
       )}
 
-      {/* TaskDetailDialog 다이얼로그 */}
-      {selectedTask && (
-        <TaskDetailDialog
-          task={selectedTask}
-          isOpen={isDialogOpen}
+      {/* 에픽 삭제 모달 추가 */}
+      {epicToDelete && (
+        <EpicDeleteModal 
+          isOpen={isEpicDeleteModalOpen}
           onClose={() => {
-            setIsDialogOpen(false);
-            setSelectedTask(null);
+            setIsEpicDeleteModalOpen(false);
+            setEpicToDelete(null);
           }}
-          onUpdate={(updatedTask) => {
-            // 상태 내 epics의 해당 task만 갱신
-            const fixedTask = convertTaskStatus(updatedTask);
-            setEpics((prevEpics) => prevEpics.map(epic =>
-              epic.id === fixedTask.epicId
-                ? { ...epic, tasks: epic.tasks.map(t => t.id === fixedTask.id ? fixedTask : t) }
-                : epic
-            ));
-          }}
-          onDelete={(taskId) => {
-            // 상태 내 epics에서 해당 task만 제거
-            setEpics((prevEpics) => prevEpics.map(epic =>
-              epic.tasks.some(t => t.id === taskId)
-                ? { ...epic, tasks: epic.tasks.filter(t => t.id !== taskId) }
-                : epic
-            ));
-            setIsDialogOpen(false);
-            setSelectedTask(null);
-          }}
-          theme={theme}
+          onDelete={confirmDeleteEpic}
+          epicName={epics.find(epic => epic.id === epicToDelete)?.title}
         />
       )}
     </div>
   );
-} 
+}
