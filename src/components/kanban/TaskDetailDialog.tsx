@@ -295,45 +295,80 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: {
         <span className="w-px h-6 bg-gray-300 mx-1"></span>
         <button
           onClick={() => {
-            const url = window.prompt('URL 입력 (예: https://example.com):');
-            if (url) {
-              // URL 유효성 검사 및 정규화
-              const normalizedUrl = /^https?:\/\//i.test(url) 
-                ? url 
-                : `https://${url}`;
+            const urlModal = document.createElement('div');
+            urlModal.innerHTML = `
+              <div class="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-[9999] backdrop-blur-sm">
+                <div class="bg-white dark:bg-[#353538] rounded-lg shadow-xl w-96 p-6 border dark:border-gray-700">
+                  <h3 class="text-lg font-semibold mb-4 dark:text-gray-200">링크 추가</h3>
+                  <input 
+                    type="text" 
+                    id="url-input" 
+                    placeholder="https://example.com" 
+                    class="w-full px-3 py-2 mb-4 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-[#2A2A2C] dark:border-gray-600 dark:text-gray-200"
+                  />
+                  <div class="flex justify-end space-x-2">
+                    <button id="cancel-url" class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
+                      취소
+                    </button>
+                    <button id="add-url" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600">
+                      추가
+                    </button>
+                  </div>
+                </div>
+              </div>
+            `;
+
+            document.body.appendChild(urlModal);
+
+            const urlInput = document.getElementById('url-input') as HTMLInputElement;
+            const addUrlBtn = document.getElementById('add-url')!;
+            const cancelUrlBtn = document.getElementById('cancel-url')!;
+
+            const normalizeUrl = (url: string) => {
+              return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+            };
+
+            addUrlBtn.addEventListener('click', () => {
+              const inputUrl = urlInput.value.trim();
               
-              try {
-                // URL 객체로 유효성 검사
-                new URL(normalizedUrl);
-                
-                // 현재 선택된 텍스트가 있는지 확인
-                const selectedText = editor.state.selection.content().size > 0 
-                  ? editor.state.doc.textBetween(
-                      editor.state.selection.from, 
-                      editor.state.selection.to
-                    ) 
-                  : '';
-                
-                if (selectedText) {
-                  // 선택된 텍스트가 있으면 해당 텍스트에 링크 적용
-                  editor
-                    .chain()
-                    .focus()
-                    .extendMarkRange('link')
-                    .setLink({ href: normalizedUrl })
-                    .run();
-                } else {
-                  // 선택된 텍스트가 없으면 URL을 텍스트로 삽입
-                  editor
-                    .chain()
-                    .focus()
-                    .insertContent(`<a href="${normalizedUrl}">${normalizedUrl}</a>`)
-                    .run();
-                }
-              } catch (error) {
-                alert('유효하지 않은 URL입니다. 다시 입력해주세요.');
+              if (!inputUrl) return;
+
+              const normalizedUrl = normalizeUrl(inputUrl);
+              
+              // 현재 선택된 텍스트가 있는지 확인
+              const selectedText = editor.state.selection.content().size > 0 
+                ? editor.state.doc.textBetween(
+                    editor.state.selection.from, 
+                    editor.state.selection.to
+                  ) 
+                : '';
+              
+              if (selectedText) {
+                // 선택된 텍스트가 있으면 해당 텍스트에 링크 적용
+                editor
+                  .chain()
+                  .focus()
+                  .extendMarkRange('link')
+                  .setLink({ href: normalizedUrl })
+                  .run();
+              } else {
+                // 선택된 텍스트가 없으면 URL을 텍스트로 삽입
+                editor
+                  .chain()
+                  .focus()
+                  .insertContent(`<a href="${normalizedUrl}">${normalizedUrl}</a>`)
+                  .run();
               }
-            }
+
+              document.body.removeChild(urlModal);
+            });
+
+            cancelUrlBtn.addEventListener('click', () => {
+              document.body.removeChild(urlModal);
+            });
+
+            // 입력란에 포커스
+            urlInput.focus();
           }}
           className={`p-1 rounded hover:bg-gray-700 min-w-[32px] min-h-[32px] flex items-center justify-center ${
             editor.isActive('link') 
