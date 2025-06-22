@@ -386,10 +386,147 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: {
         </button>
         <button
           onClick={() => {
-            const url = window.prompt('이미지 URL 입력:');
-            if (url) {
-              editor.chain().focus().setImage({ src: url }).run();
-            }
+            const imageModal = document.createElement('div');
+            imageModal.innerHTML = `
+              <div class="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-[9999] backdrop-blur-sm">
+                <div class="bg-white dark:bg-[#353538] rounded-lg shadow-xl w-96 border dark:border-gray-700">
+                  <div class="border-b dark:border-gray-700 p-4 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold dark:text-gray-200">이미지 추가</h3>
+                    <button id="close-image-modal" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  <div class="p-4">
+                    <div class="flex mb-4">
+                      <button id="url-tab" class="flex-1 py-2 text-center border-b-2 font-medium focus:outline-none dark:text-gray-200 dark:border-blue-600">
+                        URL로 추가
+                      </button>
+                      <button id="upload-tab" class="flex-1 py-2 text-center border-b-2 font-medium focus:outline-none dark:text-gray-200">
+                        파일 업로드
+                      </button>
+                    </div>
+                    
+                    <div id="url-content" class="space-y-4">
+                      <input 
+                        type="text" 
+                        id="image-url-input" 
+                        placeholder="이미지 URL을 입력하세요" 
+                        class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-[#2A2A2C] dark:border-gray-600 dark:text-gray-200"
+                      />
+                    </div>
+                    
+                    <div id="upload-content" class="space-y-4 hidden">
+                      <input 
+                        type="file" 
+                        id="image-file-input" 
+                        accept="image/*" 
+                        class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-[#2A2A2C] dark:border-gray-600 dark:text-gray-200"
+                      />
+                    </div>
+                    
+                    <div class="flex justify-end space-x-2 mt-4">
+                      <button id="cancel-image" class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
+                        취소
+                      </button>
+                      <button id="add-image" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600">
+                        추가
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `;
+
+            document.body.appendChild(imageModal);
+
+            const urlTab = document.getElementById('url-tab')!;
+            const uploadTab = document.getElementById('upload-tab')!;
+            const urlContent = document.getElementById('url-content')!;
+            const uploadContent = document.getElementById('upload-content')!;
+            const urlInput = document.getElementById('image-url-input') as HTMLInputElement;
+            const fileInput = document.getElementById('image-file-input') as HTMLInputElement;
+            const addImageBtn = document.getElementById('add-image')!;
+            const cancelImageBtn = document.getElementById('cancel-image')!;
+            const closeModalBtn = document.getElementById('close-image-modal')!;
+
+            // 탭 전환 로직
+            urlTab.addEventListener('click', () => {
+              urlTab.classList.add('border-blue-600');
+              uploadTab.classList.remove('border-blue-600');
+              urlContent.classList.remove('hidden');
+              uploadContent.classList.add('hidden');
+            });
+
+            uploadTab.addEventListener('click', () => {
+              uploadTab.classList.add('border-blue-600');
+              urlTab.classList.remove('border-blue-600');
+              uploadContent.classList.remove('hidden');
+              urlContent.classList.add('hidden');
+            });
+
+            // 이미지 추가 로직
+            addImageBtn.addEventListener('click', async () => {
+              if (urlContent.classList.contains('hidden')) {
+                // 파일 업로드 로직
+                const file = fileInput.files?.[0];
+                if (file) {
+                  try {
+                    // FormData 생성
+                    const formData = new FormData();
+                    formData.append('image', file);
+
+                    // 이미지 업로드 API 호출
+                    const response = await fetch('/api/documents/upload-image', {
+                      method: 'POST',
+                      body: formData
+                    });
+
+                    if (!response.ok) {
+                      throw new Error('이미지 업로드 실패');
+                    }
+
+                    // 서버에서 반환된 이미지 URL
+                    const { imageUrl } = await response.json();
+
+                    // 에디터에 이미지 삽입
+                    editor
+                      .chain()
+                      .focus()
+                      .setImage({ src: imageUrl })
+                      .run();
+
+                    document.body.removeChild(imageModal);
+                  } catch (error) {
+                    console.error('이미지 업로드 중 오류:', error);
+                    alert('이미지 업로드에 실패했습니다.');
+                  }
+                }
+              } else {
+                // URL 입력 로직 (기존과 동일)
+                const inputUrl = urlInput.value.trim();
+                
+                if (!inputUrl) return;
+
+                const normalizedUrl = /^https?:\/\//i.test(inputUrl) ? inputUrl : `https://${inputUrl}`;
+                
+                editor.chain().focus().setImage({ src: normalizedUrl }).run();
+                document.body.removeChild(imageModal);
+              }
+            });
+
+            // 취소 버튼 로직
+            cancelImageBtn.addEventListener('click', () => {
+              document.body.removeChild(imageModal);
+            });
+
+            // 닫기 버튼 로직
+            closeModalBtn.addEventListener('click', () => {
+              document.body.removeChild(imageModal);
+            });
           }}
           className={`p-1 rounded hover:bg-gray-700 min-w-[32px] min-h-[32px] flex items-center justify-center ${
             theme === 'dark' 
@@ -688,6 +825,20 @@ const getEditorStyles = (theme: "light" | "dark") => {
     }
     .ProseMirror .task-item-stable input[type="checkbox"] {
       margin-right: 0.5rem;
+    }
+    .ProseMirror img {
+      max-width: 100%;
+      max-height: 300px; /* 최대 높이 제한 */
+      object-fit: contain; /* 비율 유지하며 이미지 맞추기 */
+      margin: 10px 0; /* 상하 여백 추가 */
+      display: block; /* 블록 레벨 요소로 변경 */
+      margin-left: auto; /* 가운데 정렬 */
+      margin-right: auto;
+      border-radius: 8px; /* 모서리 둥글게 */
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* 약간의 그림자 */
+    }
+    .ProseMirror p {
+      margin-bottom: 10px; /* 문단 간 간격 추가 */
     }
   `;
 };
