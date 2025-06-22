@@ -57,6 +57,7 @@ import { useProject, ProjectMember } from "@/app/contexts/ProjectContext";
 import { useUsers } from "@/app/contexts/UserContext";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { DeleteConfirmModal } from "@/components/modals/DeleteConfirmModal";
+import Paragraph from '@tiptap/extension-paragraph';
 
 interface Comment {
   id: string;
@@ -173,6 +174,19 @@ const RichTextEditor = ({
         bulletList: false,
         orderedList: false,
         listItem: false,
+        codeBlock: {
+          // 코드 블록 이후 새 단락 생성 허용
+          exitOnTripleEnter: true,
+          HTMLAttributes: {
+            class: 'language-javascript', // 선택적: 언어 하이라이트를 위한 클래스
+          }
+        }
+      }),
+      Paragraph.configure({
+        // 코드 블록 다음에 새 단락 생성 시 추가 옵션
+        HTMLAttributes: {
+          class: 'my-paragraph'
+        }
       }),
       TextStyle,
       Color,
@@ -608,7 +622,7 @@ const RichTextEditor = ({
               : "text-gray-500 hover:bg-gray-200 border border-transparent"
           }`}
           type="button"
-          title="코드"
+          title="코드 블록"
         >
           <Code size={16} />
         </button>
@@ -949,6 +963,46 @@ const getEditorStyles = (theme: "light" | "dark") => {
     }
     .ProseMirror p {
       margin-bottom: 10px; /* 문단 간 간격 추가 */
+    }
+
+    .ProseMirror pre {
+      background-color: ${theme === "dark" ? "#1F2937" : "#F3F4F6"};
+      color: ${theme === "dark" ? "#E5E7EB" : "#111827"};
+      font-family: 'Courier New', monospace;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+      line-height: 1.5;
+      border: 1px solid ${theme === "dark" ? "#374151" : "#D1D5DB"};
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .ProseMirror code {
+      background-color: ${theme === "dark" ? "#374151" : "#E5E7EB"};
+      color: ${theme === "dark" ? "#F9FAFB" : "#111827"};
+      font-family: 'Courier New', monospace;
+      padding: 0.2rem 0.4rem;
+      border-radius: 0.25rem;
+      font-size: 0.9em;
+    }
+
+    .ProseMirror .my-paragraph {
+      margin-top: 0.5rem; // 간격을 좁힘
+      margin-bottom: 0.5rem;
+    }
+
+    // 코드 블록 이후 텍스트 입력 용이성 개선
+    .ProseMirror *:last-child {
+      margin-bottom: 0.5rem; // 마진을 줄임
+    }
+
+    .ProseMirror p {
+      margin-bottom: 0.5rem; // 문단 간 간격을 원래대로
+    }
+
+    .ProseMirror pre {
+      margin: 0.5rem 0; // 코드 블록 마진도 좁힘
     }
   `;
 };
