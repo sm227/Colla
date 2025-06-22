@@ -55,12 +55,6 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
   
   // projectId가 변경될 때마다 태스크를 다시 불러옵니다.
   useEffect(() => {
-    console.log("KanbanBoard - 프로젝트 ID 변경됨:", projectId);
-    if (projectId === null) {
-      console.log("KanbanBoard - 모든 프로젝트 작업 표시");
-    } else {
-      console.log("KanbanBoard - 특정 프로젝트 작업 표시:", projectId);
-    }
     // projectId가 변경되면 UI를 즉시 비우고 로딩 상태로 전환
     setTasksState([]);
     fetchTasks();
@@ -72,11 +66,9 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
       // 프로젝트 ID가 있을 경우 해당 프로젝트의 작업만 필터링
       if (projectId) {
         const filteredTasks = tasks.filter(task => task.projectId === projectId);
-        console.log(`프로젝트 ID ${projectId}에 해당하는 작업 ${filteredTasks.length}개 필터링됨`);
         setTasksState(filteredTasks);
       } else {
         // 프로젝트 ID가 없으면 모든 작업 표시
-        console.log(`전체 작업 ${tasks.length}개 로드됨`);
         setTasksState(tasks);
       }
     } else {
@@ -147,8 +139,6 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
   // 작업 업데이트 함수 - 서버에 변경사항 저장하도록 수정
   const handleUpdateTask = async (updatedTask: Task) => {
     try {
-      console.log('작업 업데이트 시작:', updatedTask);
-      
       // 로컬 상태 즉시 업데이트
       const updatedTasks = tasksState.map(t => 
         t.id === updatedTask.id ? updatedTask : t
@@ -159,8 +149,6 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
       const result = await updateTask(updatedTask);
       
       if (result) {
-        console.log('작업 업데이트 성공:', result);
-        
         // 작업 업데이트 성공 시 알림 즉시 새로고침
         setTimeout(() => {
           refreshNotifications();
@@ -180,8 +168,6 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
 
   // 삭제 함수 구현 수정 - useTasks의 deleteTask 함수 사용
   const handleDeleteTask = async (taskId: string) => {
-    console.log('handleDeleteTask 함수가 호출되었습니다.', taskId);
-    
     try {
       // DB에서 작업 삭제
       await deleteTask(taskId);
@@ -192,8 +178,6 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
       
       // 대화상자 닫기
       handleCloseDialog();
-      
-      console.log('작업이 성공적으로 삭제되었습니다.');
     } catch (error) {
       console.error('작업 삭제 중 오류 발생:', error);
       alert('작업 삭제 중 오류가 발생했습니다.');

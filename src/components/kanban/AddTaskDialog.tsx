@@ -68,16 +68,36 @@ export function AddTaskDialog({ isOpen, onClose, onAddTask, projectId }: AddTask
     
     const project = projects.find(p => p.id === projectId) || currentProject;
     if (project) {
-      // Filter for accepted members only
+      // 수락된 멤버들만 필터링
       const acceptedMembers = project.members.filter(
         member => member.inviteStatus === "accepted"
       );
-      setProjectMembers(acceptedMembers);
       
-      // 현재 사용자가 이미 프로젝트 멤버인지 확인
+      // 프로젝트 소유자 추가 (Project.user가 있는 경우)
+      const allMembers = [...acceptedMembers];
+      if (project.user && project.userId) {
+        // 프로젝트 소유자를 ProjectMember 형태로 만들어서 추가
+        const ownerAsMember = {
+          id: `owner-${project.userId}`,
+          userId: project.userId,
+          projectId: project.id,
+          role: "owner",
+          inviteStatus: "accepted",
+          createdAt: project.createdAt,
+          updatedAt: project.updatedAt,
+          user: project.user,
+          project: project
+        };
+        allMembers.unshift(ownerAsMember); // 소유자를 맨 앞에 추가
+      }
+      
+      setProjectMembers(allMembers);
+      
+      // 현재 사용자가 이미 프로젝트 멤버인지 확인 (소유자 포함)
       if (currentUser) {
         setIsCurrentUserInMembers(
-          acceptedMembers.some(member => member.userId === currentUser.id)
+          allMembers.some(member => member.userId === currentUser.id) ||
+          project.userId === currentUser.id
         );
       }
     } else {

@@ -1057,16 +1057,36 @@ export function TaskDetailDialog({
     const project =
       projects.find((p) => p.id === task.projectId) || currentProject;
     if (project) {
-      // Filter for accepted members only
+      // 수락된 멤버들만 필터링
       const acceptedMembers = project.members.filter(
         (member) => member.inviteStatus === "accepted"
       );
-      setProjectMembers(acceptedMembers);
+      
+      // 프로젝트 소유자 추가 (Project.user가 있는 경우)
+      const allMembers = [...acceptedMembers];
+      if (project.user && project.userId) {
+        // 프로젝트 소유자를 ProjectMember 형태로 만들어서 추가
+        const ownerAsMember = {
+          id: `owner-${project.userId}`,
+          userId: project.userId,
+          projectId: project.id,
+          role: "owner",
+          inviteStatus: "accepted",
+          createdAt: project.createdAt,
+          updatedAt: project.updatedAt,
+          user: project.user,
+          project: project
+        };
+        allMembers.unshift(ownerAsMember); // 소유자를 맨 앞에 추가
+      }
+      
+      setProjectMembers(allMembers);
 
-      // 현재 사용자가 이미 프로젝트 멤버인지 확인
+      // 현재 사용자가 이미 프로젝트 멤버인지 확인 (소유자 포함)
       if (currentUser) {
         setIsCurrentUserInMembers(
-          acceptedMembers.some((member) => member.userId === currentUser.id)
+          allMembers.some((member) => member.userId === currentUser.id) || 
+          project.userId === currentUser.id
         );
       }
     } else {
@@ -1079,8 +1099,8 @@ export function TaskDetailDialog({
   const handleChange = (updatedTask: Task) => {
     setEditedTask(updatedTask);
 
-    // 실시간으로 에픽 변경 사항도 서버에 저장하기
-    if (updatedTask.epicId !== task.epicId) {
+    // 실시간으로 에픽이나 담당자 변경 사항을 서버에 저장하기
+    if (updatedTask.epicId !== task.epicId || updatedTask.assignee !== task.assignee) {
       saveTask(updatedTask);
     }
   };
@@ -1088,8 +1108,6 @@ export function TaskDetailDialog({
   // 작업 저장 함수 (서버에 업데이트)
   const saveTask = async (taskToSave: Task) => {
     try {
-      console.log("💾 작업 저장 시작:", taskToSave.id);
-
       // 개별 작업 API 엔드포인트 사용
       const response = await fetch(`/api/tasks/${taskToSave.id}`, {
         method: "PUT",
@@ -1101,13 +1119,11 @@ export function TaskDetailDialog({
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("❌ 작업 업데이트 실패:", errorData);
+        console.error("작업 업데이트 실패:", errorData);
         throw new Error(errorData.details || "작업 업데이트에 실패했습니다.");
       }
 
       const updatedTask = await response.json();
-      console.log("✅ 작업 저장 성공:", updatedTask.id);
-
       onUpdate(updatedTask);
     } catch (error) {
       console.error("❌ 작업 업데이트 중 오류 발생:", error);
@@ -2147,7 +2163,7 @@ export function TaskDetailDialog({
                             : "hover:bg-gray-100"
                         }`}
                         onClick={() => {
-                          handleChange({ ...editedTask, assignee: undefined });
+                          handleChange({ ...editedTask, assignee: null });
                           setShowMembersList(false);
                         }}
                       >

@@ -168,7 +168,6 @@ export function useTasks(projectId?: string | null) {
   const updateTask = async (updatedTask: Task) => {
     try {
       setLoading(true);
-      console.log('📝 작업 업데이트 요청:', updatedTask);
       
       const response = await fetch(`/api/tasks/${updatedTask.id}`, {
         method: "PUT",
@@ -183,7 +182,6 @@ export function useTasks(projectId?: string | null) {
       }
       
       const resultTask = await response.json();
-      console.log('✅ 작업 업데이트 성공:', resultTask);
       
       setTasks((prevTasks) =>
         prevTasks.map((task) => (task.id === updatedTask.id ? resultTask : task))
@@ -191,7 +189,7 @@ export function useTasks(projectId?: string | null) {
       setError(null);
       return resultTask;
     } catch (err) {
-      console.error('❌ 작업 업데이트 오류:', err);
+      console.error('작업 업데이트 오류:', err);
       setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
       return null;
     } finally {

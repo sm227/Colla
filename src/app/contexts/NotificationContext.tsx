@@ -310,7 +310,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     // 새 알림 없음으로 설정
     setHasNewNotifications(false);
     
-    console.log("✅ 모든 알림을 읽음 처리하고 localStorage에 저장했습니다.");
+
   };
 
   // 개별 알림을 읽음 처리하는 함수
@@ -343,7 +343,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       return updatedNotifications.some(notification => !notification.isRead);
     });
     
-    console.log(`✅ 알림 ${notificationId}을 읽음 처리했습니다.`);
+
   };
 
   // 모든 알림을 지우는 함수
