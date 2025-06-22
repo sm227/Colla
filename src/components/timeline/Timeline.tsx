@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { TaskDetailDialog } from "../kanban/TaskDetailDialog";
 import type { TaskStatus } from "../kanban/KanbanBoard";
+import { DeleteConfirmModal } from "../modals/DeleteConfirmModal";
 
 // 타입 정의
 interface Epic {
@@ -73,6 +74,8 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
   const [showTaskMenu, setShowTaskMenu] = useState<{ epicId: string, taskId: string } | null>(null);
   const [selectedTask, setSelectedTask] = useState<import("../kanban/KanbanBoard").Task | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEpicDeleteModalOpen, setIsEpicDeleteModalOpen] = useState(false);
+  const [deletingEpicId, setDeletingEpicId] = useState<string | null>(null);
   
   const newEpicInputRef = useRef<HTMLInputElement>(null);
   const newTaskInputRef = useRef<HTMLInputElement>(null);
@@ -325,12 +328,16 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
   const handleDeleteEpic = async (epicId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // 이벤트 버블링 방지
     
-    if (!window.confirm('정말로 이 에픽을 삭제하시겠습니까? 포함된 모든 작업이 에픽에서 분리됩니다.')) {
-      return;
-    }
-    
+    setDeletingEpicId(epicId);
+    setIsEpicDeleteModalOpen(true);
+  };
+
+  // 에픽 삭제 확인 함수
+  const confirmDeleteEpic = async () => {
+    if (!deletingEpicId) return;
+
     try {
-      const response = await fetch(`/api/epics?id=${epicId}`, {
+      const response = await fetch(`/api/epics?id=${deletingEpicId}`, {
         method: 'DELETE',
       });
       
@@ -339,15 +346,18 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
       }
       
       // UI에서 삭제된 에픽 제거
-      setEpics(prevEpics => prevEpics.filter(epic => epic.id !== epicId));
+      setEpics(prevEpics => prevEpics.filter(epic => epic.id !== deletingEpicId));
       setShowEpicMenu(null);
       
     } catch (err) {
       console.error('에픽 삭제 중 오류 발생:', err);
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
+    } finally {
+      setIsEpicDeleteModalOpen(false);
+      setDeletingEpicId(null);
     }
   };
-  
+
   // 작업 삭제 함수
   const handleDeleteTask = async (taskId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // 이벤트 버블링 방지
@@ -819,6 +829,19 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
           theme={theme}
         />
       )}
+
+      {/* 에픽 삭제 확인 모달 */}
+      <DeleteConfirmModal
+        isOpen={isEpicDeleteModalOpen}
+        onClose={() => {
+          setIsEpicDeleteModalOpen(false);
+          setDeletingEpicId(null);
+        }}
+        onDelete={confirmDeleteEpic}
+        title="에픽 삭제"
+        description="이 에픽을 정말 삭제하시겠습니까? 포함된 모든 작업이 에픽에서 분리됩니다."
+        className="z-[9999]"
+      />
     </div>
   );
 } 
