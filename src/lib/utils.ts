@@ -69,3 +69,61 @@ export function formatFileSize(bytes: number): string {
 export function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
+
+// TipTap 콘텐츠 처리 함수
+export const processTiptapContent = (content: string | object): string => {
+  if (typeof content === 'string') {
+    return content;
+  }
+  
+  if (typeof content === 'object' && content !== null) {
+    try {
+      // TipTap JSON 구조에서 텍스트 추출
+      const extractTextFromTipTapContent = (node: any): string => {
+        if (!node) return '';
+        
+        if (typeof node === 'string') return node;
+        
+        if (node.type === 'text' && node.text) {
+          return node.text;
+        }
+        
+        if (node.content && Array.isArray(node.content)) {
+          return node.content.map(extractTextFromTipTapContent).join('');
+        }
+        
+        if (node.text) {
+          return node.text;
+        }
+        
+        return '';
+      };
+      
+      return extractTextFromTipTapContent(content);
+    } catch (error) {
+      console.error('TipTap 콘텐츠 처리 중 오류:', error);
+      return '';
+    }
+  }
+  
+  return '';
+};
+
+// HTML 태그 제거 함수
+export const removeHtmlTags = (html: string): string => {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, '').trim();
+};
+
+// 안전한 description 렌더링을 위한 함수
+export const getSafeDescription = (description: string | object | null | undefined): string => {
+  if (!description) return '';
+  
+  if (typeof description === 'string') {
+    // HTML 태그가 포함된 문자열인 경우 제거
+    return removeHtmlTags(description);
+  }
+  
+  // 객체인 경우 TipTap 콘텐츠로 처리
+  return processTiptapContent(description);
+};
