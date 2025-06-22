@@ -91,6 +91,34 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: {
       ? content 
       : '';
   
+  // 스크롤바 스타일 함수 
+  const getScrollbarStyles = (theme: "light" | "dark") => {
+    return `
+      ${theme === 'dark' ? `
+        .dark-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: #4A4A4E #2A2A2C;
+        }
+        .dark-scrollbar::-webkit-scrollbar {
+          width: 10px;
+          background-color: #2A2A2C;
+        }
+        .dark-scrollbar::-webkit-scrollbar-track {
+          background: #2A2A2C;
+          border-left: 1px solid #353538;
+        }
+        .dark-scrollbar::-webkit-scrollbar-thumb {
+          background: #4A4A4E;
+          border-left: 1px solid #353538;
+          border-radius: 4px;
+        }
+        .dark-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #5A5A5E;
+        }
+      ` : ''}
+    `;
+  };
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -112,10 +140,17 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: {
         HTMLAttributes: {
           class: 'task-item-stable',
         },
-        nested: true,
+        nested: false, // 중첩 비활성화
       }),
       LinkExtension.configure({
-        openOnClick: false,
+        openOnClick: true,
+        autolink: true,
+        linkOnPaste: true,
+        validate: (url) => /^(https?:\/\/)?[\w\-]+(\.[\w\-]+)+[#?]?.*$/.test(url),
+        HTMLAttributes: {
+          target: '_blank',
+          rel: 'noopener noreferrer'
+        }
       }),
       ImageExtension,
       Placeholder.configure({
@@ -131,6 +166,33 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: {
     immediatelyRender: false,
   });
 
+  useEffect(() => {
+    if (!editor) return;
+
+    // 링크 클릭 이벤트 핸들러 추가
+    const handleLinkClick = (event: MouseEvent) => {
+      const target = event.target as HTMLAnchorElement;
+      if (target.tagName === 'A' && target.href) {
+        event.preventDefault();
+        window.open(target.href, '_blank', 'noopener,noreferrer');
+      }
+    };
+
+    // 이벤트 리스너 추가
+    const editorDom = editor.view?.dom;
+    if (editorDom) {
+      editorDom.addEventListener('click', handleLinkClick);
+    }
+
+    // 컴포넌트 언마운트 시 이벤트 리스너 제거
+    return () => {
+      if (editorDom) {
+        editorDom.removeEventListener('click', handleLinkClick);
+      }
+      editor.destroy();
+    };
+  }, [editor]);
+
   if (!editor) {
     return null;
   }
@@ -140,8 +202,9 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: {
 
   return (
     <div className="rich-text-editor border rounded-md overflow-hidden flex flex-col">
-      <style>{editorStyles}</style>
+      {/* 스크롤바 및 에디터 스타일 */}
       <style>{scrollbarStyles}</style>
+      <style>{editorStyles}</style>
       
       <div className={`border-b p-2 flex flex-wrap gap-1 h-[48px] items-center flex-shrink-0 ${
         theme === 'dark' ? 'bg-[#353538] border-gray-700' : 'bg-gray-50 border-gray-200'
@@ -212,27 +275,8 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: {
           <ListOrdered size={16} />
         </button>
         <button
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            // 현재 에디터의 위치 저장
-            const editorElement = document.querySelector('.ProseMirror');
-            const editorRect = editorElement?.getBoundingClientRect();
-            const viewportOffset = editorRect?.top || 0;
-            
+          onClick={() => {
             editor.chain().focus().toggleTaskList().run();
-            
-            // 에디터 위치 복원
-            requestAnimationFrame(() => {
-              const newEditorElement = document.querySelector('.ProseMirror');
-              const newEditorRect = newEditorElement?.getBoundingClientRect();
-              const newViewportOffset = newEditorRect?.top || 0;
-              
-              if (viewportOffset !== newViewportOffset) {
-                window.scrollBy(0, newViewportOffset - viewportOffset);
-              }
-            });
           }}
           className={`p-1 rounded hover:bg-gray-700 min-w-[32px] min-h-[32px] flex items-center justify-center ${
             editor.isActive('taskList') 
@@ -251,10 +295,80 @@ const RichTextEditor = ({ content, onChange, theme = "light" }: {
         <span className="w-px h-6 bg-gray-300 mx-1"></span>
         <button
           onClick={() => {
-            const url = window.prompt('URL 입력:');
-            if (url) {
-              editor.chain().focus().setLink({ href: url }).run();
-            }
+            const urlModal = document.createElement('div');
+            urlModal.innerHTML = `
+              <div class="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-[9999] backdrop-blur-sm">
+                <div class="bg-white dark:bg-[#353538] rounded-lg shadow-xl w-96 p-6 border dark:border-gray-700">
+                  <h3 class="text-lg font-semibold mb-4 dark:text-gray-200">링크 추가</h3>
+                  <input 
+                    type="text" 
+                    id="url-input" 
+                    placeholder="https://example.com" 
+                    class="w-full px-3 py-2 mb-4 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-[#2A2A2C] dark:border-gray-600 dark:text-gray-200"
+                  />
+                  <div class="flex justify-end space-x-2">
+                    <button id="cancel-url" class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
+                      취소
+                    </button>
+                    <button id="add-url" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600">
+                      추가
+                    </button>
+                  </div>
+                </div>
+              </div>
+            `;
+
+            document.body.appendChild(urlModal);
+
+            const urlInput = document.getElementById('url-input') as HTMLInputElement;
+            const addUrlBtn = document.getElementById('add-url')!;
+            const cancelUrlBtn = document.getElementById('cancel-url')!;
+
+            const normalizeUrl = (url: string) => {
+              return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+            };
+
+            addUrlBtn.addEventListener('click', () => {
+              const inputUrl = urlInput.value.trim();
+              
+              if (!inputUrl) return;
+
+              const normalizedUrl = normalizeUrl(inputUrl);
+              
+              // 현재 선택된 텍스트가 있는지 확인
+              const selectedText = editor.state.selection.content().size > 0 
+                ? editor.state.doc.textBetween(
+                    editor.state.selection.from, 
+                    editor.state.selection.to
+                  ) 
+                : '';
+              
+              if (selectedText) {
+                // 선택된 텍스트가 있으면 해당 텍스트에 링크 적용
+                editor
+                  .chain()
+                  .focus()
+                  .extendMarkRange('link')
+                  .setLink({ href: normalizedUrl })
+                  .run();
+              } else {
+                // 선택된 텍스트가 없으면 URL을 텍스트로 삽입
+                editor
+                  .chain()
+                  .focus()
+                  .insertContent(`<a href="${normalizedUrl}">${normalizedUrl}</a>`)
+                  .run();
+              }
+
+              document.body.removeChild(urlModal);
+            });
+
+            cancelUrlBtn.addEventListener('click', () => {
+              document.body.removeChild(urlModal);
+            });
+
+            // 입력란에 포커스
+            urlInput.focus();
           }}
           className={`p-1 rounded hover:bg-gray-700 min-w-[32px] min-h-[32px] flex items-center justify-center ${
             editor.isActive('link') 
@@ -411,145 +525,6 @@ const removeHtmlTags = (html: string): string => {
   return html.replace(/<[^>]*>|&[^;]+;/g, '');
 };
 
-// 스타일 템플릿을 함수 내부로 이동하고 theme 파라미터 추가
-const getEditorStyles = (theme: "light" | "dark") => {
-  return `
-    .ProseMirror {
-      -webkit-user-modify: read-write;
-      overflow-wrap: break-word;
-      word-break: break-word;
-      white-space: pre-wrap;
-      outline: none;
-      padding: 0;
-      margin: 0;
-      min-height: 150px;
-      ${theme === 'dark' ? `
-        background-color: #2A2A2C;
-        color: #D1D5DB;
-      ` : ''}
-    }
-
-    .rich-text-editor {
-      position: relative;
-    }
-    
-    /* TaskList 관련 레이아웃 고정 */
-    .ProseMirror ul[data-type="taskList"],
-    .ProseMirror ul[data-type="taskList"] li {
-      margin: 0;
-      padding: 0;
-    }
-    
-    .ProseMirror li[data-type="taskItem"] {
-      display: flex;
-      align-items: flex-start;
-      min-height: 1.5em;
-      margin: 0.25rem 0;
-    }
-
-    .ProseMirror p {
-      margin: 0;
-      line-height: 1.5;
-      ${theme === 'dark' ? 'color: #D1D5DB;' : 'color: #1F2937;'}
-    }
-    .ProseMirror:focus {
-      outline: none;
-    }
-    .ProseMirror strong {
-      font-weight: bold;
-      ${theme === 'dark' ? 'color: #F3F4F6;' : 'color: #111827;'}
-    }
-    .ProseMirror em {
-      font-style: italic;
-      ${theme === 'dark' ? 'color: #E5E7EB;' : 'color: #1F2937;'}
-    }
-    .ProseMirror ul, .ProseMirror ol {
-      padding-left: 20px;
-      ${theme === 'dark' ? 'color: #D1D5DB;' : 'color: #1F2937;'}
-    }
-    .ProseMirror li {
-      margin-bottom: 4px;
-      ${theme === 'dark' ? 'color: #D1D5DB;' : 'color: #1F2937;'}
-    }
-    .ProseMirror ul li {
-      list-style-type: disc;
-    }
-    .ProseMirror ol li {
-      list-style-type: decimal;
-    }
-    .ProseMirror a {
-      color: ${theme === 'dark' ? '#60A5FA' : '#2563EB'};
-      text-decoration: underline;
-    }
-    .ProseMirror code {
-      background-color: ${theme === 'dark' ? '#3F3F46' : '#F3F4F6'};
-      color: ${theme === 'dark' ? '#E5E7EB' : '#111827'};
-      padding: 2px 4px;
-      border-radius: 4px;
-      font-family: monospace;
-    }
-    .ProseMirror blockquote {
-      border-left: 4px solid ${theme === 'dark' ? '#4B5563' : '#9CA3AF'};
-      padding-left: 10px;
-      margin-left: 0;
-      font-style: italic;
-      color: ${theme === 'dark' ? '#9CA3AF' : '#4B5563'};
-    }
-
-    /* TaskList 및 TaskItem 안정성 개선 */
-    .task-list-stable {
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-    
-    .task-item-stable {
-      display: flex;
-      align-items: center;
-      margin: 0.25rem 0;
-      min-height: 1.5em;
-    }
-    
-    .task-item-stable > * {
-      margin: 0;
-      padding: 0;
-    }
-    
-    .task-item-stable input[type="checkbox"] {
-      margin-right: 0.5rem;
-      margin-left: 0;
-    }
-  `;
-};
-
-// 스크롤바 스타일 함수 유지
-const getScrollbarStyles = (theme: "light" | "dark") => {
-  return `
-    ${theme === 'dark' ? `
-      .dark-scrollbar {
-        scrollbar-width: thin;
-        scrollbar-color: #4A4A4E #2A2A2C;
-      }
-      .dark-scrollbar::-webkit-scrollbar {
-        width: 10px;
-        background-color: #2A2A2C;
-      }
-      .dark-scrollbar::-webkit-scrollbar-track {
-        background: #2A2A2C;
-        border-left: 1px solid #353538;
-      }
-      .dark-scrollbar::-webkit-scrollbar-thumb {
-        background: #4A4A4E;
-        border-left: 1px solid #353538;
-        border-radius: 4px;
-      }
-      .dark-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: #5A5A5E;
-      }
-    ` : ''}
-  `;
-};
-
 // Badge component for status, priority, etc.
 const StatusBadge = ({ status, theme }: { status: string; theme: "light" | "dark" }) => {
   const getStatusColor = (status: string) => {
@@ -615,6 +590,106 @@ const UserAvatar = ({ user, size = "w-8 h-8" }: { user: { name: string; initials
       {initials}
     </div>
   );
+};
+
+// 에디터 스타일 함수
+const getEditorStyles = (theme: "light" | "dark") => {
+  return `
+    .ProseMirror {
+      -webkit-user-modify: read-write;
+      overflow-wrap: break-word;
+      word-break: break-word;
+      white-space: pre-wrap;
+      outline: none;
+      padding: 0;
+      margin: 0;
+      min-height: 150px;
+      ${theme === 'dark' ? `
+        background-color: #2A2A2C;
+        color: #D1D5DB;
+      ` : ''}
+    }
+
+    .ProseMirror a {
+      color: ${theme === 'dark' ? '#3B82F6' : '#1E40AF'} !important;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      text-decoration-thickness: 1px;
+      text-decoration-color: ${theme === 'dark' ? '#3B82F650' : '#1E40AF50'};
+      transition: all 0.2s ease-in-out;
+      font-weight: 500;
+      cursor: pointer;
+      position: relative;
+      border-bottom: 1px dotted ${theme === 'dark' ? '#3B82F630' : '#1E40AF30'};
+      padding-bottom: 1px;
+    }
+
+    .ProseMirror a:link,
+    .ProseMirror a:visited {
+      color: ${theme === 'dark' ? '#3B82F6' : '#1E40AF'} !important;
+    }
+
+    .ProseMirror a:hover {
+      color: ${theme === 'dark' ? '#60A5FA' : '#1D4ED8'} !important;
+      text-decoration: underline;
+      text-decoration-color: ${theme === 'dark' ? '#60A5FA' : '#1D4ED8'};
+      border-bottom-color: transparent;
+      cursor: pointer;
+      opacity: 0.9;
+    }
+
+    .ProseMirror a:active {
+      color: ${theme === 'dark' ? '#93C5FD' : '#2B6CB0'} !important;
+      text-decoration: underline;
+      opacity: 0.8;
+      transform: scale(0.99);
+    }
+
+    .ProseMirror p {
+      margin: 0;
+      line-height: 1.5;
+      ${theme === 'dark' ? 'color: #D1D5DB;' : 'color: #1F2937;'}
+    }
+    .ProseMirror:focus {
+      outline: none;
+    }
+    .ProseMirror strong {
+      font-weight: bold;
+      ${theme === 'dark' ? 'color: #F3F4F6;' : 'color: #111827;'}
+    }
+    .ProseMirror em {
+      font-style: italic;
+      ${theme === 'dark' ? 'color: #E5E7EB;' : 'color: #1F2937;'}
+    }
+    .ProseMirror ul, .ProseMirror ol {
+      padding-left: 20px;
+      ${theme === 'dark' ? 'color: #D1D5DB;' : 'color: #1F2937;'}
+    }
+    .ProseMirror li {
+      margin-bottom: 4px;
+      ${theme === 'dark' ? 'color: #D1D5DB;' : 'color: #1F2937;'}
+    }
+    .ProseMirror ul li {
+      list-style-type: disc;
+    }
+    .ProseMirror ol li {
+      list-style-type: decimal;
+    }
+    .ProseMirror ul.task-list-stable {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+    }
+    .ProseMirror .task-item-stable {
+      display: flex;
+      align-items: center;
+      margin: 0;
+      padding: 0;
+    }
+    .ProseMirror .task-item-stable input[type="checkbox"] {
+      margin-right: 0.5rem;
+    }
+  `;
 };
 
 export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, theme = "light", clickedElement }: TaskDetailDialogProps) {
@@ -1139,8 +1214,39 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
     return epic?.color || "#CCCCCC";
   };
 
+  // 스크롤바 스타일 함수 
+  const getScrollbarStyles = (theme: "light" | "dark") => {
+    return `
+      ${theme === 'dark' ? `
+        .dark-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: #4A4A4E #2A2A2C;
+        }
+        .dark-scrollbar::-webkit-scrollbar {
+          width: 10px;
+          background-color: #2A2A2C;
+        }
+        .dark-scrollbar::-webkit-scrollbar-track {
+          background: #2A2A2C;
+          border-left: 1px solid #353538;
+        }
+        .dark-scrollbar::-webkit-scrollbar-thumb {
+          background: #4A4A4E;
+          border-left: 1px solid #353538;
+          border-radius: 4px;
+        }
+        .dark-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #5A5A5E;
+        }
+      ` : ''}
+    `;
+  };
+
   // 스크롤바 스타일 추가 (함수 호출)
   const scrollbarStyles = getScrollbarStyles(theme);
+  
+  // 에디터 스타일 추가 (함수 호출)
+  const editorStyles = getEditorStyles(theme);
 
   return (
     <>
@@ -1533,7 +1639,6 @@ export function TaskDetailDialog({ task, isOpen, onClose, onUpdate, onDelete, th
                         )}
                     </div>
                     
-                    {/* 멤버 선택 드롭다운 */}
                     {showMembersList && (
                      <div className={`absolute top-full left-0 w-full mt-1 border rounded-md shadow-lg z-10 max-h-48 overflow-y-auto transform transition-all duration-200 ease-out ${
                        showMembersList ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2'
