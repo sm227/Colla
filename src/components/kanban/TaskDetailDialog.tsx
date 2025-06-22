@@ -106,6 +106,8 @@ const RichTextEditor = ({
   content,
   onChange,
   theme = "light",
+  showEmojiPicker = false,
+  onToggleEmojiPicker = () => {},
 }: {
   content:
     | string
@@ -118,6 +120,8 @@ const RichTextEditor = ({
       };
   onChange: (html: string) => void;
   theme?: "light" | "dark";
+  showEmojiPicker?: boolean;
+  onToggleEmojiPicker?: () => void;
 }) => {
   // JSON 형식의 content 처리
   const processedContent =
@@ -672,22 +676,32 @@ const RichTextEditor = ({
           </select>
         </div>
         <button
-          onClick={() => {
-            const emoji = window.prompt("이모지 입력:");
-            if (emoji) {
-              editor.chain().focus().insertContent(emoji).run();
-            }
-          }}
+          onClick={onToggleEmojiPicker}
           className={`p-1 rounded hover:bg-gray-700 min-w-[32px] min-h-[32px] flex items-center justify-center ${
             theme === "dark"
               ? "text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent hover:border-blue-800"
               : "text-gray-500 hover:bg-gray-200 border border-transparent hover:border-blue-200"
-          }`}
-          type="button"
-          title="이모지"
-        >
-          <Smile size={16} />
-        </button>
+            }`}
+          >
+            <Smile size={16} />
+          </button>
+
+        {/* 이모티콘 피커 추가 */}
+        {showEmojiPicker && (
+          <div className="absolute bottom-12 left-80 z-50">
+            <EmojiPicker
+              onEmojiClick={(emojiData) => {
+                // 현재 에디터에 이모지 삽입
+                editor
+                  .chain()
+                  .focus()
+                  .insertContent(emojiData.emoji)
+                  .run();
+                onToggleEmojiPicker();
+              }}
+            />
+          </div>
+        )}
       </div>
       <div className="flex-1">
         <EditorContent
@@ -985,6 +999,7 @@ export function TaskDetailDialog({
     height: 0,
   });
   const [isAnimating, setIsAnimating] = useState(false);
+  const [showDescriptionEmojiPicker, setShowDescriptionEmojiPicker] = useState(false);
 
   // Get project members from context
   const { projects, currentProject } = useProject();
@@ -1742,6 +1757,8 @@ export function TaskDetailDialog({
                   content={editedTask.description || ""}
                   onChange={handleDescriptionChange}
                   theme={theme}
+                  showEmojiPicker={showDescriptionEmojiPicker}
+                  onToggleEmojiPicker={() => setShowDescriptionEmojiPicker(!showDescriptionEmojiPicker)}
                 />
                 {/* </div> */}
               </div>
@@ -1799,7 +1816,7 @@ export function TaskDetailDialog({
 
                                 {/* 이모티콘 피커 */}
                                 {showEditEmojiPicker && (
-                                  <div className="absolute bottom-12 left-0 z-50">
+                                  <div className="absolute bottom-12 left-2 z-50">
                                     <EmojiPicker
                                       onEmojiClick={(emojiData) => {
                                         setEditedCommentContent((prev) => prev + emojiData.emoji);
@@ -1941,7 +1958,7 @@ export function TaskDetailDialog({
 
                         {/* 이모티콘 피커 */}
                         {showEmojiPicker && (
-                          <div className="absolute bottom-12 left-0 z-50">
+                          <div className="absolute bottom-12 left-2 z-50">
                             <EmojiPicker
                               onEmojiClick={(emojiData) => {
                                 setNewComment((prev) => prev + emojiData.emoji);
