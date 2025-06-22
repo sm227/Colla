@@ -1532,14 +1532,18 @@ export function TaskDetailDialog({
   // 현재 선택된 에픽 이름 가져오기
   const getSelectedEpicName = () => {
     if (!editedTask.epicId) return "에픽 없음";
-    const selectedEpic = epics.find((epic) => epic.id === editedTask.epicId);
+    
+    // String으로 변환해서 비교 (ID 타입 불일치 문제 해결)
+    const selectedEpic = epics.find((epic) => String(epic.id) === String(editedTask.epicId));
+    
     return selectedEpic ? selectedEpic.title : "에픽 없음";
   };
 
   // 에픽 색상 가져오기
   const getEpicColor = (epicId: string | null) => {
     if (!epicId) return "#CCCCCC"; // 기본 회색
-    const epic = epics.find((e) => e.id === epicId);
+    // String으로 변환해서 비교 (ID 타입 불일치 문제 해결)
+    const epic = epics.find((e) => String(e.id) === String(epicId));
     return epic?.color || "#CCCCCC";
   };
 
@@ -2410,15 +2414,15 @@ export function TaskDetailDialog({
                       {epics.map((epic) => (
                         <div
                           key={epic.id}
-                          className={`p-2 cursor-pointer flex items-center gap-2 ${
-                            editedTask.epicId === epic.id
-                              ? theme === "dark"
-                                ? "bg-blue-900 text-blue-300"
-                                : "bg-blue-50 text-blue-700"
-                              : theme === "dark"
-                              ? "text-gray-200 hover:bg-gray-700"
-                              : "hover:bg-gray-100"
-                          }`}
+                                                  className={`p-2 cursor-pointer flex items-center gap-2 ${
+                          String(editedTask.epicId) === String(epic.id)
+                            ? theme === "dark"
+                              ? "bg-blue-900 text-blue-300"
+                              : "bg-blue-50 text-blue-700"
+                            : theme === "dark"
+                            ? "text-gray-200 hover:bg-gray-700"
+                            : "hover:bg-gray-100"
+                        }`}
                           onClick={() => handleEpicChange(epic.id)}
                         >
                           <div

@@ -15,7 +15,7 @@ export async function GET(
       orderBy: {
         createdAt: 'desc',
       },
-      // 필요한 모든 필드 선택 (startDate, endDate, isAllDay 포함)
+      // 필요한 모든 필드 선택 (startDate, endDate, isAllDay, epicId 포함)
       select: {
         id: true,
         title: true,
@@ -29,7 +29,8 @@ export async function GET(
         isAllDay: true,
         createdAt: true,
         updatedAt: true,
-        projectId: true
+        projectId: true,
+        epicId: true
       }
     });
     

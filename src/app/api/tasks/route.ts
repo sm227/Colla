@@ -23,7 +23,11 @@ export async function GET(req: NextRequest) {
     const hasDueDate = url.searchParams.get("hasDueDate");
     
     // 필터링 조건 구성
-    const where: any = {};
+    const where: {
+      projectId?: string;
+      epicId?: string;
+      dueDate?: null | { not: null };
+    } = {};
     if (projectId) {
       where.projectId = projectId;
     }
@@ -51,6 +55,13 @@ export async function GET(req: NextRequest) {
         project: {
           select: {
             name: true
+          }
+        },
+        epic: {
+          select: {
+            id: true,
+            title: true,
+            color: true
           }
         }
       },
