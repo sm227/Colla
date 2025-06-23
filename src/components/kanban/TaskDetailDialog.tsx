@@ -1418,9 +1418,13 @@ export function TaskDetailDialog({
   };
 
   // Handle date change with proper type conversion
-  const handleDateChange = (dateStr: string) => {
-    const newDate = dateStr ? new Date(dateStr) : undefined;
-    handleChange({ ...editedTask, dueDate: newDate });
+  const handleDateChange = async (dateStr: string) => {
+    const newDate = dateStr ? new Date(dateStr) : null;
+    const updatedTask = { ...editedTask, dueDate: newDate };
+    setEditedTask(updatedTask);
+    
+    // 마감일 변경 시 즉시 서버에 저장
+    await saveTask(updatedTask);
   };
 
   // ESC 키 누를 때 모달 닫기 및 외부 클릭 시 드롭다운 닫기

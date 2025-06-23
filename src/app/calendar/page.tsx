@@ -885,7 +885,7 @@ const CalendarPageContent: React.FC = () => {
         status: draggedTask.status as TaskStatus,
         priority: draggedTask.priority as "low" | "medium" | "high",
         startDate: undefined,
-        dueDate: undefined,
+        dueDate: null, // 명시적으로 null로 설정하여 마감일 제거
         projectId: draggedTask.projectId,
       };
 
