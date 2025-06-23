@@ -57,6 +57,7 @@ import { useProject, ProjectMember } from "@/app/contexts/ProjectContext";
 import { useUsers } from "@/app/contexts/UserContext";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { DeleteConfirmModal } from "@/components/modals/DeleteConfirmModal";
+import Paragraph from '@tiptap/extension-paragraph';
 
 interface Comment {
   id: string;
@@ -106,6 +107,8 @@ const RichTextEditor = ({
   content,
   onChange,
   theme = "light",
+  showEmojiPicker = false,
+  onToggleEmojiPicker = () => {},
 }: {
   content:
     | string
@@ -118,6 +121,8 @@ const RichTextEditor = ({
       };
   onChange: (html: string) => void;
   theme?: "light" | "dark";
+  showEmojiPicker?: boolean;
+  onToggleEmojiPicker?: () => void;
 }) => {
   // JSON 형식의 content 처리
   const processedContent =
@@ -169,6 +174,19 @@ const RichTextEditor = ({
         bulletList: false,
         orderedList: false,
         listItem: false,
+        codeBlock: {
+          // 코드 블록 이후 새 단락 생성 허용
+          exitOnTripleEnter: true,
+          HTMLAttributes: {
+            class: 'language-javascript', // 선택적: 언어 하이라이트를 위한 클래스
+          }
+        }
+      }),
+      Paragraph.configure({
+        // 코드 블록 다음에 새 단락 생성 시 추가 옵션
+        HTMLAttributes: {
+          class: 'my-paragraph'
+        }
       }),
       TextStyle,
       Color,
@@ -604,7 +622,7 @@ const RichTextEditor = ({
               : "text-gray-500 hover:bg-gray-200 border border-transparent"
           }`}
           type="button"
-          title="코드"
+          title="코드 블록"
         >
           <Code size={16} />
         </button>
@@ -672,22 +690,32 @@ const RichTextEditor = ({
           </select>
         </div>
         <button
-          onClick={() => {
-            const emoji = window.prompt("이모지 입력:");
-            if (emoji) {
-              editor.chain().focus().insertContent(emoji).run();
-            }
-          }}
+          onClick={onToggleEmojiPicker}
           className={`p-1 rounded hover:bg-gray-700 min-w-[32px] min-h-[32px] flex items-center justify-center ${
             theme === "dark"
               ? "text-gray-300 hover:bg-gray-700 hover:text-gray-100 border border-transparent hover:border-blue-800"
               : "text-gray-500 hover:bg-gray-200 border border-transparent hover:border-blue-200"
-          }`}
-          type="button"
-          title="이모지"
-        >
-          <Smile size={16} />
-        </button>
+            }`}
+          >
+            <Smile size={16} />
+          </button>
+
+        {/* 이모티콘 피커 추가 */}
+        {showEmojiPicker && (
+          <div className="absolute bottom-12 left-80 z-50">
+            <EmojiPicker
+              onEmojiClick={(emojiData) => {
+                // 현재 에디터에 이모지 삽입
+                editor
+                  .chain()
+                  .focus()
+                  .insertContent(emojiData.emoji)
+                  .run();
+                onToggleEmojiPicker();
+              }}
+            />
+          </div>
+        )}
       </div>
       <div className="flex-1">
         <EditorContent
@@ -936,6 +964,46 @@ const getEditorStyles = (theme: "light" | "dark") => {
     .ProseMirror p {
       margin-bottom: 10px; /* 문단 간 간격 추가 */
     }
+
+    .ProseMirror pre {
+      background-color: ${theme === "dark" ? "#1F2937" : "#F3F4F6"};
+      color: ${theme === "dark" ? "#E5E7EB" : "#111827"};
+      font-family: 'Courier New', monospace;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+      line-height: 1.5;
+      border: 1px solid ${theme === "dark" ? "#374151" : "#D1D5DB"};
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .ProseMirror code {
+      background-color: ${theme === "dark" ? "#374151" : "#E5E7EB"};
+      color: ${theme === "dark" ? "#F9FAFB" : "#111827"};
+      font-family: 'Courier New', monospace;
+      padding: 0.2rem 0.4rem;
+      border-radius: 0.25rem;
+      font-size: 0.9em;
+    }
+
+    .ProseMirror .my-paragraph {
+      margin-top: 0.5rem; // 간격을 좁힘
+      margin-bottom: 0.5rem;
+    }
+
+    // 코드 블록 이후 텍스트 입력 용이성 개선
+    .ProseMirror *:last-child {
+      margin-bottom: 0.5rem; // 마진을 줄임
+    }
+
+    .ProseMirror p {
+      margin-bottom: 0.5rem; // 문단 간 간격을 원래대로
+    }
+
+    .ProseMirror pre {
+      margin: 0.5rem 0; // 코드 블록 마진도 좁힘
+    }
   `;
 };
 
@@ -952,6 +1020,7 @@ export function TaskDetailDialog({
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
   const [showActivity, setShowActivity] = useState(false);
   const [showMembersList, setShowMembersList] = useState(false);
@@ -984,6 +1053,7 @@ export function TaskDetailDialog({
     height: 0,
   });
   const [isAnimating, setIsAnimating] = useState(false);
+  const [showDescriptionEmojiPicker, setShowDescriptionEmojiPicker] = useState(false);
 
   // Get project members from context
   const { projects, currentProject } = useProject();
@@ -1741,6 +1811,8 @@ export function TaskDetailDialog({
                   content={editedTask.description || ""}
                   onChange={handleDescriptionChange}
                   theme={theme}
+                  showEmojiPicker={showDescriptionEmojiPicker}
+                  onToggleEmojiPicker={() => setShowDescriptionEmojiPicker(!showDescriptionEmojiPicker)}
                 />
                 {/* </div> */}
               </div>
@@ -1769,18 +1841,45 @@ export function TaskDetailDialog({
                         <div className="flex-1">
                           {editingCommentId === comment.id ? (
                             <div>
-                              <Textarea
-                                value={editedCommentContent}
-                                onChange={(e) =>
-                                  setEditedCommentContent(e.target.value)
-                                }
-                                className={`w-full border focus-visible:ring-1 focus-visible:ring-blue-500 resize-none min-h-[80px] p-2 rounded-md mb-2 ${
-                                  theme === "dark"
-                                    ? "bg-[#2A2A2C] border-gray-700 text-gray-200"
-                                    : "bg-white text-gray-800"
-                                }`}
-                                rows={3}
-                              />
+                              <div className="relative">
+                                <Textarea
+                                  value={editedCommentContent}
+                                  onChange={(e) =>
+                                    setEditedCommentContent(e.target.value)
+                                  }
+                                  className={`w-full border focus-visible:ring-1 focus-visible:ring-blue-500 resize-none min-h-[80px] p-2 rounded-md mb-2 ${
+                                    theme === "dark"
+                                      ? "bg-[#2A2A2C] border-gray-700 text-gray-200"
+                                      : "bg-white text-gray-800"
+                                  }`}
+                                  rows={3}
+                                />
+                                {/* 이모지 버튼 추가 */}
+                                <button
+                                  type="button"
+                                  onClick={() => setShowEditEmojiPicker(!showEditEmojiPicker)}
+                                  className={`absolute bottom-4 left-2 p-1 rounded hover:bg-gray-200 ${
+                                    theme === "dark"
+                                      ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200"
+                                      : "text-gray-500 hover:text-gray-700"
+                                  }`}
+                                  title="이모지 추가"
+                                >
+                                  <Smile size={16} />
+                                </button>
+
+                                {/* 이모티콘 피커 */}
+                                {showEditEmojiPicker && (
+                                  <div className="absolute bottom-12 left-2 z-50">
+                                    <EmojiPicker
+                                      onEmojiClick={(emojiData) => {
+                                        setEditedCommentContent((prev) => prev + emojiData.emoji);
+                                        setShowEditEmojiPicker(false);
+                                      }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
                               <div className="flex justify-end gap-2">
                                 <Button
                                   variant="outline"
@@ -1913,7 +2012,7 @@ export function TaskDetailDialog({
 
                         {/* 이모티콘 피커 */}
                         {showEmojiPicker && (
-                          <div className="absolute bottom-12 left-0 z-50">
+                          <div className="absolute bottom-12 left-2 z-50">
                             <EmojiPicker
                               onEmojiClick={(emojiData) => {
                                 setNewComment((prev) => prev + emojiData.emoji);
@@ -1924,20 +2023,8 @@ export function TaskDetailDialog({
                         )}
                       </div>
                       <div className="flex justify-between items-center mt-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                          className={`${
-                            theme === "dark"
-                              ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700"
-                              : "text-gray-500 hover:text-gray-700"
-                          }`}
-                        >
-                          <Smile size={16} className="mr-1" />
-                          이모지
-                        </Button>
+                        {/* 박스 밖 이모지 버튼 제거 */}
+                        <div></div>
                         <Button
                           onClick={handleAddComment}
                           size="sm"

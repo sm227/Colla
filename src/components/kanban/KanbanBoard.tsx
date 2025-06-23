@@ -78,10 +78,56 @@ export function KanbanBoard({ projectId, theme = "light" }: KanbanBoardProps) {
   }, [tasks, projectId]);
 
   // 상태별로 태스크 필터링 - tasksState 사용으로 변경
-  const todoTasks = tasksState.filter((task) => task.status === "todo");
-  const inProgressTasks = tasksState.filter((task) => task.status === "in-progress");
-  const reviewTasks = tasksState.filter((task) => task.status === "review");
-  const doneTasks = tasksState.filter((task) => task.status === "done");
+  const todoTasks = tasksState
+    .filter((task) => task.status === "todo")
+    .sort((a, b) => {
+      // 생성일이 없는 경우 처리
+      if (!a.createdAt) return 1;
+      if (!b.createdAt) return -1;
+      
+      // 문자열을 Date 객체로 변환 후 정렬
+      const dateA = new Date(a.createdAt);
+      const dateB = new Date(b.createdAt);
+      
+      // 오래된 작업(생성일이 빠른 작업)이 위로 오도록 정렬
+      return dateA.getTime() - dateB.getTime();
+    });
+
+  const inProgressTasks = tasksState
+    .filter((task) => task.status === "in-progress")
+    .sort((a, b) => {
+      if (!a.createdAt) return 1;
+      if (!b.createdAt) return -1;
+      
+      const dateA = new Date(a.createdAt);
+      const dateB = new Date(b.createdAt);
+      
+      return dateA.getTime() - dateB.getTime();
+    });
+
+  const reviewTasks = tasksState
+    .filter((task) => task.status === "review")
+    .sort((a, b) => {
+      if (!a.createdAt) return 1;
+      if (!b.createdAt) return -1;
+      
+      const dateA = new Date(a.createdAt);
+      const dateB = new Date(b.createdAt);
+      
+      return dateA.getTime() - dateB.getTime();
+    });
+
+  const doneTasks = tasksState
+    .filter((task) => task.status === "done")
+    .sort((a, b) => {
+      if (!a.createdAt) return 1;
+      if (!b.createdAt) return -1;
+      
+      const dateA = new Date(a.createdAt);
+      const dateB = new Date(b.createdAt);
+      
+      return dateA.getTime() - dateB.getTime();
+    });
 
   // 새 태스크 추가 함수
   const handleAddTask = async (newTask: Omit<Task, "id">) => {
