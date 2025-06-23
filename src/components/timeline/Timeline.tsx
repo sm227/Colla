@@ -10,7 +10,8 @@ import {
   Loader2,
   XIcon,
   MoreHorizontalIcon,
-  TrashIcon
+  TrashIcon,
+  EditIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TaskDetailDialog } from "../kanban/TaskDetailDialog";
@@ -129,9 +130,12 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEpicDeleteModalOpen, setIsEpicDeleteModalOpen] = useState(false);
   const [deletingEpicId, setDeletingEpicId] = useState<string | null>(null);
+  const [editingEpicId, setEditingEpicId] = useState<string | null>(null);
+  const [editedEpicTitle, setEditedEpicTitle] = useState("");
   
   const newEpicInputRef = useRef<HTMLInputElement>(null);
   const newTaskInputRef = useRef<HTMLInputElement>(null);
+  const editEpicTitleInputRef = useRef<HTMLInputElement>(null);
   
   const router = useRouter();
 
@@ -458,6 +462,73 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // 에픽 제목 수정 시작 함수
+  const handleStartEditEpicTitle = (epic: Epic) => {
+    setEditingEpicId(epic.id);
+    setEditedEpicTitle(epic.title);
+    
+    // 다음 렌더링 사이클에서 포커스 설정
+    setTimeout(() => {
+      editEpicTitleInputRef.current?.focus();
+      editEpicTitleInputRef.current?.select();
+    }, 0);
+  };
+
+  // 에픽 제목 수정 취소 함수
+  const handleCancelEditEpicTitle = () => {
+    setEditingEpicId(null);
+    setEditedEpicTitle("");
+  };
+
+  // 에픽 제목 수정 제출 함수
+  const handleSubmitEditEpicTitle = async () => {
+    if (!editingEpicId || !editedEpicTitle.trim()) {
+      handleCancelEditEpicTitle();
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/epics?id=${editingEpicId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: editedEpicTitle.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('에픽 제목 수정에 실패했습니다.');
+      }
+
+      // 에픽 목록 상태 업데이트
+      setEpics(prevEpics => 
+        prevEpics.map(epic => 
+          epic.id === editingEpicId 
+            ? { ...epic, title: editedEpicTitle.trim() } 
+            : epic
+        )
+      );
+      
+      // 입력 상태 초기화
+      handleCancelEditEpicTitle();
+      
+    } catch (err) {
+      console.error('에픽 제목 수정 중 오류 발생:', err);
+      setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
+    }
+  };
+
+  // 에픽 제목 입력에서 엔터키 처리
+  const handleEpicTitleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSubmitEditEpicTitle();
+    } else if (e.key === 'Escape') {
+      handleCancelEditEpicTitle();
+    }
+  };
+
   return (
     <div>
       {/* 로딩 상태 표시 */}
@@ -585,11 +656,52 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
                     className="w-3 h-3 rounded-full mr-3"
                     style={{ backgroundColor: epic.color || '#4F46E5' }}
                   ></div>
-                  <h3 className={`font-medium ${
-                    theme === 'dark' ? 'text-gray-200' : 'text-gray-800'
-                  }`}>
-                    {epic.title}
-                  </h3>
+                  {editingEpicId === epic.id ? (
+                    <div className="flex items-center w-full">
+                      <input
+                        ref={editEpicTitleInputRef}
+                        type="text"
+                        value={editedEpicTitle}
+                        onChange={(e) => setEditedEpicTitle(e.target.value)}
+                        onKeyDown={handleEpicTitleKeyDown as any}
+                        onBlur={handleSubmitEditEpicTitle}
+                        className={`flex-1 p-1 rounded border ${
+                          theme === 'dark' 
+                            ? 'bg-[#2A2A2C] border-gray-700 text-gray-200' 
+                            : 'bg-white border-gray-300 text-gray-800'
+                        }`}
+                      />
+                      <div className="ml-2 flex space-x-1">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={handleCancelEditEpicTitle}
+                          className={`${theme === 'dark' ? 'text-gray-300 hover:text-white' : ''}`}
+                        >
+                          <XIcon className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          onClick={handleSubmitEditEpicTitle}
+                          className={`${
+                            theme === 'dark' 
+                              ? 'bg-blue-700 hover:bg-blue-600 text-white' 
+                              : 'bg-blue-600 hover:bg-blue-700 text-white'
+                          }`}
+                        >
+                          저장
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <h3 
+                      className={`font-medium ${
+                        theme === 'dark' ? 'text-gray-200' : 'text-gray-800'
+                      }`}
+                    >
+                      {epic.title}
+                    </h3>
+                  )}
                 </div>
                 
                 <div className="flex items-center">
@@ -624,6 +736,21 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
                             : 'bg-white border border-gray-200'
                         }`}
                       >
+                        <div 
+                          className={`flex items-center px-4 py-2 text-sm cursor-pointer ${
+                            theme === 'dark'
+                              ? 'text-blue-400 hover:bg-gray-700' 
+                              : 'text-blue-600 hover:bg-gray-100'
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartEditEpicTitle(epic);
+                            setShowEpicMenu(null);
+                          }}
+                        >
+                          <EditIcon className="w-4 h-4 mr-2" />
+                          수정
+                        </div>
                         <div 
                           className={`flex items-center px-4 py-2 text-sm cursor-pointer ${
                             theme === 'dark'
