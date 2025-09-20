@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { Task, TaskStatus } from "@/components/kanban/KanbanBoard";
 
+// Express 백엔드 API URL
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+
 export function useTasks(projectId?: string | null) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -13,17 +16,14 @@ export function useTasks(projectId?: string | null) {
   const fetchTasks = useCallback(async () => {
     try {
       setLoading(true);
-      
-      const url = projectId 
-        ? `/api/projects/${projectId}/tasks` 
-        : "/api/tasks";
-      
-      // if (!projectId) {
-      //   console.log("🔄 모든 프로젝트의 작업을 가져오는 중... (projectId:", projectId, ")");
-      // } else {
-      //   console.log(`🔄 프로젝트 ${projectId}의 작업을 가져오는 중...`);
-      // }
-      
+
+      // Express 백엔드 API 호출로 변경
+      const url = projectId
+        ? `${BACKEND_URL}/api/tasks?projectId=${projectId}`
+        : `${BACKEND_URL}/api/tasks`;
+
+      console.log("🔄 Express API 호출:", url);
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -59,12 +59,10 @@ export function useTasks(projectId?: string | null) {
   const addTask = async (newTask: Omit<Task, "id">) => {
     try {
       setLoading(true);
-      
-      // 프로젝트 ID가 있으면 해당 프로젝트에 태스크 추가
-      const url = newTask.projectId 
-        ? `/api/projects/${newTask.projectId}/tasks` 
-        : "/api/tasks";
-      
+
+      // Express 백엔드 API 호출
+      const url = `${BACKEND_URL}/api/tasks`;
+
       const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -117,7 +115,7 @@ export function useTasks(projectId?: string | null) {
       // 현재 작업 정보 조회 (변경 전 담당자 확인용)
       const currentTask = tasks.find(task => task.id === taskId);
       
-      const response = await fetch(`/api/tasks/${taskId}`, {
+      const response = await fetch(`${BACKEND_URL}/api/tasks/${taskId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -169,7 +167,7 @@ export function useTasks(projectId?: string | null) {
     try {
       setLoading(true);
       
-      const response = await fetch(`/api/tasks/${updatedTask.id}`, {
+      const response = await fetch(`${BACKEND_URL}/api/tasks/${updatedTask.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -201,7 +199,7 @@ export function useTasks(projectId?: string | null) {
   const deleteTask = async (taskId: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/tasks/${taskId}`, {
+      const response = await fetch(`${BACKEND_URL}/api/tasks/${taskId}`, {
         method: "DELETE",
       });
       

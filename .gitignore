@@ -37,3 +37,7 @@ next-env.d.ts
 .env
 prisma/migrations
 prisma/migrations
+
+# backend
+/backend/node_modules
+/backend/.env
