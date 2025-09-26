@@ -11,20 +11,19 @@ RUN npm ci --only=production && npm cache clean --force
 FROM node:22-alpine AS builder
 WORKDIR /app
 
-# 빌드 인수 받기
-ARG DATABASE_URL
-ENV DATABASE_URL=$DATABASE_URL
-
 # 종속성 복사
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# 환경 변수 파일 복사 및 로드
+COPY .env.production .env.production
 
 # 환경 변수 설정 (빌드 시 필요)
 ENV NEXT_TELEMETRY_DISABLED 1
 ENV NODE_ENV production
 
-# Prisma 클라이언트 생성
-RUN npx prisma generate
+# .env.production에서 DATABASE_URL 읽기
+RUN export $(cat .env.production | grep -v '^#' | xargs) && npx prisma generate
 
 # Next.js 빌드 및 서버 빌드
 RUN npm run build

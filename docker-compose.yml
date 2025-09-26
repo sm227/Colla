@@ -4,8 +4,9 @@ services:
   colla-app:
     build:
       context: .
+      dockerfile: Dockerfile
       args:
-        - DATABASE_URL=postgresql://postgres:TravelLight4-1@travellight-postgres:5432/capstone?schema=public
+        - BUILDKIT_INLINE_CACHE=1
     container_name: colla-main
     ports:
       - "3001:3000"  # 메인 애플리케이션 포트
