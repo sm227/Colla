@@ -879,6 +879,8 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
     };
   }, [showSecurityMenu, showFolderModal]);
 
+  
+
   // 문서 비밀번호 업데이트 함수
   const updateDocumentPassword = async (password: string | null, isProtected: boolean) => {
     try {
