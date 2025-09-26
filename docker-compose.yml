@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  colla-app:
+    build: .
+    container_name: colla-main
+    ports:
+      - "3001:3000"  # 메인 애플리케이션 포트
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+    networks:
+      - colla-network
+      - database-network  # 기존 PostgreSQL 컨테이너와 연결
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      - colla-hocuspocus
+
+  colla-hocuspocus:
+    build: .
+    container_name: colla-hocuspocus
+    ports:
+      - "1234:1234"  # Hocuspocus 서버 포트
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+    command: ["node", "hocuspocus-server.js"]
+    networks:
+      - colla-network
+      - database-network  # 기존 PostgreSQL 컨테이너와 연결
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 1234 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+networks:
+  colla-network:
+    driver: bridge
+  database-network:
+    external: true  # 기존 PostgreSQL 컨테이너와 공유하는 네트워크
+
+volumes:
+  # 필요시 로그나 임시 파일을 위한 볼륨 추가 가능
+  colla-logs:
+    driver: local

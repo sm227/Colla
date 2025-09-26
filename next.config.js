@@ -13,6 +13,20 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: [],
   },
+  // Docker 배포를 위한 설정
+  output: 'standalone',
+  // 프로덕션 최적화
+  compress: true,
+  poweredByHeader: false,
+  // 이미지 최적화 설정
+  images: {
+    unoptimized: false,
+    domains: [],
+  },
+  // 환경별 설정
+  env: {
+    CUSTOM_KEY: process.env.CUSTOM_KEY,
+  },
 
 }
 
