@@ -122,29 +122,12 @@ export function KanbanTask({ task, onUpdate, onDelete, theme = "light" }: Kanban
           isDragging ? "opacity-50 scale-95" : ""
         }`}
       >
-        {/* Epic 태그 */}
-        {epic && (
-          <div className="mb-2">
-            <div
-              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-              style={{
-                backgroundColor: `${epic.color || '#4F46E5'}20`,
-                color: epic.color || '#4F46E5',
-                border: `1px solid ${epic.color || '#4F46E5'}40`
-              }}
-            >
-              <Bookmark size={12} className="mr-1" />
-              {epic.title}
-            </div>
-          </div>
-        )}
-
         <h4 className={`font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'} mb-2 line-clamp-2 text-base`}>{task.title}</h4>
         
         <div className="flex items-center justify-between mt-2">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {getPriorityIcon()}
-            
+
             {task.assignee ? (
               <div className="flex items-center">
                 <div className={`h-6 w-6 rounded-full ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-300'} flex items-center justify-center mr-1.5`}>
@@ -157,21 +140,38 @@ export function KanbanTask({ task, onUpdate, onDelete, theme = "light" }: Kanban
                 <User size={14} className={`${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
               </div>
             )}
-            
+
             {task.dueDate && (
               <div className="flex items-center">
                 <CalendarIcon className={`h-5 w-5 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
               </div>
             )}
           </div>
-          
-          {task.status === 'done' && (
-            <div className={`rounded-full ${theme === 'dark' ? 'bg-green-900 bg-opacity-30' : 'bg-green-100'} p-1`}>
-              <svg className={`w-4 h-4 ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`} fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-            </div>
-          )}
+
+          <div className="flex items-center gap-2">
+            {/* Epic 태그 - 오른쪽 끝 */}
+            {epic && (
+              <div
+                className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium"
+                style={{
+                  backgroundColor: `${epic.color || '#4F46E5'}20`,
+                  color: epic.color || '#4F46E5',
+                  border: `1px solid ${epic.color || '#4F46E5'}30`
+                }}
+              >
+                <Bookmark size={10} className="mr-1" />
+                <span className="truncate max-w-16">{epic.title}</span>
+              </div>
+            )}
+
+            {task.status === 'done' && (
+              <div className={`rounded-full ${theme === 'dark' ? 'bg-green-900 bg-opacity-30' : 'bg-green-100'} p-1`}>
+                <svg className={`w-4 h-4 ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`} fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       
