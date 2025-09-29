@@ -70,7 +70,28 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    return NextResponse.json(tasks);
+    // 담당자 정보를 별도로 가져와서 매핑
+    const taskWithAssigneeNames = await Promise.all(tasks.map(async (task) => {
+      let assigneeName = null;
+      if (task.assignee) {
+        try {
+          const user = await prisma.user.findUnique({
+            where: { id: task.assignee },
+            select: { name: true }
+          });
+          assigneeName = user?.name || null;
+        } catch (error) {
+          console.error('사용자 정보 조회 실패:', error);
+        }
+      }
+      
+      return {
+        ...task,
+        assigneeName
+      };
+    }));
+
+    return NextResponse.json(taskWithAssigneeNames);
   } catch (error) {
     console.error("작업 조회 중 오류 발생:", error);
     return NextResponse.json({ error: "작업 조회에 실패했습니다." }, { status: 500 });
