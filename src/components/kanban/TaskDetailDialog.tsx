@@ -1178,12 +1178,14 @@ export function TaskDetailDialog({
   // 작업 저장 함수 (서버에 업데이트)
   const saveTask = async (taskToSave: Task) => {
     try {
-      // 개별 작업 API 엔드포인트 사용
-      const response = await fetch(`/api/tasks/${taskToSave.id}`, {
+      // 개별 작업 API 엔드포인트 사용 (Express 백엔드)
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+      const response = await fetch(`${backendUrl}/api/tasks/${taskToSave.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: 'include',
         body: JSON.stringify(taskToSave),
       });
 
@@ -1595,8 +1597,11 @@ export function TaskDetailDialog({
       if (!editedTask.projectId) return;
 
       try {
-        const url = `/api/epics?projectId=${editedTask.projectId}`;
-        const response = await fetch(url);
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+        const url = `${backendUrl}/api/epics?projectId=${editedTask.projectId}`;
+        const response = await fetch(url, {
+          credentials: 'include'
+        });
         if (response.ok) {
           const data = await response.json();
           setEpics(data);

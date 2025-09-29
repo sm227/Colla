@@ -15,7 +15,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // 라우트 설정
 const tasksRoutes = require('./routes/tasks');
+const epicsRoutes = require('./routes/epics');
 app.use('/api/tasks', tasksRoutes);
+app.use('/api/epics', epicsRoutes);
 
 // 기본 라우트
 app.get('/', (req, res) => {

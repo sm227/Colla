@@ -2,7 +2,7 @@
 
 import { Task } from "./KanbanBoard";
 import { useDrag } from "./useDragDrop";
-import { CalendarIcon, UserIcon, ArrowUp, ArrowDown, Minus, User } from "lucide-react";
+import { CalendarIcon, UserIcon, ArrowUp, ArrowDown, Minus, User, Bookmark } from "lucide-react";
 import { useState, useEffect } from "react";
 import { TaskDetailDialog } from "./TaskDetailDialog";
 import { useUsers } from "@/app/contexts/UserContext";
@@ -29,6 +29,12 @@ const stripHtmlTags = (html: string): string => {
   return html.replace(/<[^>]*>|&[^;]+;/g, '');
 };
 
+interface Epic {
+  id: string;
+  title: string;
+  color?: string;
+}
+
 export function KanbanTask({ task, onUpdate, onDelete, theme = "light" }: KanbanTaskProps) {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const { isDragging, setNodeRef } = useDrag({
@@ -36,6 +42,7 @@ export function KanbanTask({ task, onUpdate, onDelete, theme = "light" }: Kanban
   });
   const { getUserName } = useUsers();
   const [assigneeName, setAssigneeName] = useState<string>("");
+  const [epic, setEpic] = useState<Epic | null>(null);
 
   // 담당자 이름 가져오기
   useEffect(() => {
@@ -47,6 +54,29 @@ export function KanbanTask({ task, onUpdate, onDelete, theme = "light" }: Kanban
       fetchName();
     }
   }, [task.assignee, getUserName]);
+
+  // Epic 정보 가져오기
+  useEffect(() => {
+    const fetchEpic = async () => {
+      if (!task.epicId || !task.projectId) return;
+
+      try {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+        const response = await fetch(`${backendUrl}/api/epics/${task.epicId}`, {
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const epicData = await response.json();
+          setEpic(epicData);
+        }
+      } catch (error) {
+        console.error('Epic 정보를 가져오는 중 오류 발생:', error);
+      }
+    };
+
+    fetchEpic();
+  }, [task.epicId, task.projectId]);
 
   // 우선순위에 따른 색상 및 아이콘 설정
   const getPriorityIcon = () => {
@@ -92,6 +122,23 @@ export function KanbanTask({ task, onUpdate, onDelete, theme = "light" }: Kanban
           isDragging ? "opacity-50 scale-95" : ""
         }`}
       >
+        {/* Epic 태그 */}
+        {epic && (
+          <div className="mb-2">
+            <div
+              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+              style={{
+                backgroundColor: `${epic.color || '#4F46E5'}20`,
+                color: epic.color || '#4F46E5',
+                border: `1px solid ${epic.color || '#4F46E5'}40`
+              }}
+            >
+              <Bookmark size={12} className="mr-1" />
+              {epic.title}
+            </div>
+          </div>
+        )}
+
         <h4 className={`font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'} mb-2 line-clamp-2 text-base`}>{task.title}</h4>
         
         <div className="flex items-center justify-between mt-2">

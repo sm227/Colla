@@ -165,11 +165,14 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
       setIsLoading(true);
       setError(null);
       try {
-        const url = projectId 
-          ? `/api/epics?projectId=${projectId}` 
-          : '/api/epics';
-        
-        const response = await fetch(url);
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+        const url = projectId
+          ? `${backendUrl}/api/epics?projectId=${projectId}`
+          : `${backendUrl}/api/epics`;
+
+        const response = await fetch(url, {
+          credentials: 'include'
+        });
         if (!response.ok) {
           throw new Error('에픽 데이터를 불러오는 데 실패했습니다.');
         }
@@ -218,11 +221,13 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
     }
 
     try {
-      const response = await fetch('/api/epics', {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+      const response = await fetch(`${backendUrl}/api/epics`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           title: newEpicTitle.trim(),
           projectId: projectId,
@@ -297,11 +302,13 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
     }
 
     try {
-      const response = await fetch('/api/tasks', {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+      const response = await fetch(`${backendUrl}/api/tasks`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           title: newTaskTitle.trim(),
           status: 'todo', // 기본 상태
@@ -394,8 +401,10 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
     if (!deletingEpicId) return;
 
     try {
-      const response = await fetch(`/api/epics?id=${deletingEpicId}`, {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+      const response = await fetch(`${backendUrl}/api/epics/${deletingEpicId}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
       
       if (!response.ok) {
@@ -424,8 +433,10 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
     }
     
     try {
-      const response = await fetch(`/api/tasks?id=${taskId}`, {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+      const response = await fetch(`${backendUrl}/api/tasks/${taskId}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
       
       if (!response.ok) {
@@ -488,11 +499,13 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
     }
 
     try {
-      const response = await fetch(`/api/epics?id=${editingEpicId}`, {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+      const response = await fetch(`${backendUrl}/api/epics/${editingEpicId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           title: editedEpicTitle.trim(),
         }),
