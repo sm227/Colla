@@ -22,8 +22,6 @@ export function useTasks(projectId?: string | null) {
         ? `${BACKEND_URL}/api/tasks?projectId=${projectId}`
         : `${BACKEND_URL}/api/tasks`;
 
-      console.log("🔄 Express API 호출:", url);
-
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -32,13 +30,12 @@ export function useTasks(projectId?: string | null) {
           "Expires": "0"
         }
       });
-      
+
       if (!response.ok) {
         throw new Error("태스크를 가져오는데 실패했습니다.");
       }
-      
+
       const data = await response.json();
-      // console.log(`✅ ${data.length}개의 작업을 가져왔습니다.`);
       setTasks(data);
       setError(null);
     } catch (err) {

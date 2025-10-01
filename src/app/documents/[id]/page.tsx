@@ -469,26 +469,23 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
     
     // 명시적으로 사용자 정보 설정
     provider.setAwarenessField('user', userInfoWithRole);
-    console.log('협업 프로바이더에 사용자 정보 설정:', userInfoWithRole);
-    
+
     // 이미 확장이 있는지 확인
     const collaborationCursor = editor.extensionManager.extensions.find(
       extension => extension.name === 'collaborationCursor'
     );
-    
+
     if (collaborationCursor) {
       try {
         // 이미 확장이 있으면 옵션 업데이트
         collaborationCursor.options.provider = provider;
         collaborationCursor.options.user = userInfoWithRole;
-        console.log('협업 커서 옵션 업데이트 완료:', userInfoWithRole);
       } catch (err) {
         console.error('협업 커서 옵션 업데이트 실패:', err);
       }
     } else {
       try {
         // 협업 커서 설정은 useDocumentEditor 훅으로 이동됨
-        console.log('협업 커서 설정 완료:', userInfoWithRole);
       } catch (err) {
         console.error('협업 커서 설정 실패:', err);
       }
@@ -699,19 +696,16 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
   useEffect(() => {
     if (!provider || !currentUser.name) return;
 
-    console.log('사용자 정보를 협업 프로바이더에 적용:', currentUser.name);
-    
     // 역할 정보 추가
     const userInfoWithRole = {
       ...currentUser,
       projectRole: userProjectRole,
       isProjectOwner
     };
-    
+
     // provider의 awareness 데이터 업데이트
     try {
       provider.setAwarenessField('user', userInfoWithRole);
-      console.log('프로바이더 사용자 정보 설정 완료', userInfoWithRole);
     } catch (error) {
       console.error('프로바이더 사용자 정보 설정 실패:', error);
     }
@@ -720,34 +714,31 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
   // 읽기 전용 모드 변경 시 문서 메타데이터 업데이트 및 전파
   useEffect(() => {
     if (!provider || !ydoc) return;
-    
+
     try {
       // Y.js 문서 메타데이터 업데이트
       const metaData = ydoc.getMap('metaData');
       metaData.set('isReadOnlyMode', isReadOnlyMode);
-      
-      console.log(`문서 읽기 전용 모드 ${isReadOnlyMode ? '활성화' : '비활성화'} 정보 공유됨`);
     } catch (error) {
       console.error('문서 읽기 전용 모드 정보 공유 실패:', error);
     }
   }, [provider, ydoc, isReadOnlyMode]);
-  
+
   // 다른 사용자의 읽기 전용 모드 변경 감지
   useEffect(() => {
     if (!ydoc) return;
-    
+
     // 문서 메타데이터에서 읽기 전용 모드 상태 가져오기
     const metaData = ydoc.getMap('metaData');
-    
+
     // 초기값 설정
     const initialReadOnlyMode = metaData.get('isReadOnlyMode');
     if (initialReadOnlyMode !== undefined) {
       // Y.js에서 반환되는 타입을 명시적으로 Boolean으로 변환
       const readOnlyValue = typeof initialReadOnlyMode === 'boolean' ? initialReadOnlyMode : false;
       setIsReadOnlyMode(readOnlyValue);
-      console.log(`다른 사용자가 설정한 읽기 전용 모드 상태 수신: ${readOnlyValue}`);
     }
-    
+
     // 메타데이터 변경 이벤트 구독
     const handleMetaDataUpdate = () => {
       const updatedReadOnlyMode = metaData.get('isReadOnlyMode');
@@ -756,13 +747,12 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
         const readOnlyValue = typeof updatedReadOnlyMode === 'boolean' ? updatedReadOnlyMode : false;
         if (readOnlyValue !== isReadOnlyMode) {
           setIsReadOnlyMode(readOnlyValue);
-          console.log(`다른 사용자가 읽기 전용 모드를 ${readOnlyValue ? '활성화' : '비활성화'}했습니다.`);
         }
       }
     };
-    
+
     metaData.observe(handleMetaDataUpdate);
-    
+
     return () => {
       metaData.unobserve(handleMetaDataUpdate);
     };
@@ -771,13 +761,12 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
   // 읽기 전용 모드 변경 시 에디터 편집 가능 여부 업데이트
   useEffect(() => {
     if (!editor) return;
-    
+
     // 읽기 전용 모드에서는 모든 사용자가 편집 불가능
     const editableState = !isReadOnlyMode;
-    
+
     if (editor.isEditable !== editableState) {
       editor.setEditable(editableState);
-      console.log(`에디터 편집 가능 상태 변경: ${editableState}, 사용자 역할: ${userProjectRole || '역할 없음'}, 읽기 전용 모드: ${isReadOnlyMode}, 프로젝트 소유자: ${isProjectOwner}`);
     }
   }, [editor, isReadOnlyMode, userProjectRole, isProjectOwner]);
 
@@ -843,8 +832,6 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
           projectId: selectedProjectId
         })
       });
-      
-      console.log(`문서 읽기 전용 모드 ${newState ? '활성화' : '비활성화'} 상태가 저장되었습니다.`);
     } catch (error) {
       console.error('읽기 전용 상태 저장 중 오류:', error);
     }
@@ -1111,11 +1098,9 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
                 onClose={() => setShowSecurityMenu(false)}
                 onAccessPermissions={() => {
                         // 문서 접근 권한 설정
-                  console.log('접근 권한 설정');
                 }}
                 onPermissionHistory={() => {
                         // 문서 권한 이력
-                  console.log('권한 이력 보기');
                 }}
                 onPasswordSettings={handleOpenPasswordModal}
                 isPasswordProtected={isPasswordProtected}

@@ -372,8 +372,6 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
             audio: true,
           });
         } catch (bothError) {
-          console.warn("Both video and audio failed, trying alternatives...");
-
           // 비디오만 시도
           try {
             localStream = await navigator.mediaDevices.getUserMedia({
@@ -381,7 +379,6 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
               audio: false,
             });
             setIsAudioEnabled(false);
-            console.log("Video only mode");
           } catch (videoError) {
             // 오디오만 시도
             try {
@@ -390,10 +387,8 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
                 audio: true,
               });
               setIsVideoEnabled(false);
-              console.log("Audio only mode");
             } catch (audioError) {
               // 둘 다 실패 - 빈 스트림 생성
-              console.warn("No media devices available, creating empty stream");
               localStream = new MediaStream();
               setIsVideoEnabled(false);
               setIsAudioEnabled(false);
@@ -456,7 +451,6 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     peerRef.current = peer;
 
     peer.on("open", (id) => {
-      console.log(`My peer ID is: ${id}`);
       myPeerIdRef.current = id;
       socketRef.current.emit("join-room", params.id, id, {
         isVideoEnabled,
@@ -483,20 +477,16 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     // Socket 이벤트 리스너
     // 기존 참가자 목록 수신 (방 입장 시)
     socketRef.current.on("existing-participants", (participants: Array<{ userId: string; userState: any }>) => {
-      console.log("📥 Received existing participants:", participants);
       participants.forEach(({ userId, userState }) => {
-        console.log(`👥 Connecting to existing participant: ${userId}`, userState);
         connectToNewUser(userId, myStream, userState);
       });
     });
 
     socketRef.current.on("user-connected", (userId: string, userState: any) => {
-      console.log("✅ New user connected:", userId, userState);
       connectToNewUser(userId, myStream, userState);
     });
 
     socketRef.current.on("user-disconnected", (userId: string) => {
-      console.log(`❌ User disconnected: ${userId}`);
       if (peersRef.current[userId]) {
         peersRef.current[userId].close();
         delete peersRef.current[userId];
@@ -507,7 +497,6 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     socketRef.current.on(
       "user-toggled-video",
       ({ userId, enabled }: { userId: string; enabled: boolean }) => {
-        console.log("📹 Received toggle video event:", { userId, enabled });
         setPeerStreams((prev) =>
           prev.map((peer) =>
             peer.userId === userId ? { ...peer, isVideoEnabled: enabled } : peer
@@ -519,7 +508,6 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     socketRef.current.on(
       "user-toggled-audio",
       ({ userId, enabled }: { userId: string; enabled: boolean }) => {
-        console.log("🎤 Received toggle audio event:", { userId, enabled });
         setPeerStreams((prev) =>
           prev.map((peer) =>
             peer.userId === userId ? { ...peer, isAudioEnabled: enabled } : peer
@@ -530,13 +518,11 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
 
     // 메시지 히스토리 수신
     socketRef.current.on("message-history", (messages: Message[]) => {
-      console.log("Received message history:", messages);
       setMessages(messages);
     });
 
     // 새 메시지 수신
     socketRef.current.on("receive-message", (message: Message) => {
-      console.log("Received new message:", message);
       setMessages((prev) => [...prev, message]);
     });
   }, [myStream, params.id, isVideoEnabled, isAudioEnabled]);
@@ -556,36 +542,25 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     stream: MediaStream,
     userState: any
   ) => {
-    console.log(`🔗 Connecting to new user ${userId} with state:`, userState);
-
     // 이미 연결된 피어는 무시
-    if (peersRef.current[userId]) {
-      console.log(`⚠️ Already connected to user ${userId}`);
-      return;
-    }
+    if (peersRef.current[userId]) return;
 
     try {
       const call = peerRef.current?.call(userId, stream);
       if (call) {
-        console.log(`📞 Call initiated to user ${userId}`);
-
         call.on("stream", (userVideoStream) => {
-          console.log(`📥 Received stream from user ${userId}, tracks:`, userVideoStream.getTracks().length);
           addPeerStream(userId, userVideoStream, userState);
         });
 
         call.on("close", () => {
-          console.log(`📴 Call closed with user ${userId}`);
           setPeerStreams((prev) => prev.filter((p) => p.userId !== userId));
           delete peersRef.current[userId];
         });
 
         peersRef.current[userId] = call;
-      } else {
-        console.warn(`⚠️ Failed to create call to user ${userId} - peer not ready`);
       }
     } catch (error) {
-      console.error(`❌ Error connecting to user ${userId}:`, error);
+      console.error(`Error connecting to user ${userId}:`, error);
     }
   };
 
@@ -594,23 +569,17 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     stream: MediaStream,
     userState?: any
   ) => {
-    console.log(`➕ Adding peer stream for user ${userId}`, {
-      hasVideo: userState?.isVideoEnabled,
-      hasAudio: userState?.isAudioEnabled,
-      trackCount: stream.getTracks().length
-    });
-
     setPeerStreams((prev) => {
       const filteredStreams = prev.filter((p) => p.userId !== userId);
-      const newStream = {
-        userId,
-        stream,
-        isVideoEnabled: userState?.isVideoEnabled ?? true,
-        isAudioEnabled: userState?.isAudioEnabled ?? true,
-      };
-
-      console.log(`📊 Current peer streams count: ${prev.length} -> ${filteredStreams.length + 1}`);
-      return [...filteredStreams, newStream];
+      return [
+        ...filteredStreams,
+        {
+          userId,
+          stream,
+          isVideoEnabled: userState?.isVideoEnabled ?? true,
+          isAudioEnabled: userState?.isAudioEnabled ?? true,
+        },
+      ];
     });
   };
 
@@ -623,14 +592,11 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
         setIsVideoEnabled(newEnabled);
 
         if (hasJoinedMeeting) {
-          const toggleEvent: ToggleEvent = {
+          socketRef.current?.emit("toggle-video", {
             roomId: params.id,
             userId: myPeerIdRef.current,
             enabled: newEnabled,
-          };
-
-          console.log("Emitting toggle video event:", toggleEvent);
-          socketRef.current?.emit("toggle-video", toggleEvent);
+          });
 
           // 비디오를 다시 켤 때 스트림 재설정
           if (newEnabled && myVideoRef.current) {
@@ -690,14 +656,11 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
         setIsAudioEnabled(newEnabled);
 
         if (hasJoinedMeeting) {
-          const toggleEvent: ToggleEvent = {
+          socketRef.current?.emit("toggle-audio", {
             roomId: params.id,
             userId: myPeerIdRef.current,
             enabled: newEnabled,
-          };
-
-          console.log("Emitting toggle audio event:", toggleEvent);
-          socketRef.current?.emit("toggle-audio", toggleEvent);
+          });
         }
 
         // 로컬 오디오 트랙 상태 즉시 업데이트
@@ -752,8 +715,6 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
       if (!response.ok) {
         throw new Error("회의 저장에 실패했습니다");
       }
-
-      console.log("회의가 성공적으로 저장되었습니다");
     } catch (error) {
       console.error("회의 저장 중 오류 발생:", error);
     }

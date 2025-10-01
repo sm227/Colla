@@ -440,7 +440,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
           // 태스크 생성 요청이고 JSON 형식의 태스크 데이터가 포함된 경우
           if (isTaskCreationRequest && data.content) {
             try {
-              console.log('AI 응답 내용:', data.content);
+              // console.log('AI 응답 내용:', data.content);
               
               // 먼저 ```json 표기 안에 있는 JSON 찾기
               const jsonRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
@@ -453,10 +453,10 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
               // JSON 문자열 추출
               let jsonString = '';
               if (match && match[1]) {
-                console.log('마크다운 코드 블록에서 JSON 찾음');
+                // console.log('마크다운 코드 블록에서 JSON 찾음');
                 jsonString = match[1];
               } else if (plainJsonMatch) {
-                console.log('일반 텍스트에서 JSON 찾음');
+                // console.log('일반 텍스트에서 JSON 찾음');
                 // 중괄호로 시작하는 부분부터 가능한 JSON 추출
                 const startIdx = data.content.indexOf('{');
                 let endIdx = -1;
@@ -484,17 +484,17 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
               if (jsonString) {
                 try {
                   jsonData = JSON.parse(jsonString);
-                  console.log('파싱된 JSON 데이터:', jsonData);
+                  // console.log('파싱된 JSON 데이터:', jsonData);
                 } catch (parseError) {
                   console.error('JSON 파싱 오류:', parseError, jsonString);
                   // JSON 파싱 오류 복구 시도 - 따옴표 수정 등
                   const fixedJsonString = jsonString
                     .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?\s*:/g, '"$2":') // 키 따옴표 수정
                     .replace(/:\s*['"]([^'"]*)['"](\s*[,}])/g, ':"$1"$2'); // 값 따옴표 수정
-                  
+
                   try {
                     jsonData = JSON.parse(fixedJsonString);
-                    console.log('수정 후 파싱된 JSON 데이터:', jsonData);
+                    // console.log('수정 후 파싱된 JSON 데이터:', jsonData);
                   } catch (e) {
                     console.error('JSON 파싱 수정 실패:', e);
                   }
@@ -508,28 +508,28 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                 const assigneeName = jsonData.data.assignee;
                 
                 if (assigneeName) {
-                  console.log('담당자 이름:', assigneeName);
-                  
+                  // console.log('담당자 이름:', assigneeName);
+
                   // 이름으로 ID 찾기 (nameToIdMap에서 찾기)
                   if (typeof assigneeName === 'string') {
                     const lowerName = assigneeName.toLowerCase();
-                    
+
                     if (dataForAI && dataForAI.nameToIdMap && dataForAI.nameToIdMap[lowerName]) {
                       assigneeId = dataForAI.nameToIdMap[lowerName];
-                      console.log('담당자 ID 찾음:', assigneeId);
+                      // console.log('담당자 ID 찾음:', assigneeId);
                     } else if (dataForAI && dataForAI.projectUsers && dataForAI.projectUsers[lowerName]) {
                       assigneeId = dataForAI.projectUsers[lowerName];
-                      console.log('프로젝트 사용자 ID 찾음:', assigneeId);
+                      // console.log('프로젝트 사용자 ID 찾음:', assigneeId);
                     } else {
                       // 이름으로 사용자 검색 시도
                       try {
-                        console.log('사용자 검색 시도:', assigneeName);
+                        // console.log('사용자 검색 시도:', assigneeName);
                         const searchResponse = await fetch(`/api/users/search?name=${encodeURIComponent(assigneeName)}`);
                         if (searchResponse.ok) {
                           const searchResult = await searchResponse.json();
                           if (searchResult.length > 0) {
                             assigneeId = searchResult[0].id;
-                            console.log('검색으로 담당자 ID 찾음:', assigneeId);
+                            // console.log('검색으로 담당자 ID 찾음:', assigneeId);
                           }
                         }
                       } catch (error) {
@@ -552,7 +552,7 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                     // 월-일만 유지하고 현재 년도로 변경
                     const monthDay = dueDateValue.substring(5); // MM-DD 부분만 추출
                     dueDateValue = `${currentYear}-${monthDay}`;
-                    console.log(`날짜 년도 수정: ${jsonData.data.dueDate} → ${dueDateValue}`);
+                    // console.log(`날짜 년도 수정: ${jsonData.data.dueDate} → ${dueDateValue}`);
                   }
                 }
                 
@@ -565,8 +565,8 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
                   dueDate: dueDateValue,
                   assignee: assigneeId  // 이름에서 변환된 ID 또는 null
                 };
-                
-                console.log('생성할 태스크 데이터:', taskData);
+
+                // console.log('생성할 태스크 데이터:', taskData);
                 
                 // 태스크 생성 API 호출
                 const createTaskResponse = await fetch('/api/tasks', {

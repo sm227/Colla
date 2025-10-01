@@ -10,7 +10,7 @@ if (process.env.NODE_ENV === 'production') {
   // 개발 환경에서는 global을 사용하여 재연결 방지
   if (!global.prisma) {
     global.prisma = new PrismaClient({
-      log: ['query', 'info', 'warn', 'error'],
+      log: ['warn', 'error'],
     });
   }
   prisma = global.prisma;
