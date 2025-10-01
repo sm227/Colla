@@ -1251,10 +1251,11 @@ function HomeContent() {
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/auth/login");
-    } else if (!authLoading && !projectLoading && user && !hasProjects) {
+    } else if (!authLoading && !projectLoading && user && projects.length === 0) {
+      // hasProjects 대신 projects.length를 직접 체크하여 정확도 향상
       router.push("/projects/new");
     }
-  }, [authLoading, projectLoading, user, hasProjects, router]);
+  }, [authLoading, projectLoading, user, projects, router]);
 
   useEffect(() => {
     if (hasProjects && !currentProject && projects.length > 0) {

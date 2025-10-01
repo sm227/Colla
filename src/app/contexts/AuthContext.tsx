@@ -189,21 +189,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       clearError();
-      
+
       const response = await fetch("/api/auth/logout", {
         method: "POST",
       });
-      
+
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.message || "로그아웃 중 오류가 발생했습니다.");
       }
-      
-      // localStorage에서 토큰 삭제
+
+      // localStorage 완전 초기화 (보안 강화)
       if (typeof window !== 'undefined') {
         localStorage.removeItem('token');
+        localStorage.removeItem('currentProjectId');
+        localStorage.removeItem('lastSelectedTimelineProjectId');
+        localStorage.removeItem('userSettings');
+        // 필요 시 다른 프로젝트 관련 데이터도 삭제
       }
-      
+
       setUser(null);
       router.push("/auth/login");
       router.refresh();

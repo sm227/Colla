@@ -850,7 +850,7 @@ function DocumentsPageContent() {
     return null;
   }
 
-  if (!authLoading && !projectLoading && user && !hasProjects) {
+  if (!authLoading && !projectLoading && user && projects.length === 0) {
     router.push("/projects/new");
     return null;
   }

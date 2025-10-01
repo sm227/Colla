@@ -74,7 +74,7 @@ function LoginPageContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative">
+    <div className="min-h-screen bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative">
       {/* 토스트 메시지 */}
       <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-md px-4">
         <div className={`transform transition-all duration-500 ease-out ${
@@ -135,33 +135,33 @@ function LoginPageContent() {
         </div>
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <div className="text-3xl font-bold text-blue-600 dark:text-primary flex items-center">
+          <div className="text-3xl font-bold text-blue-600 dark:text-blue-500 flex items-center">
             <LayoutDashboardIcon className="w-8 h-8 mr-2" />
             Colla
           </div>
         </div>
-        <h2 className="mt-6 text-center text-2xl font-bold text-gray-900 dark:text-foreground">
+        <h2 className="mt-6 text-center text-2xl font-bold text-foreground">
           계정에 로그인하세요
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600 dark:text-muted-foreground">
+        <p className="mt-2 text-center text-sm text-muted-foreground">
           또는{" "}
-          <Link href="/auth/register" className="font-medium text-blue-600 hover:text-blue-500 dark:text-primary dark:hover:text-primary-foreground">
+          <Link href="/auth/register" className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-500 dark:hover:text-blue-400">
             새 계정 만들기
           </Link>
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white dark:bg-card py-8 px-4 shadow sm:rounded-lg sm:px-10">
+        <div className="bg-card py-8 px-4 shadow sm:rounded-lg sm:px-10">
           
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-muted-foreground">
+              <label htmlFor="email" className="block text-sm font-medium text-foreground">
                 이메일
               </label>
               <div className="mt-1 relative rounded-md shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <UserIcon className="h-5 w-5 text-gray-400 dark:text-muted-foreground" />
+                  <UserIcon className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <input
                   id="email"
@@ -171,19 +171,19 @@ function LoginPageContent() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-input rounded-md shadow-sm placeholder-gray-400 dark:placeholder-muted-foreground dark:bg-input dark:text-foreground focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-primary dark:focus:border-primary"
+                  className="block w-full pl-10 pr-3 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-transparent"
                   placeholder="name@example.com"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-muted-foreground">
+              <label htmlFor="password" className="block text-sm font-medium text-foreground">
                 비밀번호
               </label>
               <div className="mt-1 relative rounded-md shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <LockIcon className="h-5 w-5 text-gray-400 dark:text-muted-foreground" />
+                  <LockIcon className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <input
                   id="password"
@@ -193,14 +193,14 @@ function LoginPageContent() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-input rounded-md shadow-sm placeholder-gray-400 dark:placeholder-muted-foreground dark:bg-input dark:text-foreground focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-primary dark:focus:border-primary"
+                  className="block w-full pl-10 pr-10 py-2 border border-input rounded-md shadow-sm placeholder:text-muted-foreground bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-transparent"
                   placeholder="••••••••"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="text-gray-400 hover:text-gray-500 dark:text-muted-foreground dark:hover:text-foreground focus:outline-none"
+                    className="text-muted-foreground hover:text-foreground focus:outline-none transition-colors"
                   >
                     {showPassword ? (
                       <EyeOffIcon className="h-5 w-5" />
@@ -220,15 +220,15 @@ function LoginPageContent() {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 dark:text-primary focus:ring-blue-500 dark:focus:ring-primary border-gray-300 dark:border-input rounded"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-600 border-input rounded bg-background"
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900 dark:text-muted-foreground">
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-foreground">
                   로그인 상태 유지
                 </label>
               </div>
 
               <div className="text-sm">
-                <Link href="/auth/forgot-password" className="font-medium text-blue-600 hover:text-blue-500 dark:text-primary dark:hover:text-primary-foreground">
+                <Link href="/auth/forgot-password" className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-500 dark:hover:text-blue-400">
                   비밀번호를 잊으셨나요?
                 </Link>
               </div>
@@ -238,7 +238,7 @@ function LoginPageContent() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white dark:text-primary-foreground bg-blue-600 hover:bg-blue-700 dark:bg-primary dark:hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-background dark:focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-600 dark:focus:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isLoading ? "로그인 중..." : "로그인"}
               </button>
@@ -248,17 +248,17 @@ function LoginPageContent() {
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300 dark:border-border" />
+                <div className="w-full border-t border-border" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white dark:bg-card text-gray-500 dark:text-muted-foreground">또는 다음으로 계속</span>
+                <span className="px-2 bg-card text-muted-foreground">또는 다음으로 계속</span>
               </div>
             </div>
 
             <div className="mt-6 grid grid-cols-2 gap-3">
               <button
                 type="button"
-                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-input rounded-md shadow-sm bg-white dark:bg-card text-sm font-medium text-gray-500 dark:text-muted-foreground hover:bg-gray-50 dark:hover:bg-secondary"
+                className="w-full inline-flex justify-center py-2 px-4 border border-border rounded-md shadow-sm bg-card text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
               >
                 <span className="sr-only">Google로 로그인</span>
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -271,7 +271,7 @@ function LoginPageContent() {
 
               <button
                 type="button"
-                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-input rounded-md shadow-sm bg-white dark:bg-card text-sm font-medium text-gray-500 dark:text-muted-foreground hover:bg-gray-50 dark:hover:bg-secondary"
+                className="w-full inline-flex justify-center py-2 px-4 border border-border rounded-md shadow-sm bg-card text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
               >
                 <span className="sr-only">GitHub로 로그인</span>
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -295,18 +295,18 @@ function LoginPageContent() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 dark:bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="flex justify-center">
-            <div className="text-3xl font-bold text-blue-600 dark:text-primary flex items-center">
-              <div className="w-8 h-8 mr-2 bg-blue-600 dark:bg-primary rounded animate-pulse"></div>
-              워크스페이스
+            <div className="text-3xl font-bold text-blue-600 dark:text-blue-500 flex items-center">
+              <div className="w-8 h-8 mr-2 bg-blue-600 dark:bg-blue-500 rounded animate-pulse"></div>
+              Colla
             </div>
           </div>
-          <h2 className="mt-6 text-center text-2xl font-bold text-gray-900 dark:text-foreground">
+          <h2 className="mt-6 text-center text-2xl font-bold text-foreground">
             로그인 페이지 로딩 중...
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600 dark:text-muted-foreground">
+          <p className="mt-2 text-center text-sm text-muted-foreground">
             잠시만 기다려주세요
           </p>
         </div>

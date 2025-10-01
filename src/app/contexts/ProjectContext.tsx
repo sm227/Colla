@@ -335,17 +335,30 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // 사용자 변경 감지 및 상태 초기화
+  useEffect(() => {
+    // 사용자가 로그아웃하거나 변경되면 모든 상태 초기화
+    if (!authLoading && !user) {
+      setProjects([]);
+      setCurrentProject(null);
+      setLoading(false);
+      setInitialized(true);
+      setError(null);
+      localStorage.removeItem("currentProjectId");
+    }
+  }, [user, authLoading]);
+
   // 컴포넌트 마운트 시 프로젝트 목록 가져오기
   useEffect(() => {
     // 로그인 상태일 때만 프로젝트 가져오기
-    if (user && !authLoading && !initialized) {
+    if (user && !authLoading) {
+      // 사용자가 변경되었으면 상태 초기화 후 다시 가져오기
+      setProjects([]);
+      setCurrentProject(null);
+      setInitialized(false);
       fetchProjects();
-    } else if (!authLoading && !user) {
-      // 인증 로딩이 끝났고 사용자가 없으면 로딩 상태 해제
-      setLoading(false);
-      setInitialized(true);
     }
-  }, [user, authLoading, initialized]); // 사용자와 인증 로딩 상태가 변경될 때 실행
+  }, [user?.id, authLoading]); // user?.id로 사용자 변경 감지
 
   // URL과 localStorage에서 현재 프로젝트 ID 로드 및 프로젝트 설정
   useEffect(() => {
