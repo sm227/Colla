@@ -116,7 +116,7 @@ function convertLocalTaskToKanbanTask(task: Task): import("../kanban/KanbanBoard
   };
 }
 
-export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
+export function Timeline({ projectId, theme }: TimelineProps) {
   const [epics, setEpics] = useState<Epic[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,32 +132,12 @@ export function Timeline({ projectId, theme: initialTheme }: TimelineProps) {
   const [deletingEpicId, setDeletingEpicId] = useState<string | null>(null);
   const [editingEpicId, setEditingEpicId] = useState<string | null>(null);
   const [editedEpicTitle, setEditedEpicTitle] = useState("");
-  
+
   const newEpicInputRef = useRef<HTMLInputElement>(null);
   const newTaskInputRef = useRef<HTMLInputElement>(null);
   const editEpicTitleInputRef = useRef<HTMLInputElement>(null);
-  
+
   const router = useRouter();
-
-  const getInitialTheme = () => {
-    if (typeof window !== "undefined") {
-      return (localStorage.getItem("theme") as "light" | "dark") || "light";
-    }
-    return "light";
-  };
-
-  const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme());
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("theme", theme);
-      if (theme === "dark") {
-        document.documentElement.classList.add("dark-mode");
-      } else {
-        document.documentElement.classList.remove("dark-mode");
-      }
-    }
-  }, [theme]);
 
   // 에픽 데이터 불러오기
   useEffect(() => {
