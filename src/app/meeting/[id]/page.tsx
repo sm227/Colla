@@ -6,12 +6,14 @@ import { useRouter } from "next/navigation";
 import {
   Share2Icon,
   UsersIcon,
+  User as UserIcon,
   Mic as MicrophoneIcon,
   MicOff as MicrophoneOffIcon,
   Video as VideoIcon,
   VideoOff as VideoOffIcon,
   PhoneOff as PhoneOffIcon,
   MessageSquare as MessageIcon,
+  X as XIcon,
 } from "lucide-react";
 import SpeechToText from "./SpeechToText";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -113,6 +115,114 @@ function Toast({
   );
 }
 
+function ParticipantsPanel({
+  isOpen,
+  onClose,
+  myPeerId,
+  peerStreams,
+  myStream,
+  isMyAudioEnabled,
+  isMyVideoEnabled,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  myPeerId: string;
+  peerStreams: PeerStream[];
+  myStream: MediaStream | null;
+  isMyAudioEnabled: boolean;
+  isMyVideoEnabled: boolean;
+}) {
+  if (!isOpen) return null;
+
+  const myHasNoDevices = myStream && myStream.getTracks().length === 0 && !isMyAudioEnabled && !isMyVideoEnabled;
+  const totalParticipants = peerStreams.length + 1; // 나 + 다른 참가자들
+
+  return (
+    <div className="fixed top-0 right-0 h-full w-80 bg-gray-900/95 backdrop-blur-sm shadow-2xl z-50 flex flex-col">
+      {/* 헤더 */}
+      <div className="p-4 border-b border-gray-700">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-semibold text-white">참가자</h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+          >
+            <XIcon className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+        <p className="text-sm text-gray-400">총 {totalParticipants}명</p>
+      </div>
+
+      {/* 참가자 목록 */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        {/* 나 */}
+        <div className="bg-gray-800 rounded-lg p-3 border-l-4 border-blue-500">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                <UserIcon className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <p className="text-white font-medium">나 (호스트)</p>
+                {myHasNoDevices && (
+                  <p className="text-xs text-yellow-400">시청 전용</p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              {!isMyAudioEnabled && (
+                <div className="bg-red-500/80 p-1.5 rounded" title="마이크 꺼짐">
+                  <MicrophoneOffIcon className="w-3 h-3 text-white" />
+                </div>
+              )}
+              {!isMyVideoEnabled && (
+                <div className="bg-red-500/80 p-1.5 rounded" title="카메라 꺼짐">
+                  <VideoOffIcon className="w-3 h-3 text-white" />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 다른 참가자들 */}
+        {peerStreams.map((peer) => {
+          const hasNoDevices = peer.stream.getTracks().length === 0 && !peer.isAudioEnabled && !peer.isVideoEnabled;
+
+          return (
+            <div key={peer.userId} className="bg-gray-800 rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
+                    <UserIcon className="w-6 h-6 text-gray-300" />
+                  </div>
+                  <div>
+                    <p className="text-white font-medium">참가자 {peer.userId.slice(0, 6)}</p>
+                    {hasNoDevices && (
+                      <p className="text-xs text-yellow-400">시청 전용</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  {!peer.isAudioEnabled && (
+                    <div className="bg-red-500/80 p-1.5 rounded" title="마이크 꺼짐">
+                      <MicrophoneOffIcon className="w-3 h-3 text-white" />
+                    </div>
+                  )}
+                  {!peer.isVideoEnabled && (
+                    <div className="bg-red-500/80 p-1.5 rounded" title="카메라 꺼짐">
+                      <VideoOffIcon className="w-3 h-3 text-white" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function PreJoinModal({
   isOpen,
   onClose,
@@ -133,10 +243,20 @@ function PreJoinModal({
 
   if (!isOpen) return null;
 
+  const hasNoDevices = !isAudioEnabled && !isVideoEnabled && localStream?.getTracks().length === 0;
+
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
       <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
         <h2 className="text-2xl font-bold mb-4 text-white">회의 참여 설정</h2>
+
+        {hasNoDevices && (
+          <div className="mb-4 bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-3">
+            <p className="text-yellow-200 text-sm">
+              ⚠️ 카메라와 마이크를 찾을 수 없습니다. 시청 전용 모드로 참여합니다.
+            </p>
+          </div>
+        )}
 
         <div className="mb-6">
           <div className="relative aspect-video bg-gray-900 rounded-xl overflow-hidden shadow-lg mb-4">
@@ -150,8 +270,11 @@ function PreJoinModal({
               }`}
             />
             {!isVideoEnabled && (
-              <div className="absolute inset-0 flex items-center justify-center">
+              <div className="absolute inset-0 flex items-center justify-center flex-col gap-2">
                 <UsersIcon className="w-20 h-20 text-gray-400" />
+                {hasNoDevices && (
+                  <p className="text-gray-400 text-sm">디바이스 없음</p>
+                )}
               </div>
             )}
           </div>
@@ -159,11 +282,15 @@ function PreJoinModal({
           <div className="flex justify-center space-x-4 mb-6">
             <button
               onClick={toggleAudio}
+              disabled={hasNoDevices}
               className={`p-4 rounded-full transition-all duration-200 ${
-                isAudioEnabled
+                hasNoDevices
+                  ? "bg-gray-600 text-gray-400 cursor-not-allowed"
+                  : isAudioEnabled
                   ? "bg-gray-700 hover:bg-gray-600 text-white"
                   : "bg-red-500 hover:bg-red-600 text-white"
               }`}
+              title={hasNoDevices ? "마이크를 찾을 수 없습니다" : ""}
             >
               {isAudioEnabled ? (
                 <MicrophoneIcon className="w-6 h-6" />
@@ -173,11 +300,15 @@ function PreJoinModal({
             </button>
             <button
               onClick={toggleVideo}
+              disabled={hasNoDevices}
               className={`p-4 rounded-full transition-all duration-200 ${
-                isVideoEnabled
+                hasNoDevices
+                  ? "bg-gray-600 text-gray-400 cursor-not-allowed"
+                  : isVideoEnabled
                   ? "bg-gray-700 hover:bg-gray-600 text-white"
                   : "bg-red-500 hover:bg-red-600 text-white"
               }`}
+              title={hasNoDevices ? "카메라를 찾을 수 없습니다" : ""}
             >
               {isVideoEnabled ? (
                 <VideoIcon className="w-6 h-6" />
@@ -226,6 +357,7 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showPreJoinModal, setShowPreJoinModal] = useState(true);
   const [hasJoinedMeeting, setHasJoinedMeeting] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
 
   useEffect(() => {
     let localStream: MediaStream | null = null;
@@ -233,23 +365,56 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
 
     const initializeMedia = async () => {
       try {
-        localStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true,
-        });
+        // 먼저 비디오와 오디오 모두 시도
+        try {
+          localStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true,
+          });
+        } catch (bothError) {
+          console.warn("Both video and audio failed, trying alternatives...");
+
+          // 비디오만 시도
+          try {
+            localStream = await navigator.mediaDevices.getUserMedia({
+              video: true,
+              audio: false,
+            });
+            setIsAudioEnabled(false);
+            console.log("Video only mode");
+          } catch (videoError) {
+            // 오디오만 시도
+            try {
+              localStream = await navigator.mediaDevices.getUserMedia({
+                video: false,
+                audio: true,
+              });
+              setIsVideoEnabled(false);
+              console.log("Audio only mode");
+            } catch (audioError) {
+              // 둘 다 실패 - 빈 스트림 생성
+              console.warn("No media devices available, creating empty stream");
+              localStream = new MediaStream();
+              setIsVideoEnabled(false);
+              setIsAudioEnabled(false);
+            }
+          }
+        }
 
         if (!isComponentMounted) {
-          localStream.getTracks().forEach((track) => track.stop());
+          localStream?.getTracks().forEach((track) => track.stop());
           return;
         }
 
         setMyStream(localStream);
-        if (myVideoRef.current) {
+        if (myVideoRef.current && localStream) {
           myVideoRef.current.srcObject = localStream;
         }
       } catch (error) {
         console.error("Error accessing media devices:", error);
-        // 카메라나 마이크 접근 실패 시 기본값 설정
+        // 완전 실패 시에도 빈 스트림으로 계속 진행
+        const emptyStream = new MediaStream();
+        setMyStream(emptyStream);
         setIsVideoEnabled(false);
         setIsAudioEnabled(false);
       }
@@ -266,12 +431,13 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
   }, []);
 
   const initializePeer = useCallback(() => {
-    if (!myStream) return;
+    // myStream이 없어도 계속 진행 (빈 스트림도 허용)
+    if (!myStream && myStream !== null) return;
 
     socketRef.current = io(
-      process.env.NEXT_PUBLIC_MEET_SOCKET_URL || "http://localhost:3000",
+      process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:4000",
       {
-        transports: ["websocket"],
+        transports: ["websocket", "polling"],
         reconnection: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
@@ -315,13 +481,22 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     });
 
     // Socket 이벤트 리스너
+    // 기존 참가자 목록 수신 (방 입장 시)
+    socketRef.current.on("existing-participants", (participants: Array<{ userId: string; userState: any }>) => {
+      console.log("📥 Received existing participants:", participants);
+      participants.forEach(({ userId, userState }) => {
+        console.log(`👥 Connecting to existing participant: ${userId}`, userState);
+        connectToNewUser(userId, myStream, userState);
+      });
+    });
+
     socketRef.current.on("user-connected", (userId: string, userState: any) => {
-      console.log("New user connected:", userId);
+      console.log("✅ New user connected:", userId, userState);
       connectToNewUser(userId, myStream, userState);
     });
 
     socketRef.current.on("user-disconnected", (userId: string) => {
-      console.log(`User disconnected: ${userId}`);
+      console.log(`❌ User disconnected: ${userId}`);
       if (peersRef.current[userId]) {
         peersRef.current[userId].close();
         delete peersRef.current[userId];
@@ -330,9 +505,9 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     });
 
     socketRef.current.on(
-      "user-toggle-video",
+      "user-toggled-video",
       ({ userId, enabled }: { userId: string; enabled: boolean }) => {
-        console.log("Received toggle video event:", { userId, enabled });
+        console.log("📹 Received toggle video event:", { userId, enabled });
         setPeerStreams((prev) =>
           prev.map((peer) =>
             peer.userId === userId ? { ...peer, isVideoEnabled: enabled } : peer
@@ -342,9 +517,9 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     );
 
     socketRef.current.on(
-      "user-toggle-audio",
+      "user-toggled-audio",
       ({ userId, enabled }: { userId: string; enabled: boolean }) => {
-        console.log("Received toggle audio event:", { userId, enabled });
+        console.log("🎤 Received toggle audio event:", { userId, enabled });
         setPeerStreams((prev) =>
           prev.map((peer) =>
             peer.userId === userId ? { ...peer, isAudioEnabled: enabled } : peer
@@ -381,32 +556,36 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     stream: MediaStream,
     userState: any
   ) => {
-    console.log(`Connecting to new user ${userId}`);
+    console.log(`🔗 Connecting to new user ${userId} with state:`, userState);
 
     // 이미 연결된 피어는 무시
     if (peersRef.current[userId]) {
-      console.log(`Already connected to user ${userId}`);
+      console.log(`⚠️ Already connected to user ${userId}`);
       return;
     }
 
     try {
       const call = peerRef.current?.call(userId, stream);
       if (call) {
+        console.log(`📞 Call initiated to user ${userId}`);
+
         call.on("stream", (userVideoStream) => {
-          console.log(`Received stream from user ${userId}`);
+          console.log(`📥 Received stream from user ${userId}, tracks:`, userVideoStream.getTracks().length);
           addPeerStream(userId, userVideoStream, userState);
         });
 
         call.on("close", () => {
-          console.log(`Call closed with user ${userId}`);
+          console.log(`📴 Call closed with user ${userId}`);
           setPeerStreams((prev) => prev.filter((p) => p.userId !== userId));
           delete peersRef.current[userId];
         });
 
         peersRef.current[userId] = call;
+      } else {
+        console.warn(`⚠️ Failed to create call to user ${userId} - peer not ready`);
       }
     } catch (error) {
-      console.error(`Error connecting to user ${userId}:`, error);
+      console.error(`❌ Error connecting to user ${userId}:`, error);
     }
   };
 
@@ -415,20 +594,23 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     stream: MediaStream,
     userState?: any
   ) => {
-    console.log(`Adding peer stream for user ${userId}`);
+    console.log(`➕ Adding peer stream for user ${userId}`, {
+      hasVideo: userState?.isVideoEnabled,
+      hasAudio: userState?.isAudioEnabled,
+      trackCount: stream.getTracks().length
+    });
 
     setPeerStreams((prev) => {
       const filteredStreams = prev.filter((p) => p.userId !== userId);
+      const newStream = {
+        userId,
+        stream,
+        isVideoEnabled: userState?.isVideoEnabled ?? true,
+        isAudioEnabled: userState?.isAudioEnabled ?? true,
+      };
 
-      return [
-        ...filteredStreams,
-        {
-          userId,
-          stream,
-          isVideoEnabled: userState?.isVideoEnabled ?? true,
-          isAudioEnabled: userState?.isAudioEnabled ?? true,
-        },
-      ];
+      console.log(`📊 Current peer streams count: ${prev.length} -> ${filteredStreams.length + 1}`);
+      return [...filteredStreams, newStream];
     });
   };
 
@@ -722,42 +904,80 @@ ${messageText}`;
               }`}
             />
             {!isVideoEnabled && (
-              <div className="absolute inset-0 flex items-center justify-center">
+              <div className="absolute inset-0 flex items-center justify-center flex-col gap-3">
                 <UsersIcon className="w-20 h-20 text-gray-400" />
+                {myStream && myStream.getTracks().length === 0 && !isAudioEnabled && (
+                  <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg px-3 py-1.5">
+                    <p className="text-yellow-200 text-xs">시청 전용</p>
+                  </div>
+                )}
               </div>
             )}
-            <div className="absolute bottom-4 left-4 text-sm text-white bg-black/50 px-3 py-1.5 rounded-lg">
-              나 {!isAudioEnabled && "(음소거)"}
+            <div className="absolute bottom-4 left-4 flex items-center gap-2">
+              <div className="text-sm text-white bg-black/50 px-3 py-1.5 rounded-lg">
+                나
+              </div>
+              {!isAudioEnabled && (
+                <div className="bg-red-500/80 p-1.5 rounded-lg" title="마이크 꺼짐">
+                  <MicrophoneOffIcon className="w-4 h-4 text-white" />
+                </div>
+              )}
+              {!isVideoEnabled && myStream && myStream.getTracks().length > 0 && (
+                <div className="bg-red-500/80 p-1.5 rounded-lg" title="카메라 꺼짐">
+                  <VideoOffIcon className="w-4 h-4 text-white" />
+                </div>
+              )}
             </div>
           </div>
 
           {/* 다른 참가자 비디오 */}
-          {peerStreams.map((peerStream) => (
-            <div
-              key={peerStream.userId}
-              className="relative aspect-video bg-gray-800 rounded-xl overflow-hidden shadow-lg"
-            >
-              <video
-                autoPlay
-                playsInline
-                ref={(element) => {
-                  if (element) element.srcObject = peerStream.stream;
-                }}
-                className={`w-full h-full object-cover transform scale-x-[-1] ${
-                  !peerStream.isVideoEnabled ? "hidden" : ""
-                }`}
-              />
-              {!peerStream.isVideoEnabled && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <UsersIcon className="w-20 h-20 text-gray-400" />
+          {peerStreams.map((peerStream) => {
+            const hasNoTracks = peerStream.stream.getTracks().length === 0;
+            const hasNoDevices = !peerStream.isVideoEnabled && !peerStream.isAudioEnabled && hasNoTracks;
+
+            return (
+              <div
+                key={peerStream.userId}
+                className="relative aspect-video bg-gray-800 rounded-xl overflow-hidden shadow-lg"
+              >
+                <video
+                  autoPlay
+                  playsInline
+                  ref={(element) => {
+                    if (element) element.srcObject = peerStream.stream;
+                  }}
+                  className={`w-full h-full object-cover transform scale-x-[-1] ${
+                    !peerStream.isVideoEnabled ? "hidden" : ""
+                  }`}
+                />
+                {!peerStream.isVideoEnabled && (
+                  <div className="absolute inset-0 flex items-center justify-center flex-col gap-3">
+                    <UsersIcon className="w-20 h-20 text-gray-400" />
+                    {hasNoDevices && (
+                      <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg px-3 py-1.5">
+                        <p className="text-yellow-200 text-xs">시청 전용</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="absolute bottom-4 left-4 flex items-center gap-2">
+                  <div className="text-sm text-white bg-black/50 px-3 py-1.5 rounded-lg">
+                    참가자 {peerStream.userId.slice(0, 4)}
+                  </div>
+                  {!peerStream.isAudioEnabled && (
+                    <div className="bg-red-500/80 p-1.5 rounded-lg" title="마이크 꺼짐">
+                      <MicrophoneOffIcon className="w-4 h-4 text-white" />
+                    </div>
+                  )}
+                  {!peerStream.isVideoEnabled && !hasNoDevices && (
+                    <div className="bg-red-500/80 p-1.5 rounded-lg" title="카메라 꺼짐">
+                      <VideoOffIcon className="w-4 h-4 text-white" />
+                    </div>
+                  )}
                 </div>
-              )}
-              <div className="absolute bottom-4 left-4 text-sm text-white bg-black/50 px-3 py-1.5 rounded-lg">
-                참가자 {peerStream.userId.slice(0, 4)}{" "}
-                {!peerStream.isAudioEnabled && "(음소거)"}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* 하단 컨트롤 바 */}
@@ -816,6 +1036,20 @@ ${messageText}`;
               <Share2Icon className="w-6 h-6" />
             </button>
             <button
+              onClick={() => setShowParticipants(!showParticipants)}
+              className={`p-4 rounded-full transition-all duration-200 relative ${
+                showParticipants
+                  ? "bg-blue-500 hover:bg-blue-600 text-white"
+                  : "bg-gray-700 hover:bg-gray-600 text-white"
+              }`}
+              title="참가자 목록"
+            >
+              <UsersIcon className="w-6 h-6" />
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                {peerStreams.length + 1}
+              </span>
+            </button>
+            <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className={`p-4 rounded-full transition-all duration-200 ${
                 isSidebarOpen
@@ -832,6 +1066,17 @@ ${messageText}`;
           </div>
         </div>
       </div>
+
+      {/* 참가자 패널 */}
+      <ParticipantsPanel
+        isOpen={showParticipants}
+        onClose={() => setShowParticipants(false)}
+        myPeerId={myPeerIdRef.current}
+        peerStreams={peerStreams}
+        myStream={myStream}
+        isMyAudioEnabled={isAudioEnabled}
+        isMyVideoEnabled={isVideoEnabled}
+      />
 
       {/* 사이드 패널 - 음성 인식 컴포넌트 */}
       <div

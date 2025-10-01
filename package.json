@@ -6,13 +6,15 @@
   "type": "commonjs",
   "scripts": {
     "dev": "npx nodemon",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:all": "concurrently --kill-others --handle-input -n \"NEXT,BACKEND,HOCUS\" -c \"blue,green,magenta\" \"npm run dev\" \"npm run dev:backend\" \"npm run hocuspocus\"",
+    "kill-ports": "npx kill-port 3000 4000 1234",
     "build": "prisma generate && prisma db push && next build && npm run build:server",
     "build:server": "tsc --project tsconfig.server.json",
     "start": "cross-env NODE_ENV=production node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "hocuspocus": "node hocuspocus-server.js",
-    "dev:all": "concurrently \"npm run dev\" \"npm run hocuspocus\"",
     "migrate:tasks": "ts-node scripts/migrate-task-description.ts"
   },
   "dependencies": {
