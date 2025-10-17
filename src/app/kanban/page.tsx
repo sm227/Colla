@@ -5,6 +5,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { useProject } from "@/app/contexts/ProjectContext";
 import { useAuth } from "@/app/contexts/AuthContext";
+import { useDeadlineChecker } from "@/hooks/useDeadlineChecker";
 import Link from "next/link";
 import { 
   HomeIcon, 
@@ -88,6 +89,12 @@ function KanbanPageContent() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // 마감일 체크 훅 사용 (1시간마다 자동 체크)
+  const { checkNow, lastCheck } = useDeadlineChecker({
+    enabled: !!user, // 사용자가 로그인한 경우에만 활성화
+    intervalMinutes: 60, // 1시간마다 체크
+  });
 
   const toggleTheme = () => {
     setTheme(theme === 'light' ? 'dark' : 'light');

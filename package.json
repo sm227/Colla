@@ -97,6 +97,7 @@
     "next-auth": "^4.24.7",
     "next-themes": "^0.4.6",
     "node-fetch": "^3.3.2",
+    "nodemailer": "^6.10.1",
     "peerjs": "^1.5.4",
     "prisma": "^6.5.0",
     "prosemirror-model": "^1.25.1",
@@ -124,6 +125,7 @@
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "@types/node": "^20",
+    "@types/nodemailer": "^7.0.2",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "concurrently": "^9.1.2",
