@@ -43,3 +43,4 @@ prisma/migrations
 /backend/.env
 
 .env.production
+backend/package-lock.json
