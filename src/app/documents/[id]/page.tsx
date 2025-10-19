@@ -56,13 +56,14 @@ import {
   useDocumentData,
   useDocumentProject
 } from "@/hooks/documents";
-import { 
-  SummaryModal, 
-  TemplateModal, 
-  PasswordModal, 
-  SettingsModal, 
-  FolderModal, 
-  SecurityDropdown 
+import {
+  SummaryModal,
+  TemplateModal,
+  PasswordModal,
+  SettingsModal,
+  FolderModal,
+  SecurityDropdown,
+  ShareModal
 } from "@/components/modals";
 
 // 문서 에디터 CSS 스타일 import
@@ -235,6 +236,7 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const searchParams = useSearchParams();
   const projectId = searchParams?.get('projectId');
+  const shareToken = searchParams?.get('share');
   
   // 폴더 목록 상태 추가
   const [availableFolders, setAvailableFolders] = useState<{ id: string; name: string; count: number }[]>([]);
@@ -332,6 +334,8 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
     setNeedsPasswordVerification,
     isPasswordVerified,
     setIsPasswordVerified,
+    isSharedAccess,
+    setIsSharedAccess,
     refetchDocument,
     setDocumentData
   } = useDocumentData({
@@ -339,7 +343,8 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
     isNewDocument,
     contentLoadedFromYjs,
     projectId,
-    setIsReadOnlyMode
+    setIsReadOnlyMode,
+    shareToken
   });
 
   // 에디터 관련 훅 사용
@@ -762,13 +767,13 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
   useEffect(() => {
     if (!editor) return;
 
-    // 읽기 전용 모드에서는 모든 사용자가 편집 불가능
-    const editableState = !isReadOnlyMode;
+    // 공유 접근이거나 읽기 전용 모드에서는 모든 사용자가 편집 불가능
+    const editableState = !isReadOnlyMode && !isSharedAccess;
 
     if (editor.isEditable !== editableState) {
       editor.setEditable(editableState);
     }
-  }, [editor, isReadOnlyMode, userProjectRole, isProjectOwner]);
+  }, [editor, isReadOnlyMode, isSharedAccess, userProjectRole, isProjectOwner]);
 
   // 에디터 컨테이너에 별도 레이어 추가
   useEffect(() => {
@@ -840,6 +845,7 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
   const [showSecurityMenu, setShowSecurityMenu] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [isPasswordSaving, setIsPasswordSaving] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   
   // 드롭다운 메뉴 토글 함수
   const toggleSecurityMenu = (e: React.MouseEvent) => {
@@ -1009,23 +1015,26 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
               
             </span>
             <div className="flex items-center space-x-1 flex-shrink-0">
-            <button
-              onClick={saveDocument}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-              disabled={isSaving || isLoading}
-              title={isSaving ? "저장 중..." : "저장"}
-            >
-              {isSaving ? (
-                <svg className="animate-spin h-5 w-5 text-gray-600 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              ) : (
-                <SaveIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              )}
-            </button>
-            {/* 읽기 전용 모드 버튼 또는 상태 표시 (관리자/소유자는 버튼, 일반 멤버는 상태 표시) */}
-            {((userProjectRole && userProjectRole !== 'member') || isProjectOwner) ? (
+            {/* 저장 버튼 - 공유 접근 사용자에게는 숨김 */}
+            {!isSharedAccess && (
+              <button
+                onClick={saveDocument}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                disabled={isSaving || isLoading}
+                title={isSaving ? "저장 중..." : "저장"}
+              >
+                {isSaving ? (
+                  <svg className="animate-spin h-5 w-5 text-gray-600 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <SaveIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                )}
+              </button>
+            )}
+            {/* 읽기 전용 모드 버튼 또는 상태 표시 (관리자/소유자는 버튼, 일반 멤버는 상태 표시) - 공유 접근 사용자에게는 숨김 */}
+            {!isSharedAccess && ((userProjectRole && userProjectRole !== 'member') || isProjectOwner) ? (
               <button 
                 className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" 
                 onClick={!isLoading && !isButtonDebouncing ? toggleReadOnlyMode : undefined}
@@ -1063,7 +1072,7 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
                 )}
               </button>
             ) : (
-              isReadOnlyMode && (
+              !isSharedAccess && isReadOnlyMode && (
                 <div className="p-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -1080,32 +1089,43 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
                 </div>
               )
             )}
-            <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" disabled={isLoading}>
-                <ShareIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-            </button>
-            <div className="relative security-menu-container">
-              <button 
-                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" 
+            {/* 공유 버튼 - 공유 접근 사용자에게는 숨김 */}
+            {!isSharedAccess && (
+              <button
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
                 disabled={isLoading}
-                onClick={toggleSecurityMenu}
+                onClick={() => setShowShareModal(true)}
+                title="문서 공유"
               >
+                <ShareIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              </button>
+            )}
+            {/* 설정 메뉴 - 공유 접근 사용자에게는 숨김 */}
+            {!isSharedAccess && (
+              <div className="relative security-menu-container">
+                <button
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+                  disabled={isLoading}
+                  onClick={toggleSecurityMenu}
+                >
                   <SettingsIcon className="w-5 h-5 text-gray-600 dark:text-gray-400 mr-1" />
                   <ChevronDown className="w-3 h-3 text-gray-500 dark:text-gray-400" />
-              </button>
-              
-              <SecurityDropdown 
-                isOpen={showSecurityMenu}
-                onClose={() => setShowSecurityMenu(false)}
-                onAccessPermissions={() => {
-                        // 문서 접근 권한 설정
-                }}
-                onPermissionHistory={() => {
-                        // 문서 권한 이력
-                }}
-                onPasswordSettings={handleOpenPasswordModal}
-                isPasswordProtected={isPasswordProtected}
-              />
-            </div>
+                </button>
+
+                <SecurityDropdown
+                  isOpen={showSecurityMenu}
+                  onClose={() => setShowSecurityMenu(false)}
+                  onAccessPermissions={() => {
+                    // 문서 접근 권한 설정
+                  }}
+                  onPermissionHistory={() => {
+                    // 문서 권한 이력
+                  }}
+                  onPasswordSettings={handleOpenPasswordModal}
+                  isPasswordProtected={isPasswordProtected}
+                />
+              </div>
+            )}
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -1190,16 +1210,35 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
         </div>
       )}
 
-      {isReadOnlyMode && (
-            <div className="fixed top-16 left-1/2 transform -translate-x-1/2 bg-blue-50 dark:bg-blue-900 border-l-4 border-blue-500 dark:border-blue-400 p-4 rounded-lg shadow-md z-50">
+      {/* 공유 링크로 접근한 사용자 알림 */}
+      {isSharedAccess && (
+        <div className="fixed top-16 left-1/2 transform -translate-x-1/2 bg-purple-50 dark:bg-purple-900 border-l-4 border-purple-500 dark:border-purple-400 p-4 rounded-lg shadow-md z-50 max-w-md">
           <div className="flex">
             <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-blue-400 dark:text-blue-300" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="h-5 w-5 text-purple-400 dark:text-purple-300" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
               </svg>
             </div>
             <div className="ml-3">
-                  <p className="text-sm text-blue-800 dark:text-blue-200">
+              <p className="text-sm text-purple-800 dark:text-purple-200">
+                <span className="font-bold">공유 링크로 접근</span> - 이 문서는 읽기 전용입니다. 편집하려면 프로젝트 멤버로 초대받아야 합니다.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 일반 읽기 전용 모드 알림 */}
+      {isReadOnlyMode && !isSharedAccess && (
+        <div className="fixed top-16 left-1/2 transform -translate-x-1/2 bg-blue-50 dark:bg-blue-900 border-l-4 border-blue-500 dark:border-blue-400 p-4 rounded-lg shadow-md z-50">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-blue-400 dark:text-blue-300" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
                 {((userProjectRole && userProjectRole !== 'member') || isProjectOwner) ? (
                   <span className="font-bold">읽기 전용입니다</span>
                 ) : (
@@ -1222,9 +1261,9 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className={`w-full text-3xl font-bold text-gray-900 dark:text-gray-100 border-none outline-none focus:ring-0 p-0 placeholder-gray-400 dark:placeholder-gray-500 bg-transparent ${isReadOnlyMode ? 'cursor-not-allowed' : ''}`}
+              className={`w-full text-3xl font-bold text-gray-900 dark:text-gray-100 border-none outline-none focus:ring-0 p-0 placeholder-gray-400 dark:placeholder-gray-500 bg-transparent ${isReadOnlyMode || isSharedAccess ? 'cursor-not-allowed' : ''}`}
               placeholder="제목 없음"
-              disabled={isLoading || isReadOnlyMode}
+              disabled={isLoading || isReadOnlyMode || isSharedAccess}
             />
           </div>
           
@@ -1466,9 +1505,9 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
           />
 
           {/* Tiptap 에디터 */}
-          <div className="prose max-w-none bg-white dark:bg-[#2a2a2c] rounded-lg">
-            <EditorContent 
-              editor={editor} 
+          <div className={`prose max-w-none bg-white dark:bg-[#2a2a2c] rounded-lg ${isSharedAccess || isReadOnlyMode ? 'pointer-events-none select-none' : ''}`}>
+            <EditorContent
+              editor={editor}
               className="min-h-[500px] px-2"
               placeholder="여기에 내용을 입력하세요..."
             />
@@ -1504,7 +1543,7 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
       />
       
       {/* 폴더 생성 모달 */}
-      <FolderModal 
+      <FolderModal
         isOpen={showFolderModal}
         onClose={() => {
                     setShowFolderModal(false);
@@ -1514,6 +1553,13 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
         onFolderNameChange={setFolderModalName}
         onCreateFolder={createFolderFromSidebar}
         isCreating={isFolderCreating}
+      />
+
+      {/* 문서 공유 모달 */}
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        documentId={savedDocumentId || params.id}
       />
         </div>
       </div>

@@ -20,6 +20,7 @@ interface UseDocumentDataProps {
   contentLoadedFromYjs: boolean;
   projectId?: string | null;
   setIsReadOnlyMode: (readOnly: boolean) => void;
+  shareToken?: string | null;
 }
 
 interface UseDocumentDataReturn {
@@ -37,11 +38,11 @@ interface UseDocumentDataReturn {
   setFolderId: (folderId: string | null) => void;
   tags: string[];
   setTags: (tags: string[]) => void;
-  
+
   // 로딩 상태
   isLoading: boolean;
   loadingError: string | null;
-  
+
   // 보안 관련
   isPasswordProtected: boolean;
   setIsPasswordProtected: (isProtected: boolean) => void;
@@ -51,11 +52,15 @@ interface UseDocumentDataReturn {
   setNeedsPasswordVerification: (needs: boolean) => void;
   isPasswordVerified: boolean;
   setIsPasswordVerified: (verified: boolean) => void;
-  
+
+  // 공유 관련
+  isSharedAccess: boolean;
+  setIsSharedAccess: (isShared: boolean) => void;
+
   // 프로젝트 관련
   projectName: string | null;
   setProjectName: (name: string | null) => void;
-  
+
   // 함수
   refetchDocument: () => Promise<void>;
   setDocumentData: (data: DocumentData) => void;
@@ -66,7 +71,8 @@ export const useDocumentData = ({
   isNewDocument,
   contentLoadedFromYjs,
   projectId,
-  setIsReadOnlyMode
+  setIsReadOnlyMode,
+  shareToken
 }: UseDocumentDataProps): UseDocumentDataReturn => {
   
   // 문서 기본 상태
@@ -87,7 +93,10 @@ export const useDocumentData = ({
   const [documentPassword, setDocumentPassword] = useState<string | null>(null);
   const [needsPasswordVerification, setNeedsPasswordVerification] = useState(false);
   const [isPasswordVerified, setIsPasswordVerified] = useState(false);
-  
+
+  // 공유 관련 상태
+  const [isSharedAccess, setIsSharedAccess] = useState(false);
+
   // 프로젝트 관련 상태
   const [projectName, setProjectName] = useState<string | null>(null);
   
@@ -111,9 +120,14 @@ export const useDocumentData = ({
     // 로딩 상태 시작
     setIsLoading(true);
     setLoadingError(null);
-    
+
     try {
-      const response = await fetch(`/api/documents/${documentId}`);
+      // 공유 토큰이 있으면 쿼리 파라미터로 추가
+      const url = shareToken
+        ? `/api/documents/${documentId}?share=${shareToken}`
+        : `/api/documents/${documentId}`;
+
+      const response = await fetch(url);
       
       if (!response.ok) {
         throw new Error('문서를 불러오는데 실패했습니다.');
@@ -142,9 +156,14 @@ export const useDocumentData = ({
       setIsStarred(data.isStarred || false);
       setFolder(data.folder || "기본 폴더");
       setFolderId(data.folderId || null);
-      
-      // 읽기 전용 모드 설정
-      setIsReadOnlyMode(data.isReadOnly || false);
+
+      // 공유 접근 여부 확인
+      const isShared = data.isSharedAccess || false;
+      setIsSharedAccess(isShared);
+
+      // 읽기 전용 모드 설정 (공유 접근이거나 원래 읽기 전용인 경우)
+      const forceReadOnly = data.forceReadOnly || data.isReadOnly || false;
+      setIsReadOnlyMode(forceReadOnly);
       
       // Tags 처리
       if (data.tags) {
@@ -203,7 +222,7 @@ export const useDocumentData = ({
   // 문서 ID가 변경되거나 초기 로딩 시 문서 데이터 가져오기
   useEffect(() => {
     fetchDocument();
-  }, [documentId, isNewDocument, projectId]);
+  }, [documentId, isNewDocument, projectId, shareToken]);
   
   // Y.js 컨텐츠가 로드되면 로딩 상태 해제
   useEffect(() => {
@@ -244,11 +263,15 @@ export const useDocumentData = ({
     setNeedsPasswordVerification,
     isPasswordVerified,
     setIsPasswordVerified,
-    
+
+    // 공유 관련
+    isSharedAccess,
+    setIsSharedAccess,
+
     // 프로젝트 관련
     projectName,
     setProjectName,
-    
+
     // 함수
     refetchDocument,
     setDocumentData

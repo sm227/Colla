@@ -41,15 +41,10 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const currentUser = await getCurrentUser();
-    
-    if (!currentUser) {
-      return NextResponse.json(
-        { error: '인증된 사용자를 찾을 수 없습니다.' }, 
-        { status: 401 }
-      );
-    }
-    
+    // URL에서 공유 토큰 가져오기
+    const { searchParams } = new URL(request.url);
+    const shareToken = searchParams.get('share');
+
     // 문서 정보 및 프로젝트 소유자 정보 가져오기
     const documentQuery = await prisma.$queryRaw`
       SELECT d.*, p."userId" as "projectOwnerId", p.id as "projectId"
@@ -57,26 +52,54 @@ export async function GET(
       LEFT JOIN "Project" p ON d."projectId" = p.id
       WHERE d.id = ${params.id}
     `;
-    
+
     const document = (documentQuery as any[])[0];
-    
+
     if (!document) {
       return NextResponse.json(
         { error: '문서를 찾을 수 없습니다.' },
         { status: 404 }
       );
     }
-    
+
+    // 공유 토큰으로 접근한 경우 (인증 불필요)
+    if (shareToken) {
+      // 공유 토큰 검증
+      if (document.isShareEnabled && document.shareToken === shareToken) {
+        // 공유 링크로 접근한 사용자는 읽기 전용으로 접근 가능
+        return NextResponse.json({
+          ...document,
+          isSharedAccess: true,
+          forceReadOnly: true
+        });
+      } else {
+        return NextResponse.json(
+          { error: '유효하지 않은 공유 링크입니다.' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // 일반 접근의 경우 인증 필요
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: '인증된 사용자를 찾을 수 없습니다.' },
+        { status: 401 }
+      );
+    }
+
     // 프로젝트 멤버십 확인
     const projectMembershipQuery = await prisma.$queryRaw`
       SELECT * FROM "ProjectMember"
       WHERE "userId" = ${currentUser.id}
       AND "projectId" = ${document.projectId}
     `;
-    
+
     const isProjectMember = (projectMembershipQuery as any[]).length > 0;
     const isProjectOwner = document.projectOwnerId === currentUser.id;
-    
+
     // 사용자가 프로젝트 소유자이거나 멤버인 경우에만 문서 접근 허용
     if (!isProjectOwner && !isProjectMember) {
       return NextResponse.json(
@@ -84,8 +107,12 @@ export async function GET(
         { status: 403 }
       );
     }
-    
-    return NextResponse.json(document);
+
+    return NextResponse.json({
+      ...document,
+      isSharedAccess: false,
+      forceReadOnly: false
+    });
   } catch (error) {
     console.error('문서 조회 오류:', error);
     return NextResponse.json(
