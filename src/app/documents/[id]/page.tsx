@@ -336,6 +336,7 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
     setIsPasswordVerified,
     isSharedAccess,
     setIsSharedAccess,
+    forceReadOnly,
     refetchDocument,
     setDocumentData
   } = useDocumentData({
@@ -767,13 +768,13 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
   useEffect(() => {
     if (!editor) return;
 
-    // 공유 접근이거나 읽기 전용 모드에서는 모든 사용자가 편집 불가능
-    const editableState = !isReadOnlyMode && !isSharedAccess;
+    // 공유 접근이거나 강제 읽기 전용이거나 읽기 전용 모드에서는 모든 사용자가 편집 불가능
+    const editableState = !isReadOnlyMode && !isSharedAccess && !forceReadOnly;
 
     if (editor.isEditable !== editableState) {
       editor.setEditable(editableState);
     }
-  }, [editor, isReadOnlyMode, isSharedAccess, userProjectRole, isProjectOwner]);
+  }, [editor, isReadOnlyMode, isSharedAccess, forceReadOnly, userProjectRole, isProjectOwner]);
 
   // 에디터 컨테이너에 별도 레이어 추가
   useEffect(() => {
@@ -1034,9 +1035,9 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
               </button>
             )}
             {/* 읽기 전용 모드 버튼 또는 상태 표시 (관리자/소유자는 버튼, 일반 멤버는 상태 표시) - 공유 접근 사용자에게는 숨김 */}
-            {!isSharedAccess && ((userProjectRole && userProjectRole !== 'member') || isProjectOwner) ? (
-              <button 
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" 
+            {!isSharedAccess && !forceReadOnly && ((userProjectRole && userProjectRole !== 'member') || isProjectOwner) ? (
+              <button
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
                 onClick={!isLoading && !isButtonDebouncing ? toggleReadOnlyMode : undefined}
                 disabled={isLoading}
                 title={isReadOnlyMode ? "편집 모드로 전환" : "읽기 전용 모드로 전환"}
@@ -1072,7 +1073,7 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
                 )}
               </button>
             ) : (
-              !isSharedAccess && isReadOnlyMode && (
+              !isSharedAccess && !forceReadOnly && isReadOnlyMode && (
                 <div className="p-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"

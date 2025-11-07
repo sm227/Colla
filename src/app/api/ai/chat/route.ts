@@ -7,6 +7,108 @@ export const revalidate = 0;
 // Remove edge runtime directive as it might be causing issues
 // export const runtime = 'edge';
 
+// 시스템 메시지 상수 정의
+const SYSTEM_MESSAGES = {
+  TASK_CREATION: `당신은 프로젝트 관리 시스템의 일정 생성 전문가입니다.
+사용자가 일정 추가를 요청했습니다. 사용자 메시지에서 다음 정보를 추출하세요:
+
+1. 일정 제목(title): 필수
+2. 설명(description): 선택, 없으면 null
+3. 마감일(dueDate): 가능하면 "YYYY-MM-DD" 형식으로 지정해주세요. 날짜가 명시되지 않았으나 "오늘", "내일" 등의 표현이 있으면 해당 날짜로 변환하세요. 날짜가 없으면 오늘 날짜를 사용하세요. 그 외에는 null로 설정하세요.
+4. 상태(status): "todo", "in_progress", "review", "done" 중 하나, 없으면 "todo"
+5. 우선순위(priority): "low", "medium", "high" 중 하나, 없으면 "medium"
+6. 담당자(assignee): 사용자 이름을 입력하세요. 시스템이 자동으로 이름을 찾아 ID로 변환합니다. 없으면 null
+
+매우 중요: 반드시 다음의 JSON 형식만 응답하세요. 그 외의 일반 대화나 설명은 포함하지 마세요:
+
+{
+  "action": "create_task",
+  "data": {
+    "title": "일정 제목",
+    "description": "상세 설명",
+    "dueDate": "YYYY-MM-DD",
+    "status": "todo",
+    "priority": "medium",
+    "assignee": "사용자 이름"
+  },
+  "message": "새 일정을 추가했습니다: [일정 제목]"
+}
+
+정보가 불충분하면 다음과 같이 응답하세요:
+
+{
+  "action": "request_more_info",
+  "message": "필요한 정보를 요청하는 메시지"
+}
+
+절대 코드 블록(\`\`\`)으로 감싸지 말고, 순수한 JSON 형식만 응답하세요.
+절대 추가 설명이나 대화를 포함하지 마세요.
+응답은 한국어로 작성하세요.`,
+
+  TASK_QUERY: `당신은 프로젝트 관리 시스템의 일정 관리 전문가입니다.
+제공된 일정 데이터를 기반으로 사용자의 질문에 정확하게 답변하세요.
+
+매우 중요: 오직 제공된 JSON 데이터에 있는 일정 정보만 사용하세요.
+데이터에 없는 일정은 절대로 만들어내지 마세요.
+존재하지 않는 일정에 대해 질문하면 "해당 일정을 찾을 수 없습니다"라고 명확히 답변하세요.
+실제 데이터에 기반한 사실만 말하고 없는 정보는 추측하지 마세요.
+
+항상 마크다운 형식으로 답변하고, 일정 정보는 번호 목록(1. 2. 3.)을 사용하여 제시하세요.
+응답은 공손하고 친절한 톤으로 작성하며, 한국어로 답변하세요.
+상태별 일정 응답에는 이모지를 적절히 사용하여 시각적 구분을 돕습니다:
+- 할 일(todo): 📋 또는 🔜
+- 진행 중(in_progress): 🚧 또는 ⚙️
+- 검토 중(review): 🔍 또는 👀
+- 완료(done): ✅ 또는 🏆
+담당자 정보와 마감일 정보를 명확히 표시하고, 사용자가 요청한 특정 일정 정보에 집중하세요.
+
+만약 요청한 정보가 데이터에 없다면, "해당 정보는 제공된 데이터에 없습니다"라고 정직하게 답변하세요.`,
+
+  SUMMARIZE: `당신은 문서 요약 전문가입니다. 주어진 콘텐츠를 명확하고 간결하게 요약하세요.
+
+요약 규칙:
+1. 핵심 포인트를 3-5개 정도 추출하여 번호가 매겨진 목록으로 표시하세요.
+2. 각 포인트는 간결하게 한 문장으로 표현하세요.
+3. 모든 중요한 정보를 포함시키되, 세부 사항은 생략하세요.
+4. 원문의 맥락과 의도를 유지하세요.
+5. 요약은 객관적이어야 합니다.
+6. 번호가 매겨진 목록 외에 추가 설명이나 서론, 결론을 포함하지 마세요.`,
+
+  PROJECT_SUMMARY: `당신은 프로젝트 관리 전문가입니다. 프로젝트의 전체 정보를 분석하고 종합적인 요약을 제공하세요.
+
+요약 시 다음 내용을 포함하세요:
+
+## 📋 프로젝트 개요
+- 프로젝트 이름, 설명, 생성일
+- 프로젝트 소유자 정보
+
+## 👥 팀 구성
+- 전체 팀원 수
+- 팀원 목록 (역할 포함)
+- 팀원별 작업 현황
+
+## 📊 작업 현황
+- 전체 작업 수
+- 상태별 작업 수 (할 일, 진행 중, 검토 중, 완료)
+- 진행률 (퍼센트)
+- 우선순위별 작업 분포
+
+## ⚠️ 주의사항
+- 임박한 마감일 (7일 이내)
+- 지연된 작업 (마감일이 지난 미완료 작업)
+
+## 💡 인사이트
+- 프로젝트 진행 상황 평가
+- 개선이 필요한 부분
+- 긍정적인 측면
+
+마크다운 형식으로 작성하고, 이모지를 적절히 활용하여 시각적으로 보기 좋게 구성하세요.
+한국어로 친절하고 전문적인 톤으로 작성하세요.`,
+
+  DEFAULT: ` 당신의 이름은 "숭민" 입니다. 당신은 친절하고 도움이 되는 AI 도우미입니다. 프로젝트 관리 시스템에서 사용자의 질문에 답변하는 역할을 합니다.
+`
+};
+
 export async function POST(req: NextRequest) {
   try {
     const { messages, projectData, userDocuments, systemMessage: clientSystemMessage } = await req.json();
@@ -51,44 +153,13 @@ export async function POST(req: NextRequest) {
     let taskSystemMessage = null;
     let shouldUseTaskMode = false;
 
-    // 클라이언트에서 전달된 systemMessage가 '일정 생성 전문가'인 경우
+    // 클라이언트에서 전달된 systemMessage 처리
     if (clientSystemMessage === '일정 생성 전문가') {
       shouldUseTaskMode = true;
-      taskSystemMessage = `당신은 프로젝트 관리 시스템의 일정 생성 전문가입니다.
-사용자가 일정 추가를 요청했습니다. 사용자 메시지에서 다음 정보를 추출하세요:
-
-1. 일정 제목(title): 필수
-2. 설명(description): 선택, 없으면 null
-3. 마감일(dueDate): 가능하면 "YYYY-MM-DD" 형식으로 지정해주세요. 날짜가 명시되지 않았으나 "오늘", "내일" 등의 표현이 있으면 해당 날짜로 변환하세요. 날짜가 없으면 오늘 날짜를 사용하세요. 그 외에는 null로 설정하세요.
-4. 상태(status): "todo", "in_progress", "review", "done" 중 하나, 없으면 "todo"
-5. 우선순위(priority): "low", "medium", "high" 중 하나, 없으면 "medium"
-6. 담당자(assignee): 사용자 이름을 입력하세요. 시스템이 자동으로 이름을 찾아 ID로 변환합니다. 없으면 null
-
-매우 중요: 반드시 다음의 JSON 형식만 응답하세요. 그 외의 일반 대화나 설명은 포함하지 마세요:
-
-{
-  "action": "create_task",
-  "data": {
-    "title": "일정 제목",
-    "description": "상세 설명",
-    "dueDate": "YYYY-MM-DD",
-    "status": "todo",
-    "priority": "medium",
-    "assignee": "사용자 이름"
-  },
-  "message": "새 일정을 추가했습니다: [일정 제목]"
-}
-
-정보가 불충분하면 다음과 같이 응답하세요:
-
-{
-  "action": "request_more_info",
-  "message": "필요한 정보를 요청하는 메시지"
-}
-
-절대 코드 블록(\`\`\`)으로 감싸지 말고, 순수한 JSON 형식만 응답하세요.
-절대 추가 설명이나 대화를 포함하지 마세요.
-응답은 한국어로 작성하세요.`;
+      taskSystemMessage = SYSTEM_MESSAGES.TASK_CREATION;
+    } else if (clientSystemMessage === '프로젝트 요약 전문가') {
+      shouldUseTaskMode = true;
+      taskSystemMessage = SYSTEM_MESSAGES.PROJECT_SUMMARY;
     }
     
     // 마지막 사용자 메시지에서 일정 데이터가 있는지 확인 (기존 로직)
@@ -119,41 +190,7 @@ export async function POST(req: NextRequest) {
         // 단순 일정 생성 요청이 감지된 경우
         console.log('간단한 일정 생성 요청 감지:', messageContent);
         shouldUseTaskMode = true;
-        taskSystemMessage = `당신은 프로젝트 관리 시스템의 일정 생성 전문가입니다.
-사용자가 일정 추가를 요청했습니다. 사용자 메시지에서 다음 정보를 추출하세요:
-
-1. 일정 제목(title): 필수
-2. 설명(description): 선택, 없으면 null
-3. 마감일(dueDate): 가능하면 "YYYY-MM-DD" 형식으로 지정해주세요. 날짜가 명시되지 않았으나 "오늘", "내일" 등의 표현이 있으면 해당 날짜로 변환하세요. 날짜가 없으면 오늘 날짜를 사용하세요. 그 외에는 null로 설정하세요.
-4. 상태(status): "todo", "in_progress", "review", "done" 중 하나, 없으면 "todo"
-5. 우선순위(priority): "low", "medium", "high" 중 하나, 없으면 "medium"
-6. 담당자(assignee): 사용자 이름을 입력하세요. 시스템이 자동으로 이름을 찾아 ID로 변환합니다. 없으면 null
-
-매우 중요: 반드시 다음의 JSON 형식만 응답하세요. 그 외의 일반 대화나 설명은 포함하지 마세요:
-
-{
-  "action": "create_task",
-  "data": {
-    "title": "일정 제목",
-    "description": "상세 설명",
-    "dueDate": "YYYY-MM-DD",
-    "status": "todo",
-    "priority": "medium",
-    "assignee": "사용자 이름"
-  },
-  "message": "새 일정을 추가했습니다: [일정 제목]"
-}
-
-정보가 불충분하면 다음과 같이 응답하세요:
-
-{
-  "action": "request_more_info",
-  "message": "필요한 정보를 요청하는 메시지"
-}
-
-절대 코드 블록(\`\`\`)으로 감싸지 말고, 순수한 JSON 형식만 응답하세요.
-절대 추가 설명이나 대화를 포함하지 마세요.
-응답은 한국어로 작성하세요.`;
+        taskSystemMessage = SYSTEM_MESSAGES.TASK_CREATION;
       }
       
       // 기존 데이터 섹션 로직
@@ -177,65 +214,12 @@ export async function POST(req: NextRequest) {
           
           if (isTaskCreationRequest) {
             // 일정 생성을 위한 시스템 메시지
-            taskSystemMessage = `당신은 프로젝트 관리 시스템의 일정 생성 전문가입니다.
-사용자가 일정 추가를 요청했습니다. 사용자 메시지에서 다음 정보를 추출하세요:
-
-1. 일정 제목(title): 필수
-2. 설명(description): 선택, 없으면 null
-3. 마감일(dueDate): 가능하면 "YYYY-MM-DD" 형식으로 지정해주세요. 날짜가 명시되지 않았으나 "오늘", "내일" 등의 표현이 있으면 해당 날짜로 변환하세요. 날짜가 없으면 오늘 날짜를 사용하세요. 그 외에는 null로 설정하세요.
-4. 상태(status): "todo", "in_progress", "review", "done" 중 하나, 없으면 "todo"
-5. 우선순위(priority): "low", "medium", "high" 중 하나, 없으면 "medium"
-6. 담당자(assignee): 사용자 이름을 입력하세요. 시스템이 자동으로 이름을 찾아 ID로 변환합니다. 없으면 null
-
-매우 중요: 반드시 다음의 JSON 형식만 응답하세요. 그 외의 일반 대화나 설명은 포함하지 마세요:
-
-{
-  "action": "create_task",
-  "data": {
-    "title": "일정 제목",
-    "description": "상세 설명",
-    "dueDate": "YYYY-MM-DD",
-    "status": "todo",
-    "priority": "medium",
-    "assignee": "사용자 이름"
-  },
-  "message": "새 일정을 추가했습니다: [일정 제목]"
-}
-
-정보가 불충분하면 다음과 같이 응답하세요:
-
-{
-  "action": "request_more_info",
-  "message": "필요한 정보를 요청하는 메시지"
-}
-
-절대 코드 블록(\`\`\`)으로 감싸지 말고, 순수한 JSON 형식만 응답하세요.
-절대 추가 설명이나 대화를 포함하지 마세요.
-응답은 한국어로 작성하세요.`;
-          
+            taskSystemMessage = SYSTEM_MESSAGES.TASK_CREATION;
             // 태스크 모드 활성화
             shouldUseTaskMode = true;
           } else {
             // 일반 일정 질문에 대한 시스템 메시지
-            taskSystemMessage = `당신은 프로젝트 관리 시스템의 일정 관리 전문가입니다.
-제공된 일정 데이터를 기반으로 사용자의 질문에 정확하게 답변하세요.
-
-매우 중요: 오직 제공된 JSON 데이터에 있는 일정 정보만 사용하세요. 
-데이터에 없는 일정은 절대로 만들어내지 마세요.
-존재하지 않는 일정에 대해 질문하면 "해당 일정을 찾을 수 없습니다"라고 명확히 답변하세요.
-실제 데이터에 기반한 사실만 말하고 없는 정보는 추측하지 마세요.
-
-항상 마크다운 형식으로 답변하고, 일정 정보는 번호 목록(1. 2. 3.)을 사용하여 제시하세요.
-응답은 공손하고 친절한 톤으로 작성하며, 한국어로 답변하세요.
-상태별 일정 응답에는 이모지를 적절히 사용하여 시각적 구분을 돕습니다:
-- 할 일(todo): 📋 또는 🔜
-- 진행 중(in_progress): 🚧 또는 ⚙️
-- 검토 중(review): 🔍 또는 👀
-- 완료(done): ✅ 또는 🏆
-담당자 정보와 마감일 정보를 명확히 표시하고, 사용자가 요청한 특정 일정 정보에 집중하세요.
-
-만약 요청한 정보가 데이터에 없다면, "해당 정보는 제공된 데이터에 없습니다"라고 정직하게 답변하세요.`;
-          
+            taskSystemMessage = SYSTEM_MESSAGES.TASK_QUERY;
             // 태스크 모드 활성화
             shouldUseTaskMode = true;
           }
@@ -252,42 +236,7 @@ export async function POST(req: NextRequest) {
         
         if (isTaskCreationRequest) {
           // 일정 생성을 위한 시스템 메시지 (데이터 없는 경우)
-          taskSystemMessage = `당신은 프로젝트 관리 시스템의 일정 생성 전문가입니다.
-사용자가 일정 추가를 요청했습니다. 사용자 메시지에서 다음 정보를 추출하세요:
-
-1. 일정 제목(title): 필수
-2. 설명(description): 선택, 없으면 null
-3. 마감일(dueDate): 가능하면 "YYYY-MM-DD" 형식으로 지정해주세요. 날짜가 명시되지 않았으나 "오늘", "내일" 등의 표현이 있으면 해당 날짜로 변환하세요. 날짜가 없으면 오늘 날짜를 사용하세요. 그 외에는 null로 설정하세요.
-4. 상태(status): "todo", "in_progress", "review", "done" 중 하나, 없으면 "todo"
-5. 우선순위(priority): "low", "medium", "high" 중 하나, 없으면 "medium"
-6. 담당자(assignee): 사용자 이름을 입력하세요. 시스템이 자동으로 이름을 찾아 ID로 변환합니다. 없으면 null
-
-매우 중요: 반드시 다음의 JSON 형식만 응답하세요. 그 외의 일반 대화나 설명은 포함하지 마세요:
-
-{
-  "action": "create_task",
-  "data": {
-    "title": "일정 제목",
-    "description": "상세 설명",
-    "dueDate": "YYYY-MM-DD",
-    "status": "todo",
-    "priority": "medium",
-    "assignee": "사용자 이름"
-  },
-  "message": "새 일정을 추가했습니다: [일정 제목]"
-}
-
-정보가 불충분하면 다음과 같이 응답하세요:
-
-{
-  "action": "request_more_info",
-  "message": "필요한 정보를 요청하는 메시지"
-}
-
-절대 코드 블록(\`\`\`)으로 감싸지 말고, 순수한 JSON 형식만 응답하세요.
-절대 추가 설명이나 대화를 포함하지 마세요.
-응답은 한국어로 작성하세요.`;
-        
+          taskSystemMessage = SYSTEM_MESSAGES.TASK_CREATION;
           // 태스크 모드 활성화
           shouldUseTaskMode = true;
         }
@@ -347,25 +296,16 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: 'claude-3-haiku-20240307',  // Using a different model that might be more reliable
         max_tokens: 1000,
-        system: taskSystemMessage ? 
+        system: taskSystemMessage ?
           // 태스크 시스템 메시지가 있는 경우 현재 날짜 정보를 추가
           `당신의 이름은 "숭민" 입니다.
-          
+
           ${taskSystemMessage.replace('YYYY-MM-DD', `${new Date().getFullYear()}-MM-DD`)}
 현재 날짜: ${new Date().toISOString().split('T')[0]}
-중요: 오늘은 ${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월 ${new Date().getDate()}일입니다.` 
-          : (isSummarizeRequest ? 
-          `당신은 문서 요약 전문가입니다. 주어진 콘텐츠를 명확하고 간결하게 요약하세요.
-          
-요약 규칙:
-1. 핵심 포인트를 3-5개 정도 추출하여 번호가 매겨진 목록으로 표시하세요.
-2. 각 포인트는 간결하게 한 문장으로 표현하세요.
-3. 모든 중요한 정보를 포함시키되, 세부 사항은 생략하세요.
-4. 원문의 맥락과 의도를 유지하세요.
-5. 요약은 객관적이어야 합니다.
-6. 번호가 매겨진 목록 외에 추가 설명이나 서론, 결론을 포함하지 마세요.` 
-          : (clientSystemMessage || ` 당신의 이름은 "숭민" 입니다. 당신은 친절하고 도움이 되는 AI 도우미입니다. 프로젝트 관리 시스템에서 사용자의 질문에 답변하는 역할을 합니다.
-`)),
+중요: 오늘은 ${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월 ${new Date().getDate()}일입니다.`
+          : (isSummarizeRequest ?
+          SYSTEM_MESSAGES.SUMMARIZE
+          : (clientSystemMessage || SYSTEM_MESSAGES.DEFAULT)),
         messages: formattedMessages
       }),
     });

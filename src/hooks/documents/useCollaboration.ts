@@ -202,52 +202,8 @@ export const useCollaboration = ({
     }
   }, [provider, currentUser, userProjectRole, isProjectOwner]);
 
-  // 읽기 전용 모드 변경 시 문서 메타데이터 업데이트 및 전파
-  useEffect(() => {
-    if (!provider || !ydoc) return;
-    
-    try {
-      const metaData = ydoc.getMap('metaData');
-      metaData.set('isReadOnlyMode', isReadOnlyMode);
-      
-      console.log(`문서 읽기 전용 모드 ${isReadOnlyMode ? '활성화' : '비활성화'} 정보 공유됨`);
-    } catch (error) {
-      console.error('문서 읽기 전용 모드 정보 공유 실패:', error);
-    }
-  }, [provider, ydoc, isReadOnlyMode]);
-  
-  // 다른 사용자의 읽기 전용 모드 변경 감지
-  useEffect(() => {
-    if (!ydoc) return;
-    
-    const metaData = ydoc.getMap('metaData');
-    
-    // 초기값 설정
-    const initialReadOnlyMode = metaData.get('isReadOnlyMode');
-    if (initialReadOnlyMode !== undefined) {
-      const readOnlyValue = typeof initialReadOnlyMode === 'boolean' ? initialReadOnlyMode : false;
-      setIsReadOnlyMode(readOnlyValue);
-      console.log(`다른 사용자가 설정한 읽기 전용 모드 상태 수신: ${readOnlyValue}`);
-    }
-    
-    // 메타데이터 변경 이벤트 구독
-    const handleMetaDataUpdate = () => {
-      const updatedReadOnlyMode = metaData.get('isReadOnlyMode');
-      if (updatedReadOnlyMode !== undefined) {
-        const readOnlyValue = typeof updatedReadOnlyMode === 'boolean' ? updatedReadOnlyMode : false;
-        if (readOnlyValue !== isReadOnlyMode) {
-          setIsReadOnlyMode(readOnlyValue);
-          console.log(`다른 사용자가 읽기 전용 모드를 ${readOnlyValue ? '활성화' : '비활성화'}했습니다.`);
-        }
-      }
-    };
-    
-    metaData.observe(handleMetaDataUpdate);
-    
-    return () => {
-      metaData.unobserve(handleMetaDataUpdate);
-    };
-  }, [ydoc, isReadOnlyMode]);
+  // 읽기 전용 모드는 각 사용자의 접근 권한에 따라 개별적으로 관리됨
+  // Y.js metadata로 공유하지 않음 (공유 링크 사용자와 프로젝트 멤버가 다른 권한을 가짐)
 
   // 읽기 전용 모드 토글 함수
   const toggleReadOnlyMode = () => {

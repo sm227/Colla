@@ -56,6 +56,7 @@ interface UseDocumentDataReturn {
   // 공유 관련
   isSharedAccess: boolean;
   setIsSharedAccess: (isShared: boolean) => void;
+  forceReadOnly: boolean;
 
   // 프로젝트 관련
   projectName: string | null;
@@ -96,6 +97,9 @@ export const useDocumentData = ({
 
   // 공유 관련 상태
   const [isSharedAccess, setIsSharedAccess] = useState(false);
+
+  // 강제 읽기 전용 상태 (공유 링크 사용자는 항상 읽기 전용)
+  const [forceReadOnly, setForceReadOnly] = useState(false);
 
   // 프로젝트 관련 상태
   const [projectName, setProjectName] = useState<string | null>(null);
@@ -161,9 +165,10 @@ export const useDocumentData = ({
       const isShared = data.isSharedAccess || false;
       setIsSharedAccess(isShared);
 
-      // 읽기 전용 모드 설정 (공유 접근이거나 원래 읽기 전용인 경우)
-      const forceReadOnly = data.forceReadOnly || data.isReadOnly || false;
-      setIsReadOnlyMode(forceReadOnly);
+      // 강제 읽기 전용 모드 설정 (공유 접근 사용자는 항상 읽기 전용)
+      const shouldForceReadOnly = data.forceReadOnly || data.isReadOnly || false;
+      setForceReadOnly(shouldForceReadOnly);
+      setIsReadOnlyMode(shouldForceReadOnly);
       
       // Tags 처리
       if (data.tags) {
@@ -267,6 +272,7 @@ export const useDocumentData = ({
     // 공유 관련
     isSharedAccess,
     setIsSharedAccess,
+    forceReadOnly,
 
     // 프로젝트 관련
     projectName,
