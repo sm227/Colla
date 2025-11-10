@@ -250,6 +250,9 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
   
   // 읽기 전용 모드 디바운싱 상태
   const [isButtonDebouncing, setIsButtonDebouncing] = useState(false);
+
+  // 공유 링크 알림 모달 표시 상태
+  const [showSharedAccessNotice, setShowSharedAccessNotice] = useState(true);
   
   // 중복 상태 제거됨 - useDocumentEditor 훅으로 이동됨
   const [templateContent, setTemplateContent] = useState('');
@@ -1212,19 +1215,28 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
       )}
 
       {/* 공유 링크로 접근한 사용자 알림 */}
-      {isSharedAccess && (
+      {isSharedAccess && showSharedAccessNotice && (
         <div className="fixed top-16 left-1/2 transform -translate-x-1/2 bg-purple-50 dark:bg-purple-900 border-l-4 border-purple-500 dark:border-purple-400 p-4 rounded-lg shadow-md z-50 max-w-md">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-purple-400 dark:text-purple-300" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
-              </svg>
+          <div className="flex items-start justify-between">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-purple-400 dark:text-purple-300" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-purple-800 dark:text-purple-200">
+                  <span className="font-bold">공유 링크로 접근</span> - 이 문서는 읽기 전용입니다. 편집하려면 프로젝트 멤버로 초대받아야 합니다.
+                </p>
+              </div>
             </div>
-            <div className="ml-3">
-              <p className="text-sm text-purple-800 dark:text-purple-200">
-                <span className="font-bold">공유 링크로 접근</span> - 이 문서는 읽기 전용입니다. 편집하려면 프로젝트 멤버로 초대받아야 합니다.
-              </p>
-            </div>
+            <button
+              onClick={() => setShowSharedAccessNotice(false)}
+              className="ml-4 flex-shrink-0 text-purple-600 dark:text-purple-300 hover:text-purple-800 dark:hover:text-purple-100 transition-colors"
+              title="닫기"
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
           </div>
         </div>
       )}
