@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Set API timeout to 30 seconds
 export const fetchCache = 'force-no-store';
@@ -121,14 +122,18 @@ export async function POST(req: NextRequest) {
     }
 
     // Make sure we have the API key
-    const apiKey = process.env.CLAUDE_AI_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.error('Missing Claude API key');
+      console.error('Missing Gemini API key');
       return NextResponse.json(
         { error: 'API key configuration error' },
         { status: 500 }
       );
     }
+
+    // Initialize Gemini
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // Check if this is a document summarization request
     const lastUserMessage = messages.filter(msg => msg.role === 'user').pop();
@@ -285,58 +290,28 @@ export async function POST(req: NextRequest) {
       ];
     }
 
-    // Use direct fetch with Claude API
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',  // Using a different model that might be more reliable
-        max_tokens: 1000,
-        system: taskSystemMessage ?
-          // 태스크 시스템 메시지가 있는 경우 현재 날짜 정보를 추가
-          `당신의 이름은 "숭민" 입니다.
+    // Prepare system message
+    const systemMessage = taskSystemMessage ?
+      // 태스크 시스템 메시지가 있는 경우 현재 날짜 정보를 추가
+      `당신의 이름은 "숭민" 입니다.
 
-          ${taskSystemMessage.replace('YYYY-MM-DD', `${new Date().getFullYear()}-MM-DD`)}
+      ${taskSystemMessage.replace('YYYY-MM-DD', `${new Date().getFullYear()}-MM-DD`)}
 현재 날짜: ${new Date().toISOString().split('T')[0]}
 중요: 오늘은 ${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월 ${new Date().getDate()}일입니다.`
-          : (isSummarizeRequest ?
-          SYSTEM_MESSAGES.SUMMARIZE
-          : (clientSystemMessage || SYSTEM_MESSAGES.DEFAULT)),
-        messages: formattedMessages
-      }),
-    });
+      : (isSummarizeRequest ?
+      SYSTEM_MESSAGES.SUMMARIZE
+      : (clientSystemMessage || SYSTEM_MESSAGES.DEFAULT));
 
-    if (!response.ok) {
-      let errorMessage = `Claude API error: ${response.status} ${response.statusText}`;
-      try {
-        const errorData = await response.json();
-        console.error('Claude API error details:', errorData);
-        if (errorData.error && errorData.error.message) {
-          errorMessage = `Claude API error: ${errorData.error.message}`;
-        }
-      } catch (e) {
-        const errorText = await response.text();
-        console.error('Claude API error text:', errorText);
-      }
-      
-      throw new Error(errorMessage);
+    // Build conversation history for Gemini
+    let conversationHistory = systemMessage + '\n\n';
+    for (const msg of formattedMessages) {
+      conversationHistory += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n\n`;
     }
 
-    const data = await response.json();
-    
-    // Extract text content from the response
-    let responseContent = 'Unable to process response';
-    
-    if (data.content && Array.isArray(data.content) && data.content.length > 0) {
-      const firstContent = data.content[0];
-      if (firstContent.type === 'text') {
-        responseContent = firstContent.text;
-      }
-    }
+    // Use Gemini API
+    const result = await model.generateContent(conversationHistory);
+    const response = await result.response;
+    const responseContent = response.text();
 
     // For summarization requests, add a helpful prefix (제거)
     if (isSummarizeRequest && lastUserMessage && lastUserMessage.content !== "요약해줘") {
