@@ -69,7 +69,7 @@ app.use((err, req, res, next) => {
 });
 
 // 서버 시작 (HTTP + Socket.IO)
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log('='.repeat(60));
   console.log('🚀 Colla Backend Server Started');
   console.log('='.repeat(60));
