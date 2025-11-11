@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { 
+import {
   ArrowLeftIcon,
   ChevronDownIcon,
   ShareIcon,
@@ -81,7 +81,7 @@ interface ChartDataPoint {
   plannedCompletion: number;
 }
 
-export default function BurnupReportPage() {
+function BurnupReportPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { theme } = useTheme();
@@ -607,4 +607,29 @@ export default function BurnupReportPage() {
       </div>
     </div>
   );
-} 
+}
+
+export default function BurnupReportPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
+        <div className="text-center flex flex-col items-center">
+          <div className="relative w-24 h-24 text-blue-500">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-16 h-16 border-4 border-current border-solid rounded-full opacity-20 border-blue-500"></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-16 h-16 border-4 border-current border-solid rounded-full border-t-transparent animate-spin"></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-3xl font-bold text-blue-500">C</span>
+            </div>
+          </div>
+          <p className="mt-6 text-lg font-medium text-gray-300">번업 보고서 로딩 중...</p>
+        </div>
+      </div>
+    }>
+      <BurnupReportPageContent />
+    </Suspense>
+  );
+}
