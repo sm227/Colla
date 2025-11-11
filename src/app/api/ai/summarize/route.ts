@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     });
 
     const systemMessage = `당신은 강력한 문서 요약 AI입니다. 
-다음 문서 내용을 간결하고 생동감 있게 요약해 주세요.
+다음 문서 내용을 "핵심"만 간결하게 요약해주세요.
 
 제목은 "📝 **[문서 주제] 요약**" 형식으로 시작하세요.
 

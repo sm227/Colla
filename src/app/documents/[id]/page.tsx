@@ -250,6 +250,9 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
   
   // 읽기 전용 모드 디바운싱 상태
   const [isButtonDebouncing, setIsButtonDebouncing] = useState(false);
+
+  // 공유 링크 알림 모달 표시 상태
+  const [showSharedAccessNotice, setShowSharedAccessNotice] = useState(true);
   
   // 중복 상태 제거됨 - useDocumentEditor 훅으로 이동됨
   const [templateContent, setTemplateContent] = useState('');
@@ -336,6 +339,7 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
     setIsPasswordVerified,
     isSharedAccess,
     setIsSharedAccess,
+    forceReadOnly,
     refetchDocument,
     setDocumentData
   } = useDocumentData({
@@ -767,13 +771,13 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
   useEffect(() => {
     if (!editor) return;
 
-    // 공유 접근이거나 읽기 전용 모드에서는 모든 사용자가 편집 불가능
-    const editableState = !isReadOnlyMode && !isSharedAccess;
+    // 공유 접근이거나 강제 읽기 전용이거나 읽기 전용 모드에서는 모든 사용자가 편집 불가능
+    const editableState = !isReadOnlyMode && !isSharedAccess && !forceReadOnly;
 
     if (editor.isEditable !== editableState) {
       editor.setEditable(editableState);
     }
-  }, [editor, isReadOnlyMode, isSharedAccess, userProjectRole, isProjectOwner]);
+  }, [editor, isReadOnlyMode, isSharedAccess, forceReadOnly, userProjectRole, isProjectOwner]);
 
   // 에디터 컨테이너에 별도 레이어 추가
   useEffect(() => {
@@ -1034,9 +1038,9 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
               </button>
             )}
             {/* 읽기 전용 모드 버튼 또는 상태 표시 (관리자/소유자는 버튼, 일반 멤버는 상태 표시) - 공유 접근 사용자에게는 숨김 */}
-            {!isSharedAccess && ((userProjectRole && userProjectRole !== 'member') || isProjectOwner) ? (
-              <button 
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" 
+            {!isSharedAccess && !forceReadOnly && ((userProjectRole && userProjectRole !== 'member') || isProjectOwner) ? (
+              <button
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
                 onClick={!isLoading && !isButtonDebouncing ? toggleReadOnlyMode : undefined}
                 disabled={isLoading}
                 title={isReadOnlyMode ? "편집 모드로 전환" : "읽기 전용 모드로 전환"}
@@ -1072,7 +1076,7 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
                 )}
               </button>
             ) : (
-              !isSharedAccess && isReadOnlyMode && (
+              !isSharedAccess && !forceReadOnly && isReadOnlyMode && (
                 <div className="p-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -1211,19 +1215,28 @@ function DocumentPageContent({ params }: { params: { id: string } }) {
       )}
 
       {/* 공유 링크로 접근한 사용자 알림 */}
-      {isSharedAccess && (
+      {isSharedAccess && showSharedAccessNotice && (
         <div className="fixed top-16 left-1/2 transform -translate-x-1/2 bg-purple-50 dark:bg-purple-900 border-l-4 border-purple-500 dark:border-purple-400 p-4 rounded-lg shadow-md z-50 max-w-md">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-purple-400 dark:text-purple-300" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
-              </svg>
+          <div className="flex items-start justify-between">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-purple-400 dark:text-purple-300" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-purple-800 dark:text-purple-200">
+                  <span className="font-bold">공유 링크로 접근</span> - 이 문서는 읽기 전용입니다. 편집하려면 프로젝트 멤버로 초대받아야 합니다.
+                </p>
+              </div>
             </div>
-            <div className="ml-3">
-              <p className="text-sm text-purple-800 dark:text-purple-200">
-                <span className="font-bold">공유 링크로 접근</span> - 이 문서는 읽기 전용입니다. 편집하려면 프로젝트 멤버로 초대받아야 합니다.
-              </p>
-            </div>
+            <button
+              onClick={() => setShowSharedAccessNotice(false)}
+              className="ml-4 flex-shrink-0 text-purple-600 dark:text-purple-300 hover:text-purple-800 dark:hover:text-purple-100 transition-colors"
+              title="닫기"
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
           </div>
         </div>
       )}

@@ -151,12 +151,42 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastCreatedTask, setLastCreatedTask] = useState<any>(null);
   const [reopened, setReopened] = useState(false);
-  
+
   // 현재 진행 중인 API 요청을 취소하기 위한 AbortController
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // useChat의 내부 상태에 접근하기 위한 변수 추가
   const chatStateRef = useRef<any>(null);
+
+  // 슬래시 커맨드 자동완성
+  const [showCommands, setShowCommands] = useState(false);
+  const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
+  const [filteredCommands, setFilteredCommands] = useState<typeof slashCommands>([]);
+
+
+  // 슬래시 커맨드 목록
+  const slashCommands = [
+    {
+      command: '/도움말',
+      description: '사용 가능한 모든 명령어를 보여줍니다',
+      action: 'help'
+    },
+    {
+      command: '/요약',
+      description: '현재 문서를 요약합니다',
+      action: '요약해줘'
+    },
+    {
+      command: '/프로젝트요약',
+      description: '프로젝트 전체 현황을 요약합니다',
+      action: '프로젝트 요약해줘'
+    },
+    {
+      command: '/일정추가',
+      description: '새로운 일정을 추가합니다',
+      action: '일정 추가해줘'
+    }
+  ];
 
   // 일정 상태별 응답 템플릿 - 기본 "일정 없음" 메시지만 남김
   const taskStatusResponses = {
@@ -276,11 +306,58 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
       !userContent.includes('설명') &&
       !userContent.includes('우선순위');
 
-    // Check if it's a summarize request
-    if (userContent === "요약해줘") {
+    // Check if it's a help request
+    if (userContent === 'help') {
+      addUserMessage('/도움말');
+      const helpMessage = `
+## 📚 사용 가능한 명령어
+
+### 슬래시 커맨드
+입력창에 \`/\`를 입력하면 자동완성 메뉴가 표시됩니다.
+
+**📋 문서 관련**
+- \`/요약\` - 현재 문서를 요약합니다
+
+**📊 프로젝트 관련**
+- \`/프로젝트요약\` - 프로젝트의 전체 현황을 분석합니다
+  - 팀원 정보
+  - 작업 통계 및 진행률
+  - 임박한 마감일
+  - 지연된 작업
+
+**✅ 일정 관리**
+- \`/일정추가\` - 새로운 일정을 추가합니다
+- 자연어로 일정 추가 가능 (예: "내일까지 보고서 작성 일정 추가해줘")
+
+**💬 일반 대화**
+- 프로젝트 관리에 관한 모든 질문에 답변합니다
+- 일정 조회, 팀원 정보 등
+
+---
+
+💡 **Tip**: 키보드 단축키
+- \`↑\` \`↓\` - 자동완성 메뉴 탐색
+- \`Enter\` - 명령어 선택
+- \`Esc\` - 자동완성 닫기
+      `;
+      addAssistantMessage(helpMessage);
+      return;
+    }
+
+    // Check if it's a project summary request
+    const isProjectSummaryRequest =
+      userContent.includes('프로젝트') && userContent.includes('요약');
+
+    if (isProjectSummaryRequest) {
+      // 프로젝트 요약 요청 처리
+      addUserMessage(userContent);
+      await handleProjectSummaryRequest();
+    }
+    // Check if it's a document summarize request
+    else if (userContent === "요약해줘") {
       // 요약 작업 전에 사용자 메시지 추가
       addUserMessage(userContent);
-      
+
       // 요약 처리
       await handleSummarizeRequest();
     } 
@@ -807,6 +884,72 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
     }
   }, [scrollToBottom]);
 
+  // Function to handle project summarization
+  const handleProjectSummaryRequest = async () => {
+    try {
+      // 현재 프로젝트 ID 가져오기
+      const projectId = getCurrentProjectId();
+
+      if (!projectId) {
+        addAssistantMessage('프로젝트 요약을 보려면 프로젝트를 선택해주세요.');
+        return;
+      }
+
+      // 로딩 표시 시작
+      setLoading(true);
+
+      try {
+        // 프로젝트 요약 정보 가져오기
+        const summaryResponse = await fetch(`/api/projects/${projectId}/summary`);
+
+        if (!summaryResponse.ok) {
+          throw new Error('프로젝트 요약 정보를 가져오는데 실패했습니다.');
+        }
+
+        const summaryData = await summaryResponse.json();
+
+        // AI API 호출하여 프로젝트 요약 생성
+        const aiResponse = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: 'user',
+                content: `다음 프로젝트 정보를 분석하여 종합적인 요약을 제공해주세요:\n\n${JSON.stringify(summaryData, null, 2)}`
+              }
+            ],
+            systemMessage: '프로젝트 요약 전문가'
+          }),
+        });
+
+        if (!aiResponse.ok) {
+          throw new Error('프로젝트 요약 생성 중 오류가 발생했습니다.');
+        }
+
+        const data = await aiResponse.json();
+
+        // 요약 결과 메시지로 추가
+        if (data.content) {
+          addAssistantMessage(data.content);
+        } else {
+          addAssistantMessage('프로젝트 요약에 실패했습니다.');
+        }
+      } catch (error) {
+        console.error('프로젝트 요약 오류:', error);
+        addAssistantMessage('프로젝트를 요약하는 동안 오류가 발생했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('프로젝트 요약 처리 오류:', error);
+      setLoading(false);
+      addAssistantMessage('프로젝트 요약을 처리하는 중 오류가 발생했습니다.');
+    }
+  };
+
   // Function to handle document summarization
   const handleSummarizeRequest = async () => {
     try {
@@ -986,12 +1129,59 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
     return userFriendlyMessage;
   };
 
+  // 입력 변경 핸들러 - 슬래시 커맨드 감지
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setInput(value);
+
+    // 슬래시로 시작하는지 확인
+    if (value.startsWith('/')) {
+      const searchTerm = value.slice(1).toLowerCase();
+      const filtered = slashCommands.filter(cmd =>
+        cmd.command.toLowerCase().includes(searchTerm)
+      );
+      setFilteredCommands(filtered);
+      setShowCommands(filtered.length > 0);
+      setSelectedCommandIndex(0);
+    }
+    else {
+      setShowCommands(false);
+    }
+  };
+
+  // 커맨드 선택 핸들러
+  const selectCommand = (command: typeof slashCommands[0]) => {
+    setInput(command.action);
+    setShowCommands(false);
+    inputRef.current?.focus();
+  };
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // 슬래시 커맨드 자동완성이 표시되어 있을 때
+    if (showCommands && filteredCommands.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedCommandIndex(prev =>
+          prev < filteredCommands.length - 1 ? prev + 1 : 0
+        );
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedCommandIndex(prev =>
+          prev > 0 ? prev - 1 : filteredCommands.length - 1
+        );
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        selectCommand(filteredCommands[selectedCommandIndex]);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowCommands(false);
+      }
+    }
+    else if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
     }
-  }, [handleSubmit]);
+  }, [handleSubmit, showCommands, filteredCommands, selectedCommandIndex]);
 
   if (!isOpen) return null;
 
@@ -1043,10 +1233,9 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-100/90 flex items-center justify-center">
               <span className="text-2xl">👋</span>
             </div>
-            <p className="mb-3 font-medium text-sm">새 대화를 시작해보세요</p>
+            <p className="mb-3 font-medium text-sm">숭민이와 새 대화를 시작해보세요</p>
             <div className="space-y-2 max-w-xs mx-auto bg-gray-50/80 p-3 rounded-lg">
-              <p className="text-xs text-blue-600">💡 Tip: 문서를 요약하려면 "요약해줘"라고 입력하세요</p>
-              <p className="text-xs text-blue-600">💡 Tip: 대화를 통해 일정 추가가 가능해요</p>
+              <p className="text-xs text-blue-600 font-semibold">💡 입력창에 <span className="bg-blue-100 px-1 rounded">/</span> 를 입력하면 명령어를 볼 수 있어요!</p>
             </div>
           </div>
         ) : (
@@ -1078,33 +1267,67 @@ export function ChatBot({ isOpen, onClose }: ChatBotProps) {
       
       {/* Input area */}
       <form onSubmit={handleSubmit} className="px-3 py-2 bg-white/80 backdrop-blur-sm rounded-b-xl">
-        <div className="relative border border-gray-300 rounded-full bg-gray-50/80 hover:bg-white/80 focus-within:bg-white/80 transition-colors focus-within:border-gray-300 focus-within:ring-0 focus-within:shadow-none">
-          <Textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="숭민이에게 무엇이든 물어보기"
-            className="resize-none pr-12 min-h-[44px] max-h-32 rounded-full bg-transparent border-0 focus:ring-0 focus:outline-none focus:border-0 text-[11px] py-0 px-4 shadow-none focus:shadow-none outline-none flex items-center"
-            rows={1}
-            disabled={isSubmitting || isLoading}
-            style={{ 
-              boxShadow: 'none', 
-              fontSize: '11px',
-              paddingTop: '13px',
-              lineHeight: '1',
-              alignItems: 'center'
-            }}
-          />
-          <div className="absolute right-1 bottom-1 flex items-center gap-1">
-            <Button 
-              type="submit" 
-              size="icon" 
-              disabled={isLoading || isSubmitting || input.trim() === ''}
-              className="h-8 w-8 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-50 disabled:shadow-none"
-            >
-              <Send className="h-3 w-3" />
-            </Button>
+        <div className="relative">
+          {/* 슬래시 커맨드 자동완성 */}
+          {showCommands && filteredCommands.length > 0 && (
+            <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+              {filteredCommands.map((cmd, index) => (
+                <div
+                  key={cmd.command}
+                  onClick={() => selectCommand(cmd)}
+                  className={`px-4 py-2 cursor-pointer transition-colors ${
+                    index === selectedCommandIndex
+                      ? 'bg-blue-50 border-l-2 border-blue-500'
+                      : 'hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-sm text-gray-900">{cmd.command}</div>
+                      <div className="text-xs text-gray-500">{cmd.description}</div>
+                    </div>
+                    {index === selectedCommandIndex && (
+                      <div className="text-xs text-blue-500 ml-2">Enter</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <div className="px-4 py-2 bg-gray-50 border-t border-gray-200">
+                <div className="text-xs text-gray-500">
+                  <span className="font-medium">↑↓</span> 탐색 · <span className="font-medium">Enter</span> 선택 · <span className="font-medium">Esc</span> 닫기
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="relative border border-gray-300 rounded-full bg-gray-50/80 hover:bg-white/80 focus-within:bg-white/80 transition-colors focus-within:border-gray-300 focus-within:ring-0 focus-within:shadow-none">
+            <Textarea
+              ref={inputRef}
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder="숭민이에게 무엇이든 물어보기 (/ 입력으로 명령어 보기)"
+              className="resize-none pr-12 min-h-[44px] max-h-32 rounded-full bg-transparent border-0 focus:ring-0 focus:outline-none focus:border-0 text-[11px] py-0 px-4 shadow-none focus:shadow-none outline-none flex items-center"
+              rows={1}
+              disabled={isSubmitting || isLoading}
+              style={{
+                boxShadow: 'none',
+                fontSize: '11px',
+                paddingTop: '13px',
+                lineHeight: '1',
+                alignItems: 'center'
+              }}
+            />
+            <div className="absolute right-1 bottom-1 flex items-center gap-1">
+              <Button
+                type="submit"
+                size="icon"
+                disabled={isLoading || isSubmitting || input.trim() === ''}
+                className="h-8 w-8 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-50 disabled:shadow-none"
+              >
+                <Send className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
         </div>
       </form>
