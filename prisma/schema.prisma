@@ -148,6 +148,8 @@ model Meeting {
   decisions     String?   @db.Text
   actionItems   String?   @db.Text
   participants  Json?     // 참가자 정보를 JSON 형태로 저장 [{userId, joinTime, leaveTime}]
+  status        String    @default("active") // "active" 또는 "completed"
+  creatorId     String?   // 회의 생성자 (방장)
   project       Project?  @relation(fields: [projectId], references: [id])
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
