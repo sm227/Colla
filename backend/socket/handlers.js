@@ -139,6 +139,19 @@ function initializeSocketHandlers(io) {
       }
     });
 
+    // 방장이 회의 종료
+    socket.on('host-ended-meeting', (roomId) => {
+      console.log(`👑 Host ended meeting in room ${roomId}`);
+      // 방의 모든 참가자에게 회의 종료 알림
+      io.to(roomId).emit('meeting-ended-by-host', roomId);
+
+      // 방 참가자 목록 삭제
+      if (roomParticipants.has(roomId)) {
+        console.log(`🗑️ Clearing room ${roomId} participants`);
+        roomParticipants.delete(roomId);
+      }
+    });
+
     // 방 나가기
     socket.on('leave-room', (roomId, userId) => {
       console.log(`🚪 User ${userId} leaving room ${roomId}`);
@@ -147,11 +160,21 @@ function initializeSocketHandlers(io) {
       // 방 참가자 목록에서 제거
       if (roomParticipants.has(roomId)) {
         const participants = roomParticipants.get(roomId);
-        roomParticipants.set(
-          roomId,
-          participants.filter(p => p.userId !== userId)
-        );
-        console.log(`📊 Room ${roomId} remaining participants:`, roomParticipants.get(roomId).map(p => p.userId));
+        const updatedParticipants = participants.filter(p => p.userId !== userId);
+        roomParticipants.set(roomId, updatedParticipants);
+
+        console.log(`📊 Room ${roomId} remaining participants:`, updatedParticipants.map(p => p.userId));
+
+        // 마지막 참가자인지 확인
+        const isLastParticipant = updatedParticipants.length === 0;
+
+        if (isLastParticipant) {
+          console.log(`🏁 User ${userId} is the last participant leaving room ${roomId}`);
+          // 마지막 참가자에게 알림
+          socket.emit('last-participant-leaving', roomId);
+          // 방 삭제
+          roomParticipants.delete(roomId);
+        }
       }
 
       socket.to(roomId).emit('user-disconnected', userId);

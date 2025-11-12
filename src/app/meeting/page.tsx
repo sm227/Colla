@@ -26,6 +26,8 @@ interface Meeting {
   actionItems: string | null;
   participants: any;
   createdAt: string;
+  status: string; // "active" 또는 "completed"
+  creatorId: string | null; // 회의 생성자 ID
 }
 
 export default function MeetingPage() {
@@ -108,13 +110,19 @@ export default function MeetingPage() {
     }
   };
 
-  // 회의 상태 판단
-  const getMeetingStatus = (startTime: string, endTime: string | null) => {
+  // 회의 상태 판단 - DB의 status 필드 우선 사용
+  const getMeetingStatus = (meeting: Meeting) => {
+    // DB에 status가 completed로 저장되어 있으면 완료된 회의
+    if (meeting.status === 'completed') {
+      return "completed";
+    }
+
     const now = new Date().getTime();
-    const start = new Date(startTime).getTime();
-    
-    if (endTime) {
-      return "completed"; // 종료 시간이 있으면 완료된 회의
+    const start = new Date(meeting.startTime).getTime();
+
+    // DB에는 active인데 endTime이 있으면 완료된 회의 (하위 호환성)
+    if (meeting.endTime) {
+      return "completed";
     } else if (start > now) {
       return "upcoming"; // 시작 시간이 현재보다 미래면 예정된 회의
     } else {
@@ -126,14 +134,14 @@ export default function MeetingPage() {
   const filteredMeetings = meetings.filter(meeting => {
     // 검색어 필터링
     const meetingTitle = meeting.title || "";
-    const searchMatches = 
+    const searchMatches =
       meetingTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (meeting.mainPoints || "").toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     // 상태 필터링
-    const status = getMeetingStatus(meeting.startTime, meeting.endTime);
+    const status = getMeetingStatus(meeting);
     const statusMatches = filterStatus === "all" || status === filterStatus;
-    
+
     return searchMatches && statusMatches;
   });
 
@@ -199,7 +207,7 @@ export default function MeetingPage() {
         {/* 회의 목록 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredMeetings.map((meeting) => {
-            const status = getMeetingStatus(meeting.startTime, meeting.endTime);
+            const status = getMeetingStatus(meeting);
             const participantCount = getParticipantCount(meeting.participants);
             
             return (
@@ -251,17 +259,22 @@ export default function MeetingPage() {
                     참여하기
                   </button>
                 )}
-                
+
                 {status === "completed" && (
-                  <button
-                    onClick={() => viewMeetingDetails(meeting.id)}
-                    className="mt-4 w-full flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    회의록 보기
-                  </button>
+                  <>
+                    <button
+                      onClick={() => viewMeetingDetails(meeting.id)}
+                      className="mt-4 w-full flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      회의록 보기
+                    </button>
+                    <p className="mt-2 text-xs text-gray-500 text-center">
+                      종료된 회의는 참여할 수 없습니다
+                    </p>
+                  </>
                 )}
-                
+
                 {status === "inprogress" && (
                   <button
                     onClick={() => router.push(`/meeting/${meeting.id}`)}

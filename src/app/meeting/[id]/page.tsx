@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { io } from "socket.io-client";
 import Peer from "peerjs";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/app/contexts/AuthContext";
 import {
   Share2Icon,
   UsersIcon,
@@ -24,6 +25,7 @@ interface PeerStream {
   stream: MediaStream;
   isVideoEnabled: boolean;
   isAudioEnabled: boolean;
+  userName?: string;
 }
 
 interface ToggleEvent {
@@ -119,6 +121,7 @@ function ParticipantsPanel({
   isOpen,
   onClose,
   myPeerId,
+  myUserName,
   peerStreams,
   myStream,
   isMyAudioEnabled,
@@ -127,6 +130,7 @@ function ParticipantsPanel({
   isOpen: boolean;
   onClose: () => void;
   myPeerId: string;
+  myUserName: string;
   peerStreams: PeerStream[];
   myStream: MediaStream | null;
   isMyAudioEnabled: boolean;
@@ -163,7 +167,7 @@ function ParticipantsPanel({
                 <UserIcon className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-white font-medium">나 (호스트)</p>
+                <p className="text-white font-medium">{myUserName} (나)</p>
                 {myHasNoDevices && (
                   <p className="text-xs text-yellow-400">시청 전용</p>
                 )}
@@ -196,7 +200,7 @@ function ParticipantsPanel({
                     <UserIcon className="w-6 h-6 text-gray-300" />
                   </div>
                   <div>
-                    <p className="text-white font-medium">참가자 {peer.userId.slice(0, 6)}</p>
+                    <p className="text-white font-medium">{peer.userName || `참가자 ${peer.userId.slice(0, 6)}`}</p>
                     {hasNoDevices && (
                       <p className="text-xs text-yellow-400">시청 전용</p>
                     )}
@@ -340,6 +344,7 @@ function PreJoinModal({
 
 export default function MeetingRoom({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const { user, loading } = useAuth();
   const [myStream, setMyStream] = useState<MediaStream | null>(null);
   const [peerStreams, setPeerStreams] = useState<PeerStream[]>([]);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
@@ -358,6 +363,89 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
   const [showPreJoinModal, setShowPreJoinModal] = useState(true);
   const [hasJoinedMeeting, setHasJoinedMeeting] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [meetingId, setMeetingId] = useState<string | null>(null);
+  const meetingStartTimeRef = useRef<Date>(new Date());
+  const [isCreator, setIsCreator] = useState(false); // 방장 여부
+
+  // 사용자 이름 관리
+  const [myUserName, setMyUserName] = useState<string>("익명");
+
+  // 연결 정리 함수 (useCallback으로 메모이제이션)
+  const cleanupConnections = useCallback(async () => {
+    // 1. 서버에 방 나가기 알림 (내 ID 전송)
+    if (socketRef.current && socketRef.current.connected) {
+      console.log("📤 서버에 leave-room 이벤트 전송:", params.id, myPeerIdRef.current);
+      socketRef.current.emit('leave-room', params.id, myPeerIdRef.current);
+
+      // 소켓 이벤트가 전송될 시간을 줌
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    // 2. 미디어 스트림 종료
+    if (myStream) {
+      console.log("🎥 미디어 스트림 종료");
+      myStream.getTracks().forEach((track) => {
+        track.stop();
+        console.log("  - 트랙 종료:", track.kind);
+      });
+    }
+
+    // 3. 모든 Peer 연결 종료
+    console.log("🔗 Peer 연결 종료:", Object.keys(peersRef.current).length, "개");
+    Object.entries(peersRef.current).forEach(([userId, call]: [string, any]) => {
+      console.log("  - Peer 연결 종료:", userId);
+      if (call && call.close) {
+        call.close();
+      }
+    });
+
+    // 4. Socket 연결 해제
+    if (socketRef.current) {
+      console.log("🔌 Socket 연결 해제");
+      socketRef.current.disconnect();
+    }
+
+    // 5. Peer 인스턴스 제거
+    if (peerRef.current) {
+      console.log("🗑️ Peer 인스턴스 제거");
+      peerRef.current.destroy();
+    }
+
+    // 6. 상태 초기화
+    console.log("🧹 상태 초기화");
+    setMyStream(null);
+    setPeerStreams([]);
+    peersRef.current = {};
+  }, [myStream, params.id]);
+
+  // 사용자 정보 로드
+  useEffect(() => {
+    const loadUserInfo = async () => {
+      console.log("👤 AuthContext User:", user);
+      console.log("⏳ Loading:", loading);
+
+      if (user?.name) {
+        setMyUserName(user.name);
+        console.log("✅ 사용자 이름 설정:", user.name);
+      } else if (!loading && !user) {
+        // 로그인되지 않은 경우, API 직접 호출 시도
+        try {
+          const response = await fetch('/api/auth/me');
+          if (response.ok) {
+            const data = await response.json();
+            if (data.authenticated && data.user?.name) {
+              setMyUserName(data.user.name);
+              console.log("✅ API에서 사용자 이름 가져옴:", data.user.name);
+            }
+          }
+        } catch (error) {
+          console.log("⚠️ 사용자 정보 로드 실패, 익명으로 표시");
+        }
+      }
+    };
+
+    loadUserInfo();
+  }, [user, loading]);
 
   useEffect(() => {
     let localStream: MediaStream | null = null;
@@ -425,19 +513,70 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     };
   }, []);
 
+  // 회의 시작 시 DB에 기본 정보 저장 (또는 기존 회의 불러오기)
+  const createMeetingInDatabase = useCallback(async () => {
+    try {
+      const response = await fetch("/api/meetings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: params.id, // URL의 회의 ID 사용
+          title: `Meeting ${new Date().toLocaleString("ko-KR")}`,
+          startTime: meetingStartTimeRef.current.toISOString(),
+          creatorId: myPeerIdRef.current, // 회의 생성자 ID 저장
+          // 나머지 필드는 나중에 업데이트됨
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("회의 생성에 실패했습니다");
+      }
+
+      const data = await response.json();
+      setMeetingId(data.data.id);
+
+      if (data.isExisting) {
+        console.log("기존 회의를 불러왔습니다:", data.data.id);
+        // 기존 회의의 생성자인지 확인
+        setIsCreator(data.data.creatorId === myPeerIdRef.current);
+      } else {
+        console.log("새 회의가 DB에 저장되었습니다:", data.data.id);
+        // 새 회의를 만들었으므로 방장임
+        setIsCreator(true);
+      }
+    } catch (error) {
+      console.error("회의 생성 중 오류 발생:", error);
+    }
+  }, [params.id]);
+
   const initializePeer = useCallback(() => {
     // myStream이 없어도 계속 진행 (빈 스트림도 허용)
     if (!myStream && myStream !== null) return;
 
-    socketRef.current = io(
-      process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:4000",
-      {
-        transports: ["websocket", "polling"],
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-      }
-    );
+    const socketUrl = process.env.NEXT_PUBLIC_MEET_SOCKET_URL || "http://localhost:4000";
+    console.log("🔌 Socket.io 서버 연결 시도:", socketUrl);
+
+    socketRef.current = io(socketUrl, {
+      transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+
+    // Socket.io 연결 상태 로그
+    socketRef.current.on("connect", () => {
+      console.log("✅ Socket.io 연결 성공! Socket ID:", socketRef.current.id);
+    });
+
+    socketRef.current.on("connect_error", (error: any) => {
+      console.error("❌ Socket.io 연결 실패:", error);
+    });
+
+    socketRef.current.on("disconnect", (reason: string) => {
+      console.log("🔌 Socket.io 연결 해제:", reason);
+    });
 
     const peer = new Peer({
       config: {
@@ -450,11 +589,19 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
 
     peerRef.current = peer;
 
-    peer.on("open", (id) => {
+    peer.on("open", async (id) => {
       myPeerIdRef.current = id;
+      console.log("🆔 내 Peer ID:", id);
+      console.log("👤 사용자 이름:", myUserName);
+
+      // Peer ID가 생성된 후 회의를 DB에 저장
+      await createMeetingInDatabase();
+
+      console.log("🚪 회의방 참여 요청:", params.id);
       socketRef.current.emit("join-room", params.id, id, {
         isVideoEnabled,
         isAudioEnabled,
+        userName: myUserName,
       });
     });
 
@@ -477,12 +624,15 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     // Socket 이벤트 리스너
     // 기존 참가자 목록 수신 (방 입장 시)
     socketRef.current.on("existing-participants", (participants: Array<{ userId: string; userState: any }>) => {
+      console.log("📋 기존 참가자 목록 수신:", participants.length, "명", participants);
       participants.forEach(({ userId, userState }) => {
+        console.log("🔗 기존 참가자와 연결 시도:", userId);
         connectToNewUser(userId, myStream, userState);
       });
     });
 
     socketRef.current.on("user-connected", (userId: string, userState: any) => {
+      console.log("👤 새 참가자 입장:", userId);
       connectToNewUser(userId, myStream, userState);
     });
 
@@ -525,11 +675,67 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     socketRef.current.on("receive-message", (message: Message) => {
       setMessages((prev) => [...prev, message]);
     });
-  }, [myStream, params.id, isVideoEnabled, isAudioEnabled]);
 
-  const handleJoinMeeting = () => {
+    // 방장이 회의를 종료한 경우
+    socketRef.current.on("meeting-ended-by-host", async (roomId: string) => {
+      console.log("👑 방장이 회의를 종료했습니다.");
+      alert("방장이 회의를 종료했습니다.");
+
+      // 연결 정리
+      await cleanupConnections();
+
+      // 회의 목록 페이지로 이동
+      router.push('/meeting');
+    });
+
+    // 마지막 참가자 이벤트 수신 (더 이상 사용하지 않지만 하위 호환성 유지)
+    socketRef.current.on("last-participant-leaving", async (roomId: string) => {
+      console.log("🏁 마지막 참가자입니다. 회의를 종료하고 요약합니다.");
+
+      // 메시지가 있으면 요약 및 DB 업데이트
+      if (messages.length > 0) {
+        setIsSummarizing(true);
+        try {
+          // 마지막 참가자이므로 isLastParticipant = true 전달
+          const summary = await summarizeMessages(messages, true);
+          setSummary(summary);
+          setShowSummary(true);
+        } catch (error) {
+          console.error("Failed to summarize meeting:", error);
+          alert("회의 요약 중 오류가 발생했습니다.");
+        } finally {
+          setIsSummarizing(false);
+        }
+      } else {
+        // 메시지가 없어도 마지막 참가자이면 회의를 완료 처리
+        console.log("📝 메시지가 없지만 마지막 참가자이므로 회의를 완료 처리합니다.");
+        try {
+          await updateMeetingInDatabase("", {
+            mainPoints: "",
+            decisions: "",
+            actionItems: ""
+          }, true);
+        } catch (error) {
+          console.error("Failed to update meeting:", error);
+        }
+      }
+    });
+  }, [myStream, params.id, isVideoEnabled, isAudioEnabled, messages, router, cleanupConnections, createMeetingInDatabase]);
+
+  const handleJoinMeeting = async () => {
+    // 회의 상태 확인
+    const canJoin = await checkMeetingStatus();
+
+    if (!canJoin) {
+      alert('이미 종료된 회의입니다. 참여할 수 없습니다.');
+      router.push('/meeting');
+      return;
+    }
+
     setShowPreJoinModal(false);
     setHasJoinedMeeting(true);
+
+    // initializePeer에서 Peer ID가 생성된 후 회의를 DB에 저장함
     initializePeer();
   };
 
@@ -542,25 +748,41 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     stream: MediaStream,
     userState: any
   ) => {
+    // 자기 자신은 무시
+    if (userId === myPeerIdRef.current) {
+      console.log("⚠️ 자기 자신은 연결하지 않음:", userId);
+      return;
+    }
+
     // 이미 연결된 피어는 무시
-    if (peersRef.current[userId]) return;
+    if (peersRef.current[userId]) {
+      console.log("⚠️ 이미 연결된 사용자:", userId);
+      return;
+    }
+
+    console.log("📞 사용자에게 전화 걸기:", userId, "상태:", userState);
 
     try {
       const call = peerRef.current?.call(userId, stream);
       if (call) {
+        console.log("✅ 통화 연결 성공:", userId);
         call.on("stream", (userVideoStream) => {
+          console.log("🎥 스트림 수신:", userId);
           addPeerStream(userId, userVideoStream, userState);
         });
 
         call.on("close", () => {
+          console.log("📴 통화 종료:", userId);
           setPeerStreams((prev) => prev.filter((p) => p.userId !== userId));
           delete peersRef.current[userId];
         });
 
         peersRef.current[userId] = call;
+      } else {
+        console.error("❌ 통화 연결 실패 - call이 null:", userId);
       }
     } catch (error) {
-      console.error(`Error connecting to user ${userId}:`, error);
+      console.error(`❌ 사용자 연결 중 오류 ${userId}:`, error);
     }
   };
 
@@ -569,6 +791,7 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     stream: MediaStream,
     userState?: any
   ) => {
+    console.log("📝 스트림 추가:", userId, "사용자 상태:", userState);
     setPeerStreams((prev) => {
       const filteredStreams = prev.filter((p) => p.userId !== userId);
       return [
@@ -578,6 +801,7 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
           stream,
           isVideoEnabled: userState?.isVideoEnabled ?? true,
           isAudioEnabled: userState?.isAudioEnabled ?? true,
+          userName: userState?.userName || "익명",
         },
       ];
     });
@@ -671,56 +895,94 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     }
   };
 
-  const saveMeetingToDatabase = async (
+  // 회의 상태 확인 (완료된 회의는 참여 불가)
+  const checkMeetingStatus = async () => {
+    try {
+      const response = await fetch(`/api/meetings/${params.id}`);
+
+      if (!response.ok) {
+        // 회의가 없으면 새로 만들 수 있으므로 true 반환
+        return true;
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        // 회의가 이미 완료되었으면 false 반환
+        if (data.data.status === 'completed') {
+          console.log("⛔ 회의가 이미 종료되었습니다.");
+          return false;
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error("회의 상태 확인 중 오류:", error);
+      // 오류 발생 시 일단 참여 허용
+      return true;
+    }
+  };
+
+  // 회의 종료 시 요약 및 전체 대화 내용 업데이트
+  const updateMeetingInDatabase = async (
     messageText: string,
     summaryResult: {
       mainPoints: string;
       decisions: string;
       actionItems: string;
-    }
+    },
+    isLastParticipant: boolean = false
   ) => {
+    if (!meetingId) {
+      console.error("회의 ID가 없습니다");
+      return;
+    }
+
     try {
       // 현재 참가자 정보 구성
       const currentParticipants = [
         {
           userId: myPeerIdRef.current,
-          joinTime: new Date().toISOString(),
+          userName: myUserName,
+          joinTime: meetingStartTimeRef.current.toISOString(),
           leaveTime: new Date().toISOString(),
         },
         ...peerStreams.map((peer) => ({
           userId: peer.userId,
-          joinTime: new Date().toISOString(), // 실제로는 참가 시간을 추적해야 합니다
+          userName: peer.userName,
+          joinTime: meetingStartTimeRef.current.toISOString(),
           leaveTime: new Date().toISOString(),
         })),
       ];
 
-      // API 요청 보내기
-      const response = await fetch("/api/meetings", {
-        method: "POST",
+      // API 요청 보내기 (PUT으로 업데이트)
+      const response = await fetch(`/api/meetings/${meetingId}`, {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          title: `Meeting ${new Date().toLocaleString("ko-KR")}`,
-          startTime: new Date().toISOString(),
           endTime: new Date().toISOString(),
           transcript: messageText,
           mainPoints: summaryResult.mainPoints,
           decisions: summaryResult.decisions,
           actionItems: summaryResult.actionItems,
           participants: currentParticipants,
+          isLastParticipant: isLastParticipant, // 마지막 참가자 여부 전달
         }),
       });
 
       if (!response.ok) {
-        throw new Error("회의 저장에 실패했습니다");
+        throw new Error("회의 업데이트에 실패했습니다");
       }
+
+      console.log("회의가 성공적으로 업데이트되었습니다", isLastParticipant ? "(완료됨)" : "");
     } catch (error) {
-      console.error("회의 저장 중 오류 발생:", error);
+      console.error("회의 업데이트 중 오류 발생:", error);
     }
   };
 
-  const summarizeMessages = async (messages: Message[]) => {
+  const summarizeMessages = async (messages: Message[], isLastParticipant: boolean = false) => {
     try {
       const genAI = new GoogleGenerativeAI(
         process.env.NEXT_PUBLIC_GEMINI_API_KEY || ""
@@ -770,8 +1032,8 @@ ${messageText}`;
         actionItems: actionItemsMatch ? actionItemsMatch[1].trim() : "",
       };
 
-      // 데이터베이스에 저장
-      await saveMeetingToDatabase(messageText, summaryResult);
+      // 데이터베이스에 업데이트 (회의 종료 시, 마지막 참가자 여부 전달)
+      await updateMeetingInDatabase(messageText, summaryResult, isLastParticipant);
 
       return summaryText;
     } catch (error) {
@@ -781,37 +1043,66 @@ ${messageText}`;
   };
 
   const handleEndCall = async () => {
-    if (messages.length > 0) {
-      setIsSummarizing(true);
-      try {
-        const summary = await summarizeMessages(messages);
-        setSummary(summary);
-        setShowSummary(true);
-      } catch (error) {
-        console.error("Failed to summarize meeting:", error);
-        alert("회의 요약 중 오류가 발생했습니다.");
-      } finally {
-        setIsSummarizing(false);
+    console.log("🔴 통화 종료 시작 - 내 Peer ID:", myPeerIdRef.current);
+    console.log("👑 방장 여부:", isCreator);
+
+    try {
+      // 방장이 종료 버튼을 누르면 회의 요약 실행
+      if (isCreator) {
+        console.log("👑 방장이 회의를 종료합니다. AI 요약을 실행합니다.");
+
+        // 1. 다른 참가자들에게 회의 종료 알림 (방장이 종료)
+        if (socketRef.current && socketRef.current.connected) {
+          socketRef.current.emit('host-ended-meeting', params.id);
+        }
+
+        // 2. 메시지가 있으면 AI 요약 실행
+        if (messages.length > 0) {
+          setIsSummarizing(true);
+          try {
+            // 방장이 종료하므로 isLastParticipant = true (회의 완료 처리)
+            const summary = await summarizeMessages(messages, true);
+            setSummary(summary);
+            setShowSummary(true);
+
+            // 요약 완료 후 연결 종료
+            await cleanupConnections();
+
+            // 요약 모달이 표시되므로 여기서는 페이지 이동 안 함 (모달 닫을 때 이동)
+            return;
+          } catch (error) {
+            console.error("Failed to summarize meeting:", error);
+            alert("회의 요약 중 오류가 발생했습니다.");
+          } finally {
+            setIsSummarizing(false);
+          }
+        } else {
+          // 메시지가 없어도 방장이 종료하면 회의를 완료 처리
+          console.log("📝 메시지가 없지만 방장이 종료하므로 회의를 완료 처리합니다.");
+          try {
+            await updateMeetingInDatabase("", {
+              mainPoints: "",
+              decisions: "",
+              actionItems: ""
+            }, true);
+          } catch (error) {
+            console.error("Failed to update meeting:", error);
+          }
+        }
       }
+
+      // 일반 참가자 또는 방장(메시지 없음)의 경우 바로 연결 종료
+      await cleanupConnections();
+
+      // 회의 목록 페이지로 이동
+      console.log("🔀 /meeting 페이지로 이동");
+      router.push('/meeting');
+
+    } catch (error) {
+      console.error("❌ 통화 종료 중 오류 발생:", error);
+      // 오류가 발생해도 페이지 이동은 시도
+      router.push('/meeting');
     }
-
-    myStream?.getTracks().forEach((track) => track.stop());
-
-    Object.values(peersRef.current).forEach((call: any) => {
-      if (call.close) call.close();
-    });
-
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-    }
-
-    if (peerRef.current) {
-      peerRef.current.destroy();
-    }
-
-    setMyStream(null);
-    setPeerStreams([]);
-    peersRef.current = {};
   };
 
   const handleCopyInviteLink = async () => {
@@ -876,7 +1167,7 @@ ${messageText}`;
             )}
             <div className="absolute bottom-4 left-4 flex items-center gap-2">
               <div className="text-sm text-white bg-black/50 px-3 py-1.5 rounded-lg">
-                나
+                {myUserName} (나)
               </div>
               {!isAudioEnabled && (
                 <div className="bg-red-500/80 p-1.5 rounded-lg" title="마이크 꺼짐">
@@ -923,7 +1214,7 @@ ${messageText}`;
                 )}
                 <div className="absolute bottom-4 left-4 flex items-center gap-2">
                   <div className="text-sm text-white bg-black/50 px-3 py-1.5 rounded-lg">
-                    참가자 {peerStream.userId.slice(0, 4)}
+                    {peerStream.userName || `참가자 ${peerStream.userId.slice(0, 4)}`}
                   </div>
                   {!peerStream.isAudioEnabled && (
                     <div className="bg-red-500/80 p-1.5 rounded-lg" title="마이크 꺼짐">
@@ -1033,6 +1324,7 @@ ${messageText}`;
         isOpen={showParticipants}
         onClose={() => setShowParticipants(false)}
         myPeerId={myPeerIdRef.current}
+        myUserName={myUserName}
         peerStreams={peerStreams}
         myStream={myStream}
         isMyAudioEnabled={isAudioEnabled}
@@ -1064,7 +1356,7 @@ ${messageText}`;
         isOpen={showSummary}
         onClose={() => {
           setShowSummary(false);
-          router.push("/");
+          router.push("/meeting");
         }}
         summary={summary}
       />
