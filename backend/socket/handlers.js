@@ -6,6 +6,8 @@
 let onlineUsers = [];
 // 각 방의 참가자 정보를 저장 { roomId: [{ userId, userState }] }
 const roomParticipants = new Map();
+// 각 방의 메시지 히스토리를 저장 { roomId: [messages] }
+const roomMessages = new Map();
 
 /**
  * Socket.IO 이벤트 핸들러 초기화
@@ -38,6 +40,11 @@ function initializeSocketHandlers(io) {
         roomParticipants.set(roomId, []);
       }
 
+      // 방에 메시지 히스토리 초기화
+      if (!roomMessages.has(roomId)) {
+        roomMessages.set(roomId, []);
+      }
+
       const participants = roomParticipants.get(roomId);
       // 중복 체크 후 추가
       if (!participants.some(p => p.userId === userId)) {
@@ -53,6 +60,11 @@ function initializeSocketHandlers(io) {
 
       socket.emit('existing-participants', existingParticipants);
       console.log(`📤 Sending ${existingParticipants.length} existing participants to ${userId}`);
+
+      // 기존 메시지 히스토리를 새로 들어온 사용자에게 전송
+      const messages = roomMessages.get(roomId);
+      socket.emit('message-history', messages);
+      console.log(`📜 Sending ${messages.length} messages to ${userId}`);
 
       // 방의 다른 사용자들에게 새 참가자 알림
       socket.to(roomId).emit('user-connected', userId, userState);
@@ -88,6 +100,21 @@ function initializeSocketHandlers(io) {
       io.to(roomId).emit('chat-message', message);
     });
 
+    // 음성 인식 메시지 (STT)
+    socket.on('new-message', (data) => {
+      const { roomId, message } = data;
+      console.log(`🗣️ STT message in room ${roomId} from ${message.userId}: ${message.content.substring(0, 50)}...`);
+
+      // 방의 메시지 히스토리에 저장
+      if (roomMessages.has(roomId)) {
+        roomMessages.get(roomId).push(message);
+        console.log(`📝 Message saved to room ${roomId} history. Total messages: ${roomMessages.get(roomId).length}`);
+      }
+
+      // 방의 다른 모든 참가자에게 메시지 브로드캐스트
+      socket.to(roomId).emit('receive-message', message);
+    });
+
     // 화면 공유
     socket.on('screen-share-started', (data) => {
       const { roomId, userId } = data;
@@ -99,6 +126,13 @@ function initializeSocketHandlers(io) {
       const { roomId, userId } = data;
       console.log(`🖥️ User ${userId} stopped screen sharing in room ${roomId}`);
       socket.to(roomId).emit('user-screen-share-stopped', userId);
+    });
+
+    // 음성 활동 감지
+    socket.on('voice-activity', (data) => {
+      const { roomId, userId, isSpeaking } = data;
+      // 방의 다른 모든 참가자에게 음성 활동 상태 브로드캐스트
+      socket.to(roomId).emit('user-voice-activity', { userId, isSpeaking });
     });
 
     // 1:1 통화 (기존 call 이벤트)
@@ -150,6 +184,12 @@ function initializeSocketHandlers(io) {
         console.log(`🗑️ Clearing room ${roomId} participants`);
         roomParticipants.delete(roomId);
       }
+
+      // 방 메시지 히스토리 삭제
+      if (roomMessages.has(roomId)) {
+        console.log(`🗑️ Clearing room ${roomId} message history (${roomMessages.get(roomId).length} messages)`);
+        roomMessages.delete(roomId);
+      }
     });
 
     // 방 나가기
@@ -174,6 +214,10 @@ function initializeSocketHandlers(io) {
           socket.emit('last-participant-leaving', roomId);
           // 방 삭제
           roomParticipants.delete(roomId);
+          // 방 메시지 히스토리 삭제
+          if (roomMessages.has(roomId)) {
+            roomMessages.delete(roomId);
+          }
         }
       }
 

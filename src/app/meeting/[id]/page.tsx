@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { io } from "socket.io-client";
 import Peer from "peerjs";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/app/contexts/AuthContext";
 import {
   Share2Icon,
@@ -15,6 +15,8 @@ import {
   PhoneOff as PhoneOffIcon,
   MessageSquare as MessageIcon,
   X as XIcon,
+  Monitor as MonitorIcon,
+  MonitorOff as MonitorOffIcon,
 } from "lucide-react";
 import SpeechToText from "./SpeechToText";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -344,6 +346,7 @@ function PreJoinModal({
 
 export default function MeetingRoom({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading } = useAuth();
   const [myStream, setMyStream] = useState<MediaStream | null>(null);
   const [peerStreams, setPeerStreams] = useState<PeerStream[]>([]);
@@ -367,8 +370,32 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
   const meetingStartTimeRef = useRef<Date>(new Date());
   const [isCreator, setIsCreator] = useState(false); // 방장 여부
 
+  // 화면 공유 관련 상태
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const [sharingUserId, setSharingUserId] = useState<string | null>(null); // 현재 화면을 공유 중인 사용자 ID
+  const screenVideoRef = useRef<HTMLVideoElement>(null);
+
+  // 화면 공유 창 크기 및 위치 상태
+  const [screenShareSize, setScreenShareSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth - 32 : 1200,
+    height: typeof window !== 'undefined' ? window.innerHeight - 160 : 700,
+    x: 16,
+    y: 16,
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeDirection, setResizeDirection] = useState<string>("");
+  const resizeStartPos = useRef({ x: 0, y: 0, width: 0, height: 0, startX: 0, startY: 0 });
+
   // 사용자 이름 관리
   const [myUserName, setMyUserName] = useState<string>("익명");
+
+  // 음성 활동 감지 상태
+  const [isSpeaking, setIsSpeaking] = useState(false); // 내가 말하고 있는지
+  const [speakingUsers, setSpeakingUsers] = useState<Set<string>>(new Set()); // 말하고 있는 다른 사용자들
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   // 연결 정리 함수 (useCallback으로 메모이제이션)
   const cleanupConnections = useCallback(async () => {
@@ -387,6 +414,15 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
       myStream.getTracks().forEach((track) => {
         track.stop();
         console.log("  - 트랙 종료:", track.kind);
+      });
+    }
+
+    // 2-1. 화면 공유 스트림 종료
+    if (screenStream) {
+      console.log("🖥️ 화면 공유 스트림 종료");
+      screenStream.getTracks().forEach((track) => {
+        track.stop();
+        console.log("  - 화면 공유 트랙 종료:", track.kind);
       });
     }
 
@@ -415,8 +451,98 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
     console.log("🧹 상태 초기화");
     setMyStream(null);
     setPeerStreams([]);
+    setScreenStream(null);
+    setIsScreenSharing(false);
+    setSharingUserId(null);
     peersRef.current = {};
-  }, [myStream, params.id]);
+  }, [myStream, screenStream, params.id]);
+
+  // 음성 활동 감지 함수
+  const detectVoiceActivity = useCallback((stream: MediaStream) => {
+    try {
+      // 기존 분석 중지
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+
+      // AudioContext 생성
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+
+      const audioContext = audioContextRef.current;
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.8;
+
+      const source = audioContext.createMediaStreamSource(stream);
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      const checkAudioLevel = () => {
+        if (!analyserRef.current) return;
+
+        analyserRef.current.getByteFrequencyData(dataArray);
+
+        // 평균 음량 계산
+        const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+
+        // 임계값 설정 (20 이상이면 말하고 있다고 판단)
+        const threshold = 20;
+        const speaking = average > threshold;
+
+        setIsSpeaking(speaking);
+
+        // 말하는 상태가 변경되면 Socket으로 알림
+        if (speaking !== isSpeaking) {
+          socketRef.current?.emit('voice-activity', {
+            roomId: params.id,
+            userId: myPeerIdRef.current,
+            isSpeaking: speaking
+          });
+        }
+
+        animationFrameRef.current = requestAnimationFrame(checkAudioLevel);
+      };
+
+      checkAudioLevel();
+    } catch (error) {
+      console.error("음성 활동 감지 오류:", error);
+    }
+  }, [params.id, isSpeaking]);
+
+  // 음성 활동 감지 정리
+  const cleanupVoiceDetection = useCallback(() => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+  }, []);
+
+  // 스트림이 변경될 때 음성 활동 감지 시작
+  useEffect(() => {
+    if (myStream && isAudioEnabled) {
+      detectVoiceActivity(myStream);
+    } else {
+      setIsSpeaking(false);
+      socketRef.current?.emit('voice-activity', {
+        roomId: params.id,
+        userId: myPeerIdRef.current,
+        isSpeaking: false
+      });
+    }
+
+    return () => {
+      cleanupVoiceDetection();
+    };
+  }, [myStream, isAudioEnabled, detectVoiceActivity, cleanupVoiceDetection, params.id]);
 
   // 사용자 정보 로드
   useEffect(() => {
@@ -607,18 +733,57 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
 
     // 다른 참가자의 호출 처리
     peer.on("call", (call) => {
-      call.answer(myStream);
+      const metadata = call.metadata;
+      const isScreenShareCall = metadata?.type === 'screen-share';
+
+      console.log(`📞 Call 수신 from ${call.peer}, metadata:`, metadata);
+
+      // 화면 공유 call이면 빈 스트림으로 응답, 일반 call이면 내 비디오로 응답
+      if (isScreenShareCall) {
+        console.log("🖥️ 화면 공유 call로 인식");
+        const emptyStream = new MediaStream();
+        call.answer(emptyStream);
+      } else {
+        call.answer(myStream || undefined);
+      }
 
       call.on("stream", (userVideoStream) => {
         const userId = call.peer;
-        addPeerStream(userId, userVideoStream);
+
+        // 메타데이터로 화면 공유 확인 (더 정확함)
+        if (isScreenShareCall) {
+          console.log("🖥️ 화면 공유 스트림 수신:", userId);
+          setScreenStream(userVideoStream);
+          setSharingUserId(userId);
+
+          // 화면 공유 비디오 엘리먼트에 설정
+          if (screenVideoRef.current) {
+            screenVideoRef.current.srcObject = userVideoStream;
+            console.log("✅ 화면 공유 비디오 엘리먼트에 설정 완료");
+          }
+        } else {
+          // 일반 비디오 스트림
+          console.log("📹 일반 비디오 스트림 수신:", userId);
+          addPeerStream(userId, userVideoStream);
+        }
       });
 
       call.on("close", () => {
-        setPeerStreams((prev) => prev.filter((p) => p.userId !== call.peer));
+        console.log("📴 Call 종료:", call.peer);
+        if (isScreenShareCall) {
+          setScreenStream(null);
+          if (sharingUserId === call.peer) {
+            setSharingUserId(null);
+          }
+        } else {
+          setPeerStreams((prev) => prev.filter((p) => p.userId !== call.peer));
+        }
       });
 
-      peersRef.current[call.peer] = call;
+      // 화면 공유 call은 별도로 저장하지 않음 (peersRef는 비디오 call만)
+      if (!isScreenShareCall) {
+        peersRef.current[call.peer] = call;
+      }
     });
 
     // Socket 이벤트 리스너
@@ -720,7 +885,35 @@ export default function MeetingRoom({ params }: { params: { id: string } }) {
         }
       }
     });
-  }, [myStream, params.id, isVideoEnabled, isAudioEnabled, messages, router, cleanupConnections, createMeetingInDatabase]);
+
+    // 화면 공유 시작 이벤트 수신
+    socketRef.current.on("user-screen-share-started", (userId: string) => {
+      console.log(`🖥️ ${userId}가 화면 공유를 시작했습니다`);
+      setSharingUserId(userId);
+    });
+
+    // 화면 공유 종료 이벤트 수신
+    socketRef.current.on("user-screen-share-stopped", (userId: string) => {
+      console.log(`🛑 ${userId}가 화면 공유를 종료했습니다`);
+      if (sharingUserId === userId) {
+        setSharingUserId(null);
+        setScreenStream(null);
+      }
+    });
+
+    // 음성 활동 이벤트 수신
+    socketRef.current.on("user-voice-activity", ({ userId, isSpeaking }: { userId: string; isSpeaking: boolean }) => {
+      setSpeakingUsers((prev) => {
+        const newSet = new Set(prev);
+        if (isSpeaking) {
+          newSet.add(userId);
+        } else {
+          newSet.delete(userId);
+        }
+        return newSet;
+      });
+    });
+  }, [myStream, params.id, isVideoEnabled, isAudioEnabled, messages, router, cleanupConnections, createMeetingInDatabase, sharingUserId]);
 
   const handleJoinMeeting = async () => {
     // 회의 상태 확인
@@ -1094,14 +1287,14 @@ ${messageText}`;
       // 일반 참가자 또는 방장(메시지 없음)의 경우 바로 연결 종료
       await cleanupConnections();
 
-      // 회의 목록 페이지로 이동
+      // 회의 목록 페이지로 이동 (캐시를 우회하여 강제 새로고침)
       console.log("🔀 /meeting 페이지로 이동");
-      router.push('/meeting');
+      router.push('/meeting?refresh=' + Date.now());
 
     } catch (error) {
       console.error("❌ 통화 종료 중 오류 발생:", error);
       // 오류가 발생해도 페이지 이동은 시도
-      router.push('/meeting');
+      router.push('/meeting?refresh=' + Date.now());
     }
   };
 
@@ -1111,6 +1304,157 @@ ${messageText}`;
       setShowToast(true);
     } catch (err) {
       console.error("Failed to copy:", err);
+    }
+  };
+
+  // 화면 공유 시작
+  const handleStartScreenShare = async () => {
+    try {
+      console.log("🖥️ 화면 공유 시작 시도");
+
+      // Screen Capture API 사용
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: false // 시스템 오디오는 선택적
+      } as DisplayMediaStreamOptions);
+
+      console.log("✅ 화면 공유 스트림 획득:", stream.id);
+      setScreenStream(stream);
+      setIsScreenSharing(true);
+      setSharingUserId(myPeerIdRef.current);
+
+      // 화면 공유 스트림을 로컬 비디오에 표시
+      if (screenVideoRef.current) {
+        screenVideoRef.current.srcObject = stream;
+      }
+
+      // 다른 참가자들에게 화면 공유 시작 알림
+      if (socketRef.current) {
+        socketRef.current.emit("screen-share-started", {
+          roomId: params.id,
+          userId: myPeerIdRef.current,
+        });
+      }
+
+      // 모든 피어에게 화면 공유 스트림 전송
+      Object.keys(peersRef.current).forEach((peerId) => {
+        console.log(`📤 화면 공유 스트림을 ${peerId}에게 전송 시도`);
+        const call = peerRef.current?.call(peerId, stream, {
+          metadata: { type: 'screen-share' }
+        });
+        if (call) {
+          console.log(`✅ 화면 공유 call 생성 완료: ${peerId}`);
+
+          call.on("stream", (remoteStream) => {
+            console.log(`📥 화면 공유 응답 스트림 수신: ${peerId}`);
+          });
+
+          call.on("error", (err) => {
+            console.error(`❌ 화면 공유 call 오류 (${peerId}):`, err);
+          });
+        }
+      });
+
+      // 화면 공유가 사용자에 의해 중단되었을 때 처리
+      stream.getVideoTracks()[0].onended = () => {
+        console.log("🛑 사용자가 화면 공유를 중단했습니다");
+        handleStopScreenShare();
+      };
+
+    } catch (error) {
+      console.error("❌ 화면 공유 시작 실패:", error);
+      alert("화면 공유를 시작할 수 없습니다. 권한을 확인해주세요.");
+    }
+  };
+
+  // 화면 공유 창 리사이즈 시작
+  const handleResizeStart = (e: React.MouseEvent, direction: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    setResizeDirection(direction);
+    resizeStartPos.current = {
+      x: screenShareSize.x,
+      y: screenShareSize.y,
+      width: screenShareSize.width,
+      height: screenShareSize.height,
+      startX: e.clientX,
+      startY: e.clientY,
+    };
+  };
+
+  // 화면 공유 창 리사이즈 중
+  const handleResizeMove = (e: MouseEvent) => {
+    if (!isResizing) return;
+
+    const deltaX = e.clientX - resizeStartPos.current.startX;
+    const deltaY = e.clientY - resizeStartPos.current.startY;
+
+    let newSize = { ...screenShareSize };
+
+    if (resizeDirection.includes("right")) {
+      newSize.width = Math.max(400, resizeStartPos.current.width + deltaX);
+    }
+    if (resizeDirection.includes("left")) {
+      const newWidth = Math.max(400, resizeStartPos.current.width - deltaX);
+      if (newWidth !== newSize.width) {
+        newSize.x = resizeStartPos.current.x + (resizeStartPos.current.width - newWidth);
+        newSize.width = newWidth;
+      }
+    }
+    if (resizeDirection.includes("bottom")) {
+      newSize.height = Math.max(300, resizeStartPos.current.height + deltaY);
+    }
+    if (resizeDirection.includes("top")) {
+      const newHeight = Math.max(300, resizeStartPos.current.height - deltaY);
+      if (newHeight !== newSize.height) {
+        newSize.y = resizeStartPos.current.y + (resizeStartPos.current.height - newHeight);
+        newSize.height = newHeight;
+      }
+    }
+
+    setScreenShareSize(newSize);
+  };
+
+  // 화면 공유 창 리사이즈 종료
+  const handleResizeEnd = () => {
+    setIsResizing(false);
+    setResizeDirection("");
+  };
+
+  // 리사이즈 이벤트 리스너 등록
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener("mousemove", handleResizeMove);
+      window.addEventListener("mouseup", handleResizeEnd);
+      return () => {
+        window.removeEventListener("mousemove", handleResizeMove);
+        window.removeEventListener("mouseup", handleResizeEnd);
+      };
+    }
+  }, [isResizing, resizeDirection]);
+
+  // 화면 공유 종료
+  const handleStopScreenShare = () => {
+    console.log("🛑 화면 공유 종료");
+
+    if (screenStream) {
+      screenStream.getTracks().forEach((track) => {
+        track.stop();
+        console.log("  - 화면 공유 트랙 종료:", track.kind);
+      });
+    }
+
+    setScreenStream(null);
+    setIsScreenSharing(false);
+    setSharingUserId(null);
+
+    // 다른 참가자들에게 화면 공유 종료 알림
+    if (socketRef.current) {
+      socketRef.current.emit("screen-share-stopped", {
+        roomId: params.id,
+        userId: myPeerIdRef.current,
+      });
     }
   };
 
@@ -1141,11 +1485,93 @@ ${messageText}`;
         joinMeeting={handleJoinMeeting}
       />
 
+      {/* 화면 공유 표시 영역 */}
+      {(sharingUserId || isScreenSharing) && (
+        <div
+          className="fixed z-20 bg-black/95 rounded-xl overflow-hidden shadow-2xl border-2 border-blue-500"
+          style={{
+            left: `${screenShareSize.x}px`,
+            top: `${screenShareSize.y}px`,
+            width: `${screenShareSize.width}px`,
+            height: `${screenShareSize.height}px`,
+          }}
+        >
+          <video
+            ref={screenVideoRef}
+            autoPlay
+            playsInline
+            className="w-full h-full object-contain"
+          />
+
+          {/* 리사이즈 핸들들 */}
+          {/* 상단 */}
+          <div
+            className="absolute top-0 left-0 right-0 h-2 cursor-n-resize hover:bg-blue-500/30 transition-colors"
+            onMouseDown={(e) => handleResizeStart(e, "top")}
+          />
+          {/* 하단 */}
+          <div
+            className="absolute bottom-0 left-0 right-0 h-2 cursor-s-resize hover:bg-blue-500/30 transition-colors"
+            onMouseDown={(e) => handleResizeStart(e, "bottom")}
+          />
+          {/* 좌측 */}
+          <div
+            className="absolute top-0 left-0 bottom-0 w-2 cursor-w-resize hover:bg-blue-500/30 transition-colors"
+            onMouseDown={(e) => handleResizeStart(e, "left")}
+          />
+          {/* 우측 */}
+          <div
+            className="absolute top-0 right-0 bottom-0 w-2 cursor-e-resize hover:bg-blue-500/30 transition-colors"
+            onMouseDown={(e) => handleResizeStart(e, "right")}
+          />
+          {/* 좌상단 코너 */}
+          <div
+            className="absolute top-0 left-0 w-4 h-4 cursor-nw-resize hover:bg-blue-500/50 transition-colors"
+            onMouseDown={(e) => handleResizeStart(e, "topleft")}
+          />
+          {/* 우상단 코너 */}
+          <div
+            className="absolute top-0 right-0 w-4 h-4 cursor-ne-resize hover:bg-blue-500/50 transition-colors"
+            onMouseDown={(e) => handleResizeStart(e, "topright")}
+          />
+          {/* 좌하단 코너 */}
+          <div
+            className="absolute bottom-0 left-0 w-4 h-4 cursor-sw-resize hover:bg-blue-500/50 transition-colors"
+            onMouseDown={(e) => handleResizeStart(e, "bottomleft")}
+          />
+          {/* 우하단 코너 */}
+          <div
+            className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize hover:bg-blue-500/50 transition-colors"
+            onMouseDown={(e) => handleResizeStart(e, "bottomright")}
+          />
+
+          <div className="absolute top-4 left-4 bg-blue-500/90 px-4 py-2 rounded-lg flex items-center gap-2 pointer-events-none">
+            <MonitorIcon className="w-5 h-5 text-white" />
+            <span className="text-white font-medium">
+              {isScreenSharing ? "내가 화면을 공유 중입니다" : `${sharingUserId}님이 화면을 공유 중입니다`}
+            </span>
+          </div>
+          {isScreenSharing && (
+            <button
+              onClick={handleStopScreenShare}
+              className="absolute top-4 right-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors z-10"
+            >
+              <MonitorOffIcon className="w-5 h-5" />
+              <span>공유 중지</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* 메인 비디오 그리드 */}
       <div className="h-screen p-4 flex flex-col">
-        <div className="flex-grow grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-fr">
+        <div className={`flex-grow grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-fr ${
+          (sharingUserId || isScreenSharing) ? "opacity-30" : ""
+        }`}>
           {/* 내 비디오 */}
-          <div className="relative aspect-video bg-gray-800 rounded-xl overflow-hidden shadow-lg">
+          <div className={`relative aspect-video bg-gray-800 rounded-xl overflow-hidden shadow-lg transition-all duration-300 ${
+            isSpeaking ? "ring-4 ring-cyan-400 shadow-cyan-400/50" : ""
+          }`}>
             <video
               ref={myVideoRef}
               muted
@@ -1186,11 +1612,14 @@ ${messageText}`;
           {peerStreams.map((peerStream) => {
             const hasNoTracks = peerStream.stream.getTracks().length === 0;
             const hasNoDevices = !peerStream.isVideoEnabled && !peerStream.isAudioEnabled && hasNoTracks;
+            const isUserSpeaking = speakingUsers.has(peerStream.userId);
 
             return (
               <div
                 key={peerStream.userId}
-                className="relative aspect-video bg-gray-800 rounded-xl overflow-hidden shadow-lg"
+                className={`relative aspect-video bg-gray-800 rounded-xl overflow-hidden shadow-lg transition-all duration-300 ${
+                  isUserSpeaking ? "ring-4 ring-cyan-400 shadow-cyan-400/50" : ""
+                }`}
               >
                 <video
                   autoPlay
@@ -1271,6 +1700,21 @@ ${messageText}`;
               )}
             </button>
             <button
+              onClick={isScreenSharing ? handleStopScreenShare : handleStartScreenShare}
+              className={`p-4 rounded-full transition-all duration-200 ${
+                isScreenSharing
+                  ? "bg-blue-500 hover:bg-blue-600 text-white"
+                  : "bg-gray-700 hover:bg-gray-600 text-white"
+              }`}
+              title={isScreenSharing ? "화면 공유 중지" : "화면 공유"}
+            >
+              {isScreenSharing ? (
+                <MonitorOffIcon className="w-6 h-6" />
+              ) : (
+                <MonitorIcon className="w-6 h-6" />
+              )}
+            </button>
+            <button
               onClick={handleEndCall}
               className="p-4 rounded-full bg-red-500 hover:bg-red-600 text-white transition-all duration-200"
               disabled={isSummarizing}
@@ -1340,9 +1784,13 @@ ${messageText}`;
         <SpeechToText
           isAudioEnabled={isAudioEnabled}
           userId={myPeerIdRef.current}
-          userName="나"
+          userName={myUserName}
           messages={messages}
           onNewMessage={handleNewMessage}
+          userNames={new Map([
+            [myPeerIdRef.current, myUserName],
+            ...peerStreams.map(peer => [peer.userId, peer.userName || `참가자 ${peer.userId.slice(0, 4)}`] as [string, string])
+          ])}
         />
       </div>
 
@@ -1356,7 +1804,7 @@ ${messageText}`;
         isOpen={showSummary}
         onClose={() => {
           setShowSummary(false);
-          router.push("/meeting");
+          router.push("/meeting?refresh=" + Date.now());
         }}
         summary={summary}
       />

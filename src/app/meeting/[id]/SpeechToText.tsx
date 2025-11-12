@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 
 interface Message {
   userId: string;
@@ -14,17 +14,31 @@ interface SpeechToTextProps {
   userName: string;
   messages: Message[];
   onNewMessage: (message: Message) => void;
+  userNames?: Map<string, string>; // userId -> userName 매핑
 }
 
-export default function SpeechToText({ 
-  isAudioEnabled, 
-  userId, 
-  userName, 
+export default function SpeechToText({
+  isAudioEnabled,
+  userId,
+  userName,
   messages,
-  onNewMessage 
+  onNewMessage,
+  userNames
 }: SpeechToTextProps) {
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
+
+  // 최신 userName을 추적하기 위한 ref
+  const userNameRef = useRef(userName);
+  const userIdRef = useRef(userId);
+  const onNewMessageRef = useRef(onNewMessage);
+
+  // ref 업데이트
+  useEffect(() => {
+    userNameRef.current = userName;
+    userIdRef.current = userId;
+    onNewMessageRef.current = onNewMessage;
+  }, [userName, userId, onNewMessage]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -46,12 +60,13 @@ export default function SpeechToText({
           }
           if (finalTranscript) {
             const newMessage: Message = {
-              userId,
-              userName,
+              userId: userIdRef.current,
+              userName: userNameRef.current,
               content: finalTranscript.trim(),
               timestamp: Date.now()
             };
-            onNewMessage(newMessage);
+            console.log('🎤 새 메시지 생성:', newMessage);
+            onNewMessageRef.current(newMessage);
           }
         };
 
@@ -62,7 +77,7 @@ export default function SpeechToText({
         setRecognition(recognition);
       }
     }
-  }, [userId, userName, onNewMessage]);
+  }, []); // 의존성 배열을 비워서 한 번만 생성
 
   useEffect(() => {
     if (recognition && isAudioEnabled && !isListening) {
@@ -104,11 +119,13 @@ export default function SpeechToText({
                 <div className="flex items-center space-x-2 text-xs text-gray-400 mb-1">
                   <span>{formatTime(message.timestamp)}</span>
                   <span className={`font-medium ${
-                    message.userId === userId 
-                      ? 'text-blue-400' 
+                    message.userId === userId
+                      ? 'text-blue-400'
                       : 'text-emerald-400'
                   }`}>
-                    {message.userId === userId ? '나' : `참가자 ${message.userId.slice(0, 4)}`}
+                    {message.userId === userId
+                      ? '나'
+                      : (message.userName || userNames?.get(message.userId) || `참가자 ${message.userId.slice(0, 4)}`)}
                   </span>
                 </div>
                 <div className="pl-4 border-l-2 border-gray-700 group-hover:border-blue-500 transition-colors">
