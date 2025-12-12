@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -31,7 +31,7 @@ interface Meeting {
   creatorId: string | null; // 회의 생성자 ID
 }
 
-export default function MeetingPage() {
+function MeetingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
@@ -346,5 +346,22 @@ export default function MeetingPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function MeetingPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen bg-background">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">로딩 중...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <MeetingContent />
+    </Suspense>
   );
 } 
